@@ -2,22 +2,24 @@
 
 import { useState } from "react";
 
-type Msg = {
-  role: "user" | "assistant";
-  content: string;
-};
+type Msg = { role: "user" | "assistant"; content: string };
 
 export default function ChatPage() {
+  const [input, setInput] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+
+  // 👇 Explicitly type messages so TS never widens role to "string"
   const [messages, setMessages] = useState<Msg[]>([
     { role: "assistant", content: "Hi — I’m your site AI. What are we building?" },
   ]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
 
   async function send() {
-    if (!input.trim() || loading) return;
+    const text = input.trim();
+    if (!text || loading) return;
 
-    const next = [...messages, { role: "user", content: input }];
+    // 👇 Explicitly type next as Msg[]
+    const next: Msg[] = [...messages, { role: "user", content: text }];
+
     setMessages(next);
     setInput("");
     setLoading(true);
@@ -30,7 +32,9 @@ export default function ChatPage() {
       });
 
       const data = await res.json();
-      setMessages([...next, { role: "assistant", content: data.message }]);
+      const reply: string = data?.message ?? "(no reply)";
+
+      setMessages([...next, { role: "assistant", content: reply }]);
     } catch {
       setMessages([...next, { role: "assistant", content: "Error talking to AI." }]);
     } finally {
@@ -73,10 +77,7 @@ export default function ChatPage() {
           }}
           onKeyDown={(e) => e.key === "Enter" && send()}
         />
-        <button
-          onClick={send}
-          style={{ padding: "12px 16px", borderRadius: 10 }}
-        >
+        <button onClick={send} style={{ padding: "12px 16px", borderRadius: 10 }}>
           Send
         </button>
       </div>
