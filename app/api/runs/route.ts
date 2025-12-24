@@ -1,11 +1,10 @@
-// app/api/runs/route.ts
 import { NextResponse } from "next/server";
-import { KV } from "@/lib/kv";
-import { keys } from "@/lib/keys";
-import { makeId } from "@/lib/ids";
-import { getCurrentUserId } from "@/lib/demoAuth";
-import { CreateRunInputSchema, RunSchema } from "@/lib/models/run";
-import { RunLogSchema } from "@/lib/models/log";
+import { KV } from "../../../lib/kv";
+import { keys } from "../../../lib/keys";
+import { makeId } from "../../../lib/ids";
+import { getCurrentUserId } from "../../../lib/demoAuth";
+import { CreateRunInputSchema, RunSchema } from "../../../lib/models/run";
+import { RunLogSchema } from "../../../lib/models/log";
 
 export const runtime = "nodejs";
 
@@ -58,10 +57,8 @@ export async function POST(req: Request) {
     updatedAt: now,
   };
 
-  // Persist run
   await KV.set(keys.run(runId), run);
 
-  // Index runs
   await KV.zadd(keys.runIdsByOwner(ownerId), {
     score: Date.now(),
     member: runId,
@@ -71,7 +68,6 @@ export async function POST(req: Request) {
     member: runId,
   });
 
-  // Initial log entry
   const log = RunLogSchema.parse({
     ts: now,
     level: "info",
