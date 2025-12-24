@@ -1,33 +1,44 @@
-import { NextResponse } from "next/server";
-import { KV } from "../../../lib/kv";
-import { keys } from "../../../lib/keys";
-import { getCurrentUserId } from "../../../lib/demoAuth";
-import { RunSchema } from "../../../lib/models/run";
+"use client";
 
-export const runtime = "nodejs";
+import { useEffect, useState } from "react";
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { runId: string } }
-) {
-  const ownerId = getCurrentUserId();
-  const run = await KV.get(keys.run(params.runId));
+type LogLine = { ts: number; level: string; message: string };
 
-  if (!run) {
-    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+export default function RunPage({ params }: { params: { runId: string } }) {
+  const runId = params.runId;
+  const [logs, setLogs] = useState<LogLine[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  async function loadLogs() {
+    const res = await fetch(`/api/runs/${runId}/logs`);
+    if (!res.ok) {
+      setLogs([]);
+      return;
+    }
+    const data = await res.json();
+    setLogs(Array.isArray(data?.logs) ? data.logs : []);
   }
 
-  const parsed = RunSchema.safeParse(run);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, error: "Corrupt run data" },
-      { status: 500 }
-    );
-  }
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      await loadLogs();
+      setLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runId]);
 
-  if (parsed.data.ownerId !== ownerId) {
-    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  }
+  return (
+    <div style={{ padding: 16 }}>
+      <h1>Run: {runId}</h1>
 
-  return NextResponse.json({ ok: true, run: parsed.data });
+      {loading ? (
+        <p>Loading…</p>
+      ) : (
+        <pre style={{ marginTop: 16, padding: 12, border: "1px solid #ddd" }}>
+          {logs.map((l) => `${new Date(l.ts).toISOString()} [${l.level}] ${l.message}`).join("\n")}
+        </pre>
+      )}
+    </div>
+  );
 }
