@@ -1,81 +1,33 @@
 import { NextResponse } from "next/server";
-import { KV } from "../../lib/kv";
-import { keys } from "../../lib/keys";
-import { makeId } from "../../lib/ids";
-import { getCurrentUserId } from "../../lib/demoAuth";
-import { CreateRunInputSchema, RunSchema } from "../../lib/models/run";
-import { RunLogSchema } from "../../lib/models/log";
+import { KV } from "../../../lib/kv";
+import { keys } from "../../../lib/keys";
+import { getCurrentUserId } from "../../../lib/demoAuth";
+import { RunSchema } from "../../../lib/models/run";
 
 export const runtime = "nodejs";
 
-export async function GET(req: Request) {
+export async function GET(
+  _req: Request,
+  { params }: { params: { runId: string } }
+) {
   const ownerId = getCurrentUserId();
+  const run = await KV.get(keys.run(params.runId));
 
-  const url = new URL(req.url);
-  const projectId = url.searchParams.get("projectId");
-
-  const indexKey = projectId
-    ? keys.runIdsByProject(projectId)
-    : keys.runIdsByOwner(ownerId);
-
-  const ids = (await KV.zrange(indexKey, 0, 49, { rev: true })) as string[];
-
-  const runs = [];
-  for (const id of ids) {
-    const r = await KV.get(keys.run(id));
-    if (!r) continue;
-    const parsed = RunSchema.safeParse(r);
-    if (parsed.success && parsed.data.ownerId === ownerId) runs.push(parsed.data);
+  if (!run) {
+    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ ok: true, runs });
-}
-
-export async function POST(req: Request) {
-  const ownerId = getCurrentUserId();
-  const body = await req.json().catch(() => ({}));
-  const parsedInput = CreateRunInputSchema.safeParse(body);
-
-  if (!parsedInput.success) {
+  const parsed = RunSchema.safeParse(run);
+  if (!parsed.success) {
     return NextResponse.json(
-      { ok: false, error: "Invalid input", issues: parsedInput.error.issues },
-      { status: 400 }
+      { ok: false, error: "Corrupt run data" },
+      { status: 500 }
     );
   }
 
-  const now = new Date().toISOString();
-  const runId = makeId("run");
+  if (parsed.data.ownerId !== ownerId) {
+    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  }
 
-  const run = {
-    id: runId,
-    ownerId,
-    projectId: parsedInput.data.projectId,
-    title: parsedInput.data.title,
-    input: parsedInput.data.input,
-    status: "queued" as const,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  await KV.set(keys.run(runId), run);
-
-  await KV.zadd(keys.runIdsByOwner(ownerId), {
-    score: Date.now(),
-    member: runId,
-  });
-  await KV.zadd(keys.runIdsByProject(run.projectId), {
-    score: Date.now(),
-    member: runId,
-  });
-
-  const log = RunLogSchema.parse({
-    ts: now,
-    level: "info",
-    message: "Run created (queued).",
-    data: { projectId: run.projectId },
-  });
-  await KV.rpush(keys.runLogs(runId), log);
-
-  const validated = RunSchema.parse(run);
-  return NextResponse.json({ ok: true, run: validated });
+  return NextResponse.json({ ok: true, run: parsed.data });
 }
