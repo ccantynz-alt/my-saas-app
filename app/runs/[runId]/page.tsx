@@ -16,6 +16,18 @@ type Log = {
   message: string;
 };
 
+async function readJsonSafe(res: Response) {
+  const text = await res.text();
+  if (!text) return { ok: false, status: res.status, json: null, text: "" };
+
+  try {
+    const json = JSON.parse(text);
+    return { ok: res.ok, status: res.status, json, text };
+  } catch {
+    return { ok: res.ok, status: res.status, json: null, text };
+  }
+}
+
 export default function RunDetailPage({ params }: { params: { runId: string } }) {
   const runId = params.runId;
 
@@ -29,32 +41,41 @@ export default function RunDetailPage({ params }: { params: { runId: string } })
     setErr(null);
 
     try {
-      // Fetch run (relative URL = no base URL problems)
+      // RUN
       const runRes = await fetch(`/api/runs/${runId}`, { cache: "no-store" });
-      const runJson = await runRes.json();
+      const runRead = await readJsonSafe(runRes);
 
-      if (!runRes.ok) {
+      if (!runRead.ok) {
+        const msg =
+          runRead.json?.error ||
+          runRead.json?.message ||
+          (runRead.text ? `Non-JSON response (status ${runRead.status})` : `Empty response (status ${runRead.status})`);
         setRun(null);
         setLogs([]);
-        setErr(runJson?.error ?? "Failed to load run");
+        setErr(msg);
         setLoading(false);
         return;
       }
 
-      setRun(runJson.run ?? null);
+      const runObj = runRead.json?.run ?? null;
+      setRun(runObj);
 
-      // Fetch logs
+      // LOGS
       const logsRes = await fetch(`/api/runs/${runId}/logs?limit=200`, { cache: "no-store" });
-      const logsJson = await logsRes.json();
+      const logsRead = await readJsonSafe(logsRes);
 
-      if (!logsRes.ok) {
+      if (!logsRead.ok) {
+        const msg =
+          logsRead.json?.error ||
+          logsRead.json?.message ||
+          (logsRead.text ? `Non-JSON response (status ${logsRead.status})` : `Empty response (status ${logsRead.status})`);
         setLogs([]);
-        setErr(logsJson?.error ?? "Failed to load logs");
+        setErr(msg);
         setLoading(false);
         return;
       }
 
-      setLogs(Array.isArray(logsJson.logs) ? logsJson.logs : []);
+      setLogs(Array.isArray(logsRead.json?.logs) ? logsRead.json.logs : []);
       setLoading(false);
     } catch (e: any) {
       setErr(e?.message ?? "Unexpected error");
@@ -91,6 +112,9 @@ export default function RunDetailPage({ params }: { params: { runId: string } })
             <button className="rounded-xl border px-3 py-2 text-sm" onClick={load}>
               Retry
             </button>
+          </div>
+          <div className="mt-3 text-xs text-neutral-500">
+            Tip: if this says “Non-JSON response”, your API route is missing or returning HTML.
           </div>
         </div>
       ) : run ? (
