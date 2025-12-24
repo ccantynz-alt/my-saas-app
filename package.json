@@ -1,23 +1,23 @@
 {
-  "name": "ai-saas-starter",
+  "name": "my-saas-app",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "lint": "next lint"
   },
-"dependencies": {
-  "openai": "^4.0.0",
-  "next": "14.2.5",
-  "react": "^18.2.0",
-  "react-dom": "^18.2.0"
-},
+  "dependencies": {
+    "@vercel/kv": "^0.2.4",
+    "next": "14.2.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zod": "^3.23.8"
+  },
   "devDependencies": {
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5.5.4",
-    "@types/node": "^20.14.10",
-    "@types/react": "^18.2.79"
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.10"
   }
 }
