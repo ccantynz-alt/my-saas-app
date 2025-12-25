@@ -1,6 +1,29 @@
 import { kv } from "./kv";
-import type { Run, RunStatus } from "./types";
-import { nowIso } from "./time";
+
+export type RunStatus = "queued" | "running" | "succeeded" | "failed";
+
+export type RunKind =
+  | "agent:plan"
+  | "agent:build"
+  | "agent:import"
+  | "agent:deploy"
+  | "agent:maintenance";
+
+export type Run = {
+  id: string;
+  kind: RunKind;
+  status: RunStatus;
+  createdAt: string;
+  updatedAt: string;
+  title: string;
+  input?: Record<string, any>;
+  output?: Record<string, any>;
+  error?: string;
+};
+
+function nowIso() {
+  return new Date().toISOString();
+}
 
 const KEY_RUN = (id: string) => `run:${id}`;
 const KEY_RUN_LOGS = (id: string) => `run:${id}:logs`;
@@ -14,23 +37,27 @@ export async function saveRun(run: Run) {
 }
 
 export async function getRun(id: string): Promise<Run | null> {
-  return (await kv.get<Run>(KEY_RUN(id))) ?? null;
+  const v = await kv.get(KEY_RUN(id));
+  return (v as Run) ?? null;
 }
 
 export async function listRuns(limit = 25): Promise<Run[]> {
-  // newest at end; fetch last N
-  const ids = await kv.zrange<string[]>(KEY_RUN_INDEX, -limit, -1);
-  const runs = await Promise.all(ids.map((id) => getRun(id)));
+  const ids = (await kv.zrange(KEY_RUN_INDEX, -limit, -1)) as any[];
+
+  // Defensive: ensure we end up with string ids even if API returns something odd.
+  const stringIds = (ids ?? []).map((x) => String(x));
+
+  const runs = await Promise.all(stringIds.map((id) => getRun(id)));
   return runs.filter(Boolean) as Run[];
 }
 
 export async function enqueueRun(id: string) {
-  // lpush + rpop = FIFO-ish queue
   await kv.lpush(KEY_QUEUE, id);
 }
 
 export async function dequeueRun(): Promise<string | null> {
-  return await kv.rpop<string>(KEY_QUEUE);
+  const v = await kv.rpop(KEY_QUEUE);
+  return v ? String(v) : null;
 }
 
 export async function appendRunLog(id: string, line: string) {
@@ -39,8 +66,8 @@ export async function appendRunLog(id: string, line: string) {
 }
 
 export async function getRunLogs(id: string, limit = 300): Promise<string[]> {
-  const logs = await kv.lrange<string[]>(KEY_RUN_LOGS(id), -limit, -1);
-  return logs ?? [];
+  const logs = (await kv.lrange(KEY_RUN_LOGS(id), -limit, -1)) as any[];
+  return (logs ?? []).map((x) => String(x));
 }
 
 export async function updateRunStatus(id: string, status: RunStatus, patch?: Partial<Run>) {
@@ -51,7 +78,7 @@ export async function updateRunStatus(id: string, status: RunStatus, patch?: Par
     ...run,
     ...patch,
     status,
-    updatedAt: nowIso(),
+    updatedAt: nowIso()
   };
 
   await saveRun(updated);
