@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
-import { dequeueRun, appendRunLog, updateRunStatus, getRun } from "../../../../lib/store";
-import { nowIso } from "../../../../lib/time";
+import { dequeueRun, appendRunLog, updateRunStatus, getRun } from "../../../lib/store";
+import { nowIso } from "../../../lib/time";
 
-/**
- * Vercel Cron calls this endpoint.
- * It processes a small number of queued runs each tick to stay reliable.
- */
 export async function GET() {
   const startedAt = nowIso();
   const processed: string[] = [];
