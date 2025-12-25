@@ -1,11 +1,19 @@
-const KV_URL = process.env.KV_REST_API_URL;
-const KV_TOKEN = process.env.KV_REST_API_TOKEN;
+let KV_URL = process.env.KV_REST_API_URL;
+let KV_TOKEN = process.env.KV_REST_API_TOKEN;
 
-if (!KV_URL || !KV_TOKEN) {
-  throw new Error("Missing KV_REST_API_URL or KV_REST_API_TOKEN");
+function assertKvEnv() {
+  // Re-read in case environment is injected later in the process lifecycle
+  KV_URL = process.env.KV_REST_API_URL;
+  KV_TOKEN = process.env.KV_REST_API_TOKEN;
+
+  if (!KV_URL || !KV_TOKEN) {
+    throw new Error("Missing KV_REST_API_URL or KV_REST_API_TOKEN");
+  }
 }
 
 async function kvFetch<T>(path: string, body?: any): Promise<T> {
+  assertKvEnv();
+
   const res = await fetch(`${KV_URL}${path}`, {
     method: "POST",
     headers: {
@@ -38,7 +46,6 @@ export const kv = {
     return kvFetch("/del", { key });
   },
 
-  // ✅ accept any JSON value, not only string
   lpush: async (key: string, value: any) => {
     return kvFetch("/lpush", { key, value });
   },
@@ -48,7 +55,6 @@ export const kv = {
     return r?.result ?? null;
   },
 
-  // ✅ accept any JSON value, not only string
   rpush: async (key: string, value: any) => {
     return kvFetch("/rpush", { key, value });
   },
