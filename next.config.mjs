@@ -2,13 +2,8 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  // 🚫 DO NOT EXPORT STATIC
-  output: undefined,
-
-  // ✅ Force server runtime
-  experimental: {
-    appDir: true
-  }
+  // ✅ ensure server build, not static export
+  output: undefined
 };
 
 export default nextConfig;
