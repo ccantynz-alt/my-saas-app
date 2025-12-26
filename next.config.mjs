@@ -2,8 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
 
-  // ✅ CRITICAL: do NOT static export
-  output: undefined
+  // 🚫 DO NOT EXPORT STATIC
+  output: undefined,
+
+  // ✅ Force server runtime
+  experimental: {
+    appDir: true
+  }
 };
 
 export default nextConfig;
