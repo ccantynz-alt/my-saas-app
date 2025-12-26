@@ -1,7 +1,7 @@
 {
   "name": "my-saas-app",
   "version": "0.1.0",
-  "description": "ai-agent-platform",
+  "description": "force-openai-zod-2210",
   "private": true,
   "scripts": {
     "dev": "next dev",
