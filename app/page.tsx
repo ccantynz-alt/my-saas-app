@@ -1,13 +1,10 @@
 // app/page.tsx
-export default function HomePage() {
+export default function Page() {
   return (
-    <main style={{ padding: "40px", fontFamily: "system-ui" }}>
-      <h1>✅ My SaaS App is Live</h1>
-      <p>Your backend is deployed and working.</p>
-
-      <h2>API</h2>
+    <main style={{ padding: 40, fontFamily: "system-ui" }}>
+      <h1>✅ Home Page Working</h1>
       <p>
-        <a href="/api/projects">/api/projects</a>
+        Try the API: <a href="/api/projects">/api/projects</a>
       </p>
     </main>
   );
