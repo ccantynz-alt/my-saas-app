@@ -1,33 +1,24 @@
 // app/api/runs/[runId]/route.ts
-export const runtime = "nodejs";
-
 import { NextResponse } from "next/server";
-import { KV } from "../../../lib/kv";
-import { keys } from "../../../lib/keys";
+import { kvJsonGet } from "../../../lib/kv";
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { runId: string } }
-) {
-  try {
-    const run = await KV.get(keys.run(params.runId));
+type RunStatus = "queued" | "running" | "failed" | "succeeded";
 
-    if (!run) {
-      return NextResponse.json(
-        { ok: false, message: "Run not found" },
-        { status: 404 }
-      );
-    }
+type RunRecord = {
+  id: string;
+  projectId: string;
+  status: RunStatus;
+  createdAt: string;
+  updatedAt: string;
+  error?: string;
+};
 
-    return NextResponse.json({ ok: true, run });
-  } catch (err: any) {
-    return NextResponse.json(
-      {
-        ok: false,
-        where: "/api/runs/[runId] GET",
-        message: err?.message ?? "Unknown error",
-      },
-      { status: 500 }
-    );
-  }
+function runKey(runId: string) {
+  return `runs:${runId}`;
+}
+
+export async function GET(_req: Request, ctx: { params: { runId: string } }) {
+  const run = await kvJsonGet<RunRecord>(runKey(ctx.params.runId));
+  if (!run) return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  return NextResponse.json({ ok: true, run });
 }
