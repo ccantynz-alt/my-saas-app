@@ -5,6 +5,8 @@ type RunFile = {
   content: string;
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function RunPage({
   params,
 }: {
@@ -41,20 +43,33 @@ export default async function RunPage({
         </div>
       </div>
 
-      {files.length > 0 && (
-        <Link
-          href={`/api/runs/${runId}/zip`}
-          className="inline-flex items-center rounded-md border px-3 py-2 text-sm"
-        >
-          Download ZIP
-        </Link>
-      )}
+      <div className="flex gap-3">
+        {files.length > 0 && (
+          <Link
+            href={`/api/runs/${runId}/zip`}
+            className="inline-flex items-center rounded-md border px-3 py-2 text-sm"
+          >
+            Download ZIP
+          </Link>
+        )}
 
-      <div className="text-sm opacity-80">
-        <Link href="/dashboard" className="underline">
+        <Link href="/dashboard" className="underline text-sm self-center">
           Back to Dashboard
         </Link>
       </div>
+
+      {files.length > 0 && (
+        <div className="rounded-md border p-4 space-y-2">
+          <h2 className="font-medium">Files</h2>
+          <ul className="space-y-1 text-sm">
+            {files.map((f) => (
+              <li key={f.path} className="flex items-center justify-between gap-3">
+                <span className="truncate">{f.path}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </main>
   );
 }
