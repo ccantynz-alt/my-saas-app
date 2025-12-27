@@ -1,145 +1,89 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 type Project = {
   id: string;
   name: string;
-  createdAt?: string;
 };
 
 export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [name, setName] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  async function loadProjects() {
+  async function load() {
+    const res = await fetch("/api/projects", { cache: "no-store" });
+    const json = await res.json();
+    if (json?.ok) setProjects(json.projects || []);
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function createProject() {
+    setError(null);
     setLoading(true);
-    setError("");
+
     try {
-      const res = await fetch("/api/projects", { cache: "no-store" });
-      const data = await res.json();
-      const list = Array.isArray(data?.projects) ? data.projects : [];
-      setProjects(list);
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "Failed to create project");
+      }
+
+      setName("");
+      await load();
     } catch (e: any) {
-      setError(e?.message || "Failed to load projects");
+      setError(e.message);
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
-
-  async function createProject() {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-
-    setCreating(true);
-    setError("");
-
-    try {
-      // Your API supports form submissions, so we send x-www-form-urlencoded
-      const res = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ name: trimmed }),
-      });
-
-      const data = await res.json().catch(() => null);
-
-      const projectId =
-        data?.project?.id ||
-        data?.id ||
-        data?.projectId ||
-        data?.project?.projectId;
-
-      if (projectId) {
-        // Go straight to the project page
-        window.location.href = `/dashboard/projects/${projectId}`;
-        return;
-      }
-
-      // If API returned ok but no id parsed, just refresh list
-      setName("");
-      await loadProjects();
-    } catch (e: any) {
-      setError(e?.message || "Failed to create project");
-    } finally {
-      setCreating(false);
-    }
-  }
-
   return (
-    <main style={{ padding: 24 }}>
-      <h1 style={{ fontSize: 32, fontWeight: 700, marginBottom: 12 }}>
-        Dashboard
-      </h1>
+    <div style={{ padding: 24, maxWidth: 900 }}>
+      <h1>Dashboard</h1>
 
-      <section style={{ marginBottom: 24 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
-          Create a Project
-        </h2>
+      <h2>Create a Project</h2>
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Project name"
-            style={{
-              padding: "10px 12px",
-              border: "1px solid #ccc",
-              borderRadius: 8,
-              minWidth: 260,
-            }}
-            autoComplete="off"
-          />
-          <button
-            onClick={createProject}
-            disabled={creating}
-            style={{
-              padding: "10px 12px",
-              border: "1px solid #000",
-              borderRadius: 8,
-              cursor: creating ? "not-allowed" : "pointer",
-              background: "#fff",
-              fontWeight: 600,
-            }}
-          >
-            {creating ? "Creating..." : "Create Project"}
-          </button>
-        </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Project name"
+          style={{ padding: 8, minWidth: 240 }}
+        />
+        <button onClick={createProject} disabled={loading || !name}>
+          {loading ? "Creating…" : "Create Project"}
+        </button>
+      </div>
 
-        {error ? (
-          <p style={{ marginTop: 10 }}>
-            <strong>Error:</strong> {error}
-          </p>
-        ) : null}
-      </section>
+      {error ? <div style={{ color: "red", marginTop: 8 }}>{error}</div> : null}
 
-      <section>
-        <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
-          Projects
-        </h2>
+      <h2 style={{ marginTop: 24 }}>Projects</h2>
 
-        {loading ? (
-          <p>Loading…</p>
-        ) : projects.length === 0 ? (
-          <p>No projects yet.</p>
-        ) : (
-          <ul style={{ display: "grid", gap: 8, paddingLeft: 18 }}>
-            {projects.map((p) => (
-              <li key={p.id}>
-                <Link href={`/dashboard/projects/${p.id}`}>{p.name}</Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </main>
+      {projects.length === 0 ? (
+        <div>No projects yet.</div>
+      ) : (
+        <ul>
+          {projects.map((p) => (
+            <li key={p.id}>
+              <Link href={`/dashboard/projects/${p.id}`}>
+                {p.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
