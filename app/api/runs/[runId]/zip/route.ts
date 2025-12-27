@@ -1,3 +1,4 @@
+// app/api/runs/[runId]/zip/route.ts
 import { z } from "zod";
 import JSZip from "jszip";
 import { kvJsonGet } from "../../../../lib/kv";
@@ -22,20 +23,20 @@ function safePath(p: string) {
   return path;
 }
 
-export async function GET(
-  _req: Request,
-  ctx: { params: { runId: string } }
-) {
+export async function GET(_req: Request, ctx: { params: { runId: string } }) {
   const userId = await getCurrentUserId();
   const { runId } = ParamsSchema.parse(ctx.params);
 
   const files = await kvJsonGet<RunFile[]>(filesKey(userId, runId));
 
   if (!Array.isArray(files) || files.length === 0) {
-    return new Response(JSON.stringify({ ok: false, error: "No files for this run" }), {
-      status: 404,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ ok: false, error: "No files for this run" }),
+      {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 
   const zip = new JSZip();
@@ -46,12 +47,14 @@ export async function GET(
     zip.file(path, f.content ?? "");
   }
 
-  const data = await zip.generateAsync({ type: "uint8array" });
+  // IMPORTANT: use ArrayBuffer so Response() accepts it without TS errors
+  const data = await zip.generateAsync({ type: "arraybuffer" });
 
   return new Response(data, {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="run-${runId}.zip"`,
+      "Cache-Control": "no-store",
     },
   });
 }
