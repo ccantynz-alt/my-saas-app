@@ -1,59 +1,64 @@
-// app/dashboard/page.tsx
+export const dynamic = "force-dynamic";
+
 import Link from "next/link";
 
-async function getProjects() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/api/projects`, {
-    cache: "no-store",
-  }).catch(() => null);
+type Project = {
+  id: string;
+  name: string;
+  createdAt?: string;
+};
 
-  if (!res || !res.ok) return { projects: [] as any[] };
-  return res.json();
+async function getProjects(): Promise<Project[]> {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/api/projects`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const projects = data?.projects ?? data?.items ?? [];
+    return Array.isArray(projects) ? projects : [];
+  } catch {
+    return [];
+  }
 }
 
 export default async function DashboardPage() {
-  const data = await getProjects();
-  const projects = data?.projects ?? [];
+  const projects = await getProjects();
 
   return (
-    <main style={{ padding: 40, fontFamily: "system-ui" }}>
-      <h1>Dashboard</h1>
-      <p>Create a project, then run the agent to generate files.</p>
+    <main className="p-6 space-y-6">
+      <h1 className="text-xl font-semibold">Dashboard</h1>
 
-      <section style={{ marginTop: 24 }}>
-        <h2>Projects</h2>
+      <div className="rounded-md border p-4 space-y-3">
+        <h2 className="font-medium">Projects</h2>
 
-        <form
-          action="/api/projects"
-          method="post"
-          onSubmit={(e) => {
-            // Let the browser submit normally in dev; in prod you can replace with fetch.
-            // This keeps things super simple for MVP.
-          }}
-        >
-          <p>
-            <input name="name" placeholder="Project name" required />
-          </p>
-          <p>
-            <input name="description" placeholder="Description (optional)" />
-          </p>
-          <button type="submit">Create Project</button>
-        </form>
+        {projects.length === 0 ? (
+          <p className="text-sm opacity-80">No projects yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {projects.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-medium">{p.name}</div>
+                  <div className="text-xs opacity-70">{p.id}</div>
+                </div>
+                <Link
+                  className="underline text-sm"
+                  href={`/dashboard/projects/${p.id}`}
+                >
+                  Open
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
 
-        <ul style={{ marginTop: 16 }}>
-          {projects.map((p: any) => (
-            <li key={p.id}>
-              <Link href={`/dashboard/projects/${p.id}`}>{p.name}</Link>
-            </li>
-          ))}
-        </ul>
-
-        <p style={{ marginTop: 16 }}>
-          If the form above doesn’t work in your browser, create via API using JSON:
-          <code style={{ display: "block", marginTop: 8 }}>
-            POST /api/projects {"{ name: \"My Project\" }"}
-          </code>
-        </p>
-      </section>
+      <div className="text-sm opacity-80">
+        <Link href="/" className="underline">
+          Back to home
+        </Link>
+      </div>
     </main>
   );
 }
