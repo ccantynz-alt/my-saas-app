@@ -1,8 +1,10 @@
-// app/lib/demoAuth.ts
 /**
- * Demo-only auth helper.
- * Replace later with real auth (Clerk/Auth.js).
+ * DEMO AUTH
+ * ----------
+ * This guarantees a stable user id so KV writes work.
+ * Replace with real auth later.
  */
-export function getCurrentUserId(): string {
+
+export function getCurrentUserId() {
   return "demo-user";
 }
