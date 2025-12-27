@@ -1,153 +1,137 @@
-// app/api/agents/run/route.ts
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
-import { kvJsonGet, kvJsonSet, kvNowISO } from "../../../lib/kv";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import OpenAI from "openai";
+import { kvJsonGet, kvJsonSet, kvNowISO } from "../../../lib/kv";
+import { getCurrentUserId } from "../../../lib/demoAuth";
 
-const BodySchema = z.object({
-  projectId: z.string().min(1),
-  prompt: z.string().min(1),
+const FileSchema = z.object({
+  path: z.string().min(1),
+  content: z.string(),
+});
+const AgentResponseSchema = z.object({
+  files: z.array(FileSchema).min(1),
 });
 
-type RunStatus = "queued" | "running" | "failed" | "succeeded";
-
-type RunRecord = {
-  id: string;
-  projectId: string;
-  status: RunStatus;
-  createdAt: string;
-  updatedAt: string;
-  error?: string;
-};
-
-type RunLog = { ts: string; level: "info" | "error"; msg: string };
-type GeneratedFile = { path: string; content: string };
-
-function uid(prefix = ""): string {
+function uid(prefix = "") {
   const id = randomUUID().replace(/-/g, "");
   return prefix ? `${prefix}_${id}` : id;
 }
 
-function runKey(runId: string) {
-  return `runs:${runId}`;
+function runKey(userId: string, runId: string) {
+  return `runs:${userId}:${runId}`;
 }
-function runLogsKey(runId: string) {
-  return `runs:${runId}:logs`;
+function runFilesKey(userId: string, runId: string) {
+  return `runfiles:${userId}:${runId}`;
 }
-function runFilesKey(runId: string) {
-  return `runs:${runId}:files`;
+function runLogsKey(userId: string, runId: string) {
+  return `runlogs:${userId}:${runId}`;
 }
-function projectRunsIndexKey(projectId: string) {
-  return `projects:${projectId}:runs`;
+function runsIndexKey(userId: string, projectId: string) {
+  return `runs:index:${userId}:${projectId}`;
 }
 
-async function appendLog(runId: string, level: RunLog["level"], msg: string) {
-  const ts = await kvNowISO();
-  const entry: RunLog = { ts, level, msg };
-  const key = runLogsKey(runId);
-  const logs = ((await kvJsonGet<RunLog[]>(key)) ?? []) as RunLog[];
-  logs.push(entry);
-  await kvJsonSet(key, logs);
+function safePath(p: string) {
+  if (!p.startsWith("app/generated/")) return false;
+  if (p.includes("..")) return false;
+  return true;
 }
 
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => null);
-  const parsed = BodySchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: "Invalid input" }, { status: 400 });
-  }
+  const userId = getCurrentUserId();
+  const body = await req.json().catch(() => ({}));
 
-  const { projectId, prompt } = parsed.data;
-  const now = await kvNowISO();
+  const projectId = String(body.projectId || "");
+  const prompt = String(body.prompt || "").trim();
+
+  if (!projectId) return NextResponse.json({ ok: false, error: "Missing projectId" }, { status: 400 });
+  if (!prompt) return NextResponse.json({ ok: false, error: "Missing prompt" }, { status: 400 });
+
   const runId = uid("run");
+  const createdAt = kvNowISO();
 
-  const run: RunRecord = {
+  // Create run record early
+  await kvJsonSet(runKey(userId, runId), {
     id: runId,
     projectId,
-    status: "queued",
-    createdAt: now,
-    updatedAt: now,
-  };
+    status: "running",
+    createdAt,
+    updatedAt: createdAt,
+    prompt,
+  });
 
-  await kvJsonSet(runKey(runId), run);
+  // Add to runs index
+  const idx = (await kvJsonGet<string[]>(runsIndexKey(userId, projectId))) || [];
+  await kvJsonSet(runsIndexKey(userId, projectId), [runId, ...idx]);
 
-  const idxKey = projectRunsIndexKey(projectId);
-  const idx = (await kvJsonGet<string[]>(idxKey)) ?? [];
-  idx.unshift(runId);
-  await kvJsonSet(idxKey, idx);
+  // Init logs
+  await kvJsonSet(runLogsKey(userId, runId), [`[${createdAt}] Run created`]);
 
   try {
-    await appendLog(runId, "info", "Run created. Starting generation…");
-    run.status = "running";
-    run.updatedAt = await kvNowISO();
-    await kvJsonSet(runKey(runId), run);
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error("Missing OPENAI_API_KEY in Vercel env vars.");
+    const system = `
+You are an in-app code generation agent.
+Return ONLY strict JSON (no markdown).
+You may ONLY create files under "app/generated/".
+Return format:
+{ "files": [ { "path": "app/generated/...", "content": "..." } ] }
+`.trim();
 
-    const client = new OpenAI({ apiKey });
-
-    await appendLog(runId, "info", "Calling ChatGPT to generate files…");
-
-    const system = [
-      "You are a senior full-stack engineer.",
-      "Return ONLY valid JSON. No markdown. No commentary.",
-      "Output MUST be a JSON array of {path: string, content: string}.",
-      "Paths are relative like 'app/templates/page.tsx'.",
-      "Keep changes minimal and compile-safe for Next.js App Router + TypeScript.",
-      "Do not delete existing files. Only create new files under 'app/generated/'.",
-    ].join(" ");
-
-    const user = [
-      "Goal: AI automated website builder platform.",
-      `ProjectId: ${projectId}`,
-      "Task: Generate a small useful feature as files under app/generated/.",
-      `Prompt: ${prompt}`,
-    ].join("\n");
+    const user = `
+ProjectId: ${projectId}
+User request:
+${prompt}
+`.trim();
 
     const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+      temperature: 0.2,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
       ],
-      temperature: 0.2,
+      response_format: { type: "json_object" },
     });
 
-    const text = completion.choices?.[0]?.message?.content?.trim() ?? "";
+    const text = completion.choices[0]?.message?.content || "";
+    const parsed = AgentResponseSchema.parse(JSON.parse(text));
 
-    let files: GeneratedFile[] = [];
-    try {
-      files = JSON.parse(text);
-      if (!Array.isArray(files)) throw new Error("Not an array");
-      for (const f of files) {
-        if (!f?.path || typeof f.path !== "string") throw new Error("Bad path");
-        if (typeof f.content !== "string") throw new Error("Bad content");
-      }
-    } catch {
-      await appendLog(runId, "error", "Model output was not valid JSON. Raw output logged:");
-      await appendLog(runId, "error", text.slice(0, 4000));
-      throw new Error("Generation failed (invalid JSON).");
-    }
+    // Safety: enforce paths
+    const bad = parsed.files.find((f) => !safePath(f.path));
+    if (bad) throw new Error(`Unsafe path rejected: ${bad.path}`);
 
-    await kvJsonSet(runFilesKey(runId), files);
-    await appendLog(runId, "info", `Generated ${files.length} files.`);
-    await appendLog(runId, "info", "Run completed.");
+    await kvJsonSet(runFilesKey(userId, runId), parsed.files);
 
-    run.status = "succeeded";
-    run.updatedAt = await kvNowISO();
-    await kvJsonSet(runKey(runId), run);
+    const doneAt = kvNowISO();
+    await kvJsonSet(runKey(userId, runId), {
+      id: runId,
+      projectId,
+      status: "completed",
+      createdAt,
+      updatedAt: doneAt,
+      prompt,
+      fileCount: parsed.files.length,
+    });
+
+    await kvJsonSet(runLogsKey(userId, runId), [
+      ...(await kvJsonGet<string[]>(runLogsKey(userId, runId)))!,
+      `[${doneAt}] Generated ${parsed.files.length} files`,
+    ]);
 
     return NextResponse.json({ ok: true, runId });
   } catch (err: any) {
-    await appendLog(runId, "error", err?.message ?? "Unknown error");
-    const latest = (await kvJsonGet<RunRecord>(runKey(runId))) ?? run;
-    latest.status = "failed";
-    latest.error = err?.message ?? "Unknown error";
-    latest.updatedAt = await kvNowISO();
-    await kvJsonSet(runKey(runId), latest);
-
-    return NextResponse.json({ ok: false, runId, error: latest.error }, { status: 500 });
+    const failedAt = kvNowISO();
+    await kvJsonSet(runKey(userId, runId), {
+      ...(await kvJsonGet<any>(runKey(userId, runId))),
+      status: "failed",
+      updatedAt: failedAt,
+      error: String(err?.message || err),
+    });
+    await kvJsonSet(runLogsKey(userId, runId), [
+      ...(await kvJsonGet<string[]>(runLogsKey(userId, runId)))!,
+      `[${failedAt}] ERROR: ${String(err?.message || err)}`,
+    ]);
+    return NextResponse.json({ ok: false, error: String(err?.message || err), runId }, { status: 500 });
   }
 }
