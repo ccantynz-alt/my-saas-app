@@ -11,7 +11,10 @@ export async function POST(
     const { projectId } = params;
 
     if (!projectId) {
-      return NextResponse.json({ ok: false, error: "Missing projectId" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Missing projectId" },
+        { status: 400 }
+      );
     }
 
     await kvJsonSet(`projects:${userId}:${projectId}`, {
@@ -27,4 +30,3 @@ export async function POST(
     );
   }
 }
-
