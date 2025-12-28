@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { kvJsonGet } from "../../../../../lib/kv";
-import { getCurrentUserId } from "../../../../../lib/demoAuth";
+import { kvJsonGet } from "../../../lib/kv";
+import { getCurrentUserId } from "../../../lib/demoAuth";
 
 export const runtime = "nodejs";
 
 function runFilesKey(userId: string, runId: string) {
-  // Must match what your agent run route writes
   return `runfiles:${userId}:${runId}`;
 }
 
