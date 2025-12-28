@@ -5,6 +5,9 @@ import { z } from "zod";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Change this string any time you paste a new file so we can confirm deployment.
+const VERSION = "agents-run-v4-NO_STARTSWITH";
+
 const RunRequestSchema = z.object({
   projectId: z.string().min(1),
   prompt: z.string().min(1),
@@ -20,10 +23,21 @@ function runKey(userId: string, runId: string) {
   return `runs:${userId}:${runId}`;
 }
 
+// No startsWith usage anywhere:
+function hasPrefix(value: unknown, prefix: string) {
+  if (typeof value !== "string") return false;
+  return value.slice(0, prefix.length) === prefix;
+}
+
 export async function GET() {
   return NextResponse.json({
     ok: true,
+    version: VERSION,
     message: "Agent endpoint is online. POST JSON { projectId, prompt }",
+    example: {
+      projectId: "proj_test",
+      prompt: "Create app/generated/page.tsx with a hero headline and button",
+    },
   });
 }
 
@@ -34,7 +48,7 @@ export async function POST(req: Request) {
     const parsedReq = RunRequestSchema.safeParse(body);
     if (!parsedReq.success) {
       return NextResponse.json(
-        { ok: false, error: "Invalid request body", issues: parsedReq.error.issues },
+        { ok: false, version: VERSION, error: "Invalid request body", issues: parsedReq.error.issues },
         { status: 400 }
       );
     }
@@ -44,12 +58,12 @@ export async function POST(req: Request) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { ok: false, error: "Missing OPENAI_API_KEY" },
+        { ok: false, version: VERSION, error: "Missing OPENAI_API_KEY" },
         { status: 500 }
       );
     }
 
-    // Dynamic imports (prevents build-time crashes)
+    // Dynamic imports so Next build step can't execute code at build-time
     const [{ default: OpenAI }, kvMod, authMod] = await Promise.all([
       import("openai"),
       import("../../../lib/kv"),
@@ -69,7 +83,7 @@ export async function POST(req: Request) {
         {
           role: "system",
           content:
-            'Return JSON ONLY in this shape: {"files":[{"path":"app/generated/...","content":"..."}]}',
+            'Return JSON ONLY in this exact shape: {"files":[{"path":"app/generated/...","content":"..."}]}',
         },
         { role: "user", content: prompt },
       ],
@@ -82,32 +96,25 @@ export async function POST(req: Request) {
       parsed = JSON.parse(raw);
     } catch {
       return NextResponse.json(
-        { ok: false, error: "Model returned invalid JSON", raw },
+        { ok: false, version: VERSION, error: "Model returned invalid JSON", raw: raw.slice(0, 2000) },
         { status: 500 }
       );
     }
 
     const filesRaw = Array.isArray(parsed?.files) ? parsed.files : [];
 
-    // 🔒 HARD SANITIZATION (THIS FIXES YOUR BUG)
-    const files = filesRaw
+    // Sanitize aggressively (no startsWith used)
+    const cleaned = filesRaw
       .filter((f: any) => f && typeof f === "object")
       .map((f: any) => ({
         path: typeof f.path === "string" ? f.path : "",
         content: typeof f.content === "string" ? f.content : "",
       }))
-      .filter(
-        (f: any) =>
-          f.path.startsWith("app/generated/") && f.content.length > 0
-      );
+      .filter((f: any) => hasPrefix(f.path, "app/generated/") && f.content.length > 0);
 
-    if (files.length === 0) {
+    if (cleaned.length === 0) {
       return NextResponse.json(
-        {
-          ok: false,
-          error: "Agent returned no valid files",
-          raw: parsed,
-        },
+        { ok: false, version: VERSION, error: "Agent returned no valid files", raw: parsed },
         { status: 400 }
       );
     }
@@ -122,17 +129,18 @@ export async function POST(req: Request) {
       projectId,
       prompt,
       createdAt: kvNowISO(),
-      files,
+      files: cleaned,
     });
 
     return NextResponse.json({
       ok: true,
+      version: VERSION,
       runId,
-      filesCount: files.length,
+      filesCount: cleaned.length,
     });
   } catch (err: any) {
     return NextResponse.json(
-      { ok: false, error: err?.message ?? "Unknown error" },
+      { ok: false, version: VERSION, error: err?.message ?? "Unknown error" },
       { status: 500 }
     );
   }
