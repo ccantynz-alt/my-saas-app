@@ -1,39 +1,26 @@
 // app/preview/[projectId]/[[...slug]]/page.tsx
 import React from "react";
+import { kvJsonGet } from "@/app/lib/kv";
+import { getCurrentUserId } from "@/app/lib/demoAuth";
 
 type GenFile = { path: string; content: string };
 
-async function getProjectFiles(projectId: string) {
-  const base =
-    process.env.NEXT_PUBLIC_BASE_URL ||
-    process.env.VERCEL_URL?.startsWith("http")
-      ? process.env.VERCEL_URL
-      : process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "";
+type ProjectRecord = {
+  projectId: string;
+  userId: string;
+  files: GenFile[];
+  updatedAt: string;
+};
 
-  // If base is empty, relative fetch will still work in most Next setups,
-  // but we prefer absolute when available.
-  const url = base
-    ? `${base}/api/projects/${projectId}/files`
-    : `/api/projects/${projectId}/files`;
-
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Failed to load project files (${res.status})`);
-  }
-  return (await res.json()) as {
-    ok: boolean;
-    projectId: string;
-    files: GenFile[];
-  };
+function projectKey(userId: string, projectId: string) {
+  return `projects:${userId}:${projectId}`;
 }
 
-function pickGeneratedPage(files: GenFile[], slug: string[]) {
-  // slug [] => homepage => app/generated/page.tsx
-  // slug ["about"] => app/generated/about/page.tsx
-  // slug ["pricing"] => app/generated/pricing/page.tsx
-  // slug ["contact"] => app/generated/contact/page.tsx
+function normalizePath(p: string) {
+  return p.replace(/^\/+/, "");
+}
+
+function pickGeneratedPage(files: GenFile[], slug?: string[]) {
   const clean = (slug || []).filter(Boolean);
 
   const target =
@@ -41,28 +28,36 @@ function pickGeneratedPage(files: GenFile[], slug: string[]) {
       ? "app/generated/page.tsx"
       : `app/generated/${clean.join("/")}/page.tsx`;
 
-  const found = files.find((f) => f.path.replace(/^\/+/, "") === target);
-
+  const found = files.find((f) => normalizePath(f.path) === target);
   return { target, found };
 }
 
 export default async function PreviewCatchAllPage({
   params,
 }: {
-  params: Promise<{ projectId: string; slug?: string[] }>;
+  params: { projectId: string; slug?: string[] };
 }) {
-  const { projectId, slug } = await params;
+  const userId = getCurrentUserId();
+  const { projectId, slug } = params;
 
-  const data = await getProjectFiles(projectId);
-  const files = data.files || [];
+  const project = await kvJsonGet<ProjectRecord>(projectKey(userId, projectId));
+  const files = project?.files ?? [];
 
-  const { target, found } = pickGeneratedPage(files, slug ?? []);
+  const { target, found } = pickGeneratedPage(files, slug);
 
-  // Very simple "best effort" preview:
-  // - We show the file path
-  // - We show the source content
-  // (Your existing /preview page likely does fancier rendering;
-  // this solves the routing first, reliably.)
+  if (!project) {
+    return (
+      <main style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
+        <h1 style={{ fontSize: 22, marginBottom: 8 }}>Preview</h1>
+        <p>
+          Project not found in KV for:
+          <br />
+          <code>{projectId}</code>
+        </p>
+      </main>
+    );
+  }
+
   if (!found) {
     return (
       <main style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
