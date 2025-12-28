@@ -1,19 +1,45 @@
+// app/api/agents/run/route.ts
 import { NextResponse } from "next/server";
-import { randomUUID } from "crypto";
 import { z } from "zod";
 
+// If you already have these helpers in your project, keep these imports.
+// If your project uses different paths, adjust them to match your repo.
+import { kvJsonGet, kvJsonSet, kvNowISO } from "../../lib/kv";
+
+// If you use a demo auth helper, keep it. If not, we’ll fall back safely.
+import { getCurrentUserId } from "../../lib/demoAuth";
+
+import OpenAI from "openai";
+
 export const runtime = "nodejs";
+
+// ---------- Schemas (keeps the app from crashing on bad data) ----------
+const RunRequestSchema = z.object({
+  projectId: z.string().min(1),
+  prompt: z.string().min(1),
+});
 
 const AgentResponseSchema = z.object({
   files: z.array(
     z.object({
-      path: z.string(),
+      path: z.string().min(1),
       content: z.string(),
     })
   ),
 });
 
-// ✅ If you open the endpoint in a browser, you will now see this JSON (no blank screen)
+// ---------- Small helpers ----------
+function runKey(userId: string, runId: string) {
+  return `runs:${userId}:${runId}`;
+}
+
+function uid(prefix = "") {
+  const rnd = Math.random().toString(16).slice(2);
+  const ts = Date.now().toString(16);
+  return prefix ? `${prefix}_${ts}${rnd}` : `${ts}${rnd}`;
+}
+
+// ---------- GET: status (safe to open in browser) ----------
 export async function GET() {
   return NextResponse.json({
     ok: true,
@@ -25,33 +51,27 @@ export async function GET() {
   });
 }
 
-function runKey(userId: string, runId: string) {
-  return `runs:${userId}:${runId}`;
-}
-
-function runFilesKey(userId: string, runId: string) {
-  return `runfiles:${userId}:${runId}`;
-}
-
+// ---------- POST: run agent ----------
 export async function POST(req: Request) {
   try {
-    // ✅ Lazy-load inside POST so builds stay safe
-    const { getCurrentUserId } = await import("../../../lib/demoAuth");
-    const { kvJsonSet, kvNowISO } = await import("../../../lib/kv");
+    // 1) Parse incoming JSON safely
+    const body = await req.json().catch(() => null);
 
-    const userId = getCurrentUserId();
-    const body = await req.json().catch(() => ({} as any));
-
-    const projectId = String(body.projectId || "").trim();
-    const prompt = String(body.prompt || "").trim();
-
-    if (!projectId || !prompt) {
+    const parsedReq = RunRequestSchema.safeParse(body);
+    if (!parsedReq.success) {
       return NextResponse.json(
-        { ok: false, error: "Missing projectId or prompt" },
+        {
+          ok: false,
+          error: "Invalid request body. Must be JSON: { projectId, prompt }",
+          issues: parsedReq.error.issues,
+        },
         { status: 400 }
       );
     }
 
+    const { projectId, prompt } = parsedReq.data;
+
+    // 2) Validate env (so errors are readable)
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
@@ -60,57 +80,79 @@ export async function POST(req: Request) {
       );
     }
 
-    const runId = `run_${randomUUID().replace(/-/g, "")}`;
-    const createdAt = kvNowISO();
-
-    await kvJsonSet(runKey(userId, runId), {
-      id: runId,
-      projectId,
-      status: "running",
-      createdAt,
-      prompt,
-    });
-
-    const { default: OpenAI } = await import("openai");
+    // 3) Create OpenAI client
     const client = new OpenAI({ apiKey });
+
+    // 4) Ask model for STRICT JSON ONLY
+    const system = `
+You are a codegen agent.
+Return JSON ONLY. No markdown. No commentary.
+The only valid response shape is:
+{
+  "files": [
+    { "path": "app/generated/...", "content": "..." }
+  ]
+}
+Rules:
+- Every file.path MUST start with "app/generated/"
+- content must be a string.
+`;
 
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0.2,
-      response_format: { type: "json_object" },
       messages: [
-        {
-          role: "system",
-          content:
-            'Return ONLY JSON: { "files": [ { "path": "app/generated/...", "content": "..." } ] }. Paths MUST start with "app/generated/".',
-        },
+        { role: "system", content: system.trim() },
         { role: "user", content: prompt },
       ],
+      response_format: { type: "json_object" },
     });
 
-    const text = completion.choices[0]?.message?.content || "{}";
-    const parsed = AgentResponseSchema.parse(JSON.parse(text));
+    const text = completion.choices?.[0]?.message?.content ?? "";
 
-    await kvJsonSet(runFilesKey(userId, runId), parsed.files);
+    // 5) Parse model JSON safely
+    let agentJson: unknown = null;
+    try {
+      agentJson = JSON.parse(text);
+    } catch (e) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Model did not return valid JSON (could not parse).",
+          raw: text.slice(0, 2000),
+        },
+        { status: 500 }
+      );
+    }
 
-    await kvJsonSet(runKey(userId, runId), {
-      id: runId,
-      projectId,
-      status: "completed",
-      createdAt,
-      completedAt: kvNowISO(),
-      fileCount: parsed.files.length,
-    });
+    const parsedAgent = AgentResponseSchema.safeParse(agentJson);
+    if (!parsedAgent.success) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Model returned JSON but not in the required shape.",
+          issues: parsedAgent.error.issues,
+          raw: agentJson,
+        },
+        { status: 500 }
+      );
+    }
 
-    return NextResponse.json({
-      ok: true,
-      runId,
-      fileCount: parsed.files.length,
-    });
-  } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || String(err) },
-      { status: 500 }
-    );
-  }
-}
+    const files = parsedAgent.data.files;
+
+    // 6) Enforce the app/generated/ prefix (and error clearly if wrong)
+    for (const f of files) {
+      if (typeof f.path !== "string" || !f.path.startsWith("app/generated/")) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              'Invalid file.path. Every path must start with "app/generated/".',
+            badFile: f,
+          },
+          { status: 400 }
+        );
+      }
+      if (typeof f.content !== "string") {
+        return NextResponse.json(
+          { ok: false, error: "Invali
