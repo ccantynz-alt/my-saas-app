@@ -1,8 +1,8 @@
 // app/api/projects/[projectId]/apply/route.ts
 import { NextResponse } from "next/server";
-import { kvJsonGet, kvJsonSet, kvNowISO } from "@/app/lib/kv";
 import { z } from "zod";
-import { getCurrentUserId } from "@/app/lib/demoAuth";
+import { kvJsonGet, kvJsonSet, kvNowISO } from "../../../../lib/kv";
+import { getCurrentUserId } from "../../../../lib/demoAuth";
 
 const BodySchema = z.object({
   runId: z.string().min(1),
@@ -12,7 +12,13 @@ function projectKey(userId: string, projectId: string) {
   return `projects:${userId}:${projectId}`;
 }
 
-function runKey(runId: string) {
+// IMPORTANT: runs are usually stored per-user
+function runKeyUserScoped(userId: string, runId: string) {
+  return `runs:${userId}:${runId}`;
+}
+
+// Fallback in case older code stored runs without userId
+function runKeyLegacy(runId: string) {
   return `runs:${runId}`;
 }
 
@@ -23,7 +29,7 @@ export async function POST(
   const userId = getCurrentUserId();
   const projectId = params.projectId;
 
-  let body: any;
+  let body: unknown;
   try {
     body = await req.json();
   } catch {
@@ -40,11 +46,15 @@ export async function POST(
 
   const { runId } = parsed.data;
 
-  const rKey = runKey(runId);
+  const rKey1 = runKeyUserScoped(userId, runId);
+  const rKey2 = runKeyLegacy(runId);
   const pKey = projectKey(userId, projectId);
 
-  // 1) Load the run (source of truth)
-  const run = await kvJsonGet<any>(rKey);
+  // 1) Load run (try user-scoped key first, then legacy)
+  const run1 = await kvJsonGet<any>(rKey1);
+  const run2 = run1 ? null : await kvJsonGet<any>(rKey2);
+  const run = run1 || run2;
+
   const runFiles = Array.isArray(run?.files) ? run.files : [];
   const runFilesCount = runFiles.length;
 
@@ -56,15 +66,15 @@ export async function POST(
         userId,
         projectId,
         runId,
-        rKey,
+        triedRunKeys: [rKey1, rKey2],
         pKey,
-        runHasFiles: runFilesCount,
+        runFilesCount,
       },
       { status: 404 }
     );
   }
 
-  // 2) Write to project (draft state)
+  // 2) Write to project draft state
   const payload = {
     projectId,
     userId,
@@ -74,7 +84,7 @@ export async function POST(
 
   await kvJsonSet(pKey, payload);
 
-  // 3) Read-back proof (kills key mismatch instantly)
+  // 3) Read-back proof (confirms persistence)
   const readBack = await kvJsonGet<any>(pKey);
   const readBackCount = Array.isArray(readBack?.files) ? readBack.files.length : 0;
 
@@ -83,12 +93,16 @@ export async function POST(
     userId,
     projectId,
     runId,
-    rKey,
+    usedRunKey: run1 ? rKey1 : rKey2,
+    triedRunKeys: [rKey1, rKey2],
     pKey,
     runFilesCount,
     writtenCount: runFilesCount,
     readBackCount,
-    readBackHasProjectId: readBack?.projectId ?? null,
-    readBackHasUserId: readBack?.userId ?? null,
+    readBackMeta: {
+      storedProjectId: readBack?.projectId ?? null,
+      storedUserId: readBack?.userId ?? null,
+      updatedAt: readBack?.updatedAt ?? null,
+    },
   });
 }
