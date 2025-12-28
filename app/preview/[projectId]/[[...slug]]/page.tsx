@@ -1,5 +1,5 @@
-import { kvJsonGet } from "../../../../lib/kv";
-import { getCurrentUserId } from "../../../../lib/demoAuth";
+import { kvJsonGet } from "../../../lib/kv";
+import { getCurrentUserId } from "../../../lib/demoAuth";
 
 export default async function PreviewPage({
   params,
