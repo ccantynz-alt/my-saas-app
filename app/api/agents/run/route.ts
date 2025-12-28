@@ -10,15 +10,6 @@ const RunRequestSchema = z.object({
   prompt: z.string().min(1),
 });
 
-const AgentResponseSchema = z.object({
-  files: z.array(
-    z.object({
-      path: z.string().min(1),
-      content: z.string(),
-    })
-  ),
-});
-
 function uid(prefix = "") {
   const rnd = Math.random().toString(16).slice(2);
   const ts = Date.now().toString(16);
@@ -32,11 +23,7 @@ function runKey(userId: string, runId: string) {
 export async function GET() {
   return NextResponse.json({
     ok: true,
-    message: "Agent endpoint is online. Use POST with JSON { projectId, prompt }",
-    example: {
-      projectId: "proj_test",
-      prompt: "Create app/generated/page.tsx with a hero headline and button",
-    },
+    message: "Agent endpoint is online. POST JSON { projectId, prompt }",
   });
 }
 
@@ -62,7 +49,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // IMPORTANT: dynamic imports (prevents build-time evaluation crashes)
+    // Dynamic imports (prevents build-time crashes)
     const [{ default: OpenAI }, kvMod, authMod] = await Promise.all([
       import("openai"),
       import("../../../lib/kv"),
@@ -74,82 +61,78 @@ export async function POST(req: Request) {
 
     const client = new OpenAI({ apiKey });
 
-    const system =
-      'Return JSON only. Shape: {"files":[{"path":"app/generated/...","content":"..."}]}. ' +
-      'Rules: every path must start with "app/generated/".';
-
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0.2,
+      response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: system },
+        {
+          role: "system",
+          content:
+            'Return JSON ONLY in this shape: {"files":[{"path":"app/generated/...","content":"..."}]}',
+        },
         { role: "user", content: prompt },
       ],
-      response_format: { type: "json_object" },
     });
 
-    const text = completion.choices?.[0]?.message?.content ?? "";
-    let agentJson: unknown;
+    const raw = completion.choices?.[0]?.message?.content ?? "";
+    let parsed: any;
 
     try {
-      agentJson = JSON.parse(text);
+      parsed = JSON.parse(raw);
     } catch {
       return NextResponse.json(
-        { ok: false, error: "Model did not return valid JSON", raw: text.slice(0, 2000) },
+        { ok: false, error: "Model returned invalid JSON", raw },
         { status: 500 }
       );
     }
 
-    const parsedAgent = AgentResponseSchema.safeParse(agentJson);
-    if (!parsedAgent.success) {
+    const filesRaw = Array.isArray(parsed?.files) ? parsed.files : [];
+
+    // 🔒 HARD SANITIZATION (THIS FIXES YOUR BUG)
+    const files = filesRaw
+      .filter((f: any) => f && typeof f === "object")
+      .map((f: any) => ({
+        path: typeof f.path === "string" ? f.path : "",
+        content: typeof f.content === "string" ? f.content : "",
+      }))
+      .filter(
+        (f: any) =>
+          f.path.startsWith("app/generated/") && f.content.length > 0
+      );
+
+    if (files.length === 0) {
       return NextResponse.json(
-        { ok: false, error: "Model JSON wrong shape", issues: parsedAgent.error.issues, raw: agentJson },
-        { status: 500 }
+        {
+          ok: false,
+          error: "Agent returned no valid files",
+          raw: parsed,
+        },
+        { status: 400 }
       );
-    }
-
-    const files = parsedAgent.data.files;
-
-    // SAFE enforcement (can never crash)
-    for (const f of files) {
-      if (typeof f?.path !== "string") {
-        return NextResponse.json(
-          { ok: false, error: "Invalid file.path (missing or not a string)", badFile: f },
-          { status: 400 }
-        );
-      }
-      if (!f.path.startsWith("app/generated/")) {
-        return NextResponse.json(
-          { ok: false, error: 'Invalid path (must start with "app/generated/")', badFile: f },
-          { status: 400 }
-        );
-      }
-      if (typeof f?.content !== "string") {
-        return NextResponse.json(
-          { ok: false, error: "Invalid file.content (must be a string).", badFile: f },
-          { status: 400 }
-        );
-      }
     }
 
     const userId =
       (typeof getCurrentUserId === "function" && getCurrentUserId()) || "demo";
 
     const runId = uid("run");
-    const now = kvNowISO();
 
     await kvJsonSet(runKey(userId, runId), {
       runId,
       projectId,
       prompt,
-      createdAt: now,
+      createdAt: kvNowISO(),
       files,
     });
 
-    return NextResponse.json({ ok: true, runId, filesCount: files.length });
+    return NextResponse.json({
+      ok: true,
+      runId,
+      filesCount: files.length,
+    });
   } catch (err: any) {
     return NextResponse.json(
-      { ok: false, error: err?.message ?? "Unknown server error" },
+      { ok: false, error: err?.message ?? "Unknown error" },
       { status: 500 }
     );
   }
