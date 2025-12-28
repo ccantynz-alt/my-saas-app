@@ -1,5 +1,4 @@
 // app/api/projects/[projectId]/zip/route.ts
-import { NextResponse } from "next/server";
 import JSZip from "jszip";
 import { kvJsonGet } from "../../../../lib/kv";
 import { getCurrentUserId } from "../../../../lib/demoAuth";
@@ -24,9 +23,12 @@ export async function GET(
   const files: FileRec[] = Array.isArray(proj?.files) ? proj.files : [];
 
   if (!files.length) {
-    return NextResponse.json(
-      { ok: false, error: "No project files to zip", userId, projectId, pKey },
-      { status: 404 }
+    return new Response(
+      JSON.stringify({ ok: false, error: "No project files to zip", userId, projectId, pKey }),
+      {
+        status: 404,
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+      }
     );
   }
 
@@ -43,10 +45,10 @@ export async function GET(
     zip.file(path, content);
   }
 
-  // ✅ Use Uint8Array so NextResponse typing is happy
-  const bytes = await zip.generateAsync({ type: "uint8array" });
+  // Generate an ArrayBuffer for a standards-compliant web Response
+  const ab = await zip.generateAsync({ type: "arraybuffer" });
 
-  return new NextResponse(bytes, {
+  return new Response(ab, {
     status: 200,
     headers: {
       "Content-Type": "application/zip",
