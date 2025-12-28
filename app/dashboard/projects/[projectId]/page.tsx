@@ -19,24 +19,28 @@ export default function ProjectPage({ params }: { params: { projectId: string } 
   const [prompt, setPrompt] = useState(
     "Build a modern landing page website with pricing, FAQ, and a contact form. Use clean, minimal styling."
   );
-  const [running, setRunning] = useState(false);
-  const [runLog, setRunLog] = useState<string>("");
-  const [publishing, setPublishing] = useState(false);
-const [publishLog, setPublishLog] = useState<string>("");
 
+  const [running, setRunning] = useState(false);
+  const [runLog, setRunLog] = useState("");
+
+  const [publishing, setPublishing] = useState(false);
+  const [publishLog, setPublishLog] = useState("");
 
   async function load() {
     setLoading(true);
     setErr(null);
     try {
-      const pRes = await fetch(`/api/projects?projectId=${encodeURIComponent(projectId)}`, { cache: "no-store" });
+      const pRes = await fetch(`/api/projects?projectId=${encodeURIComponent(projectId)}`, {
+        cache: "no-store",
+      });
       const pJson = await pRes.json();
       if (!pRes.ok || !pJson.ok) throw new Error(pJson.error || "Failed to load project");
       setProject(pJson.project);
 
-      const rRes = await fetch(`/api/projects?projectId=${encodeURIComponent(projectId)}&includeRuns=1`, {
-        cache: "no-store",
-      });
+      const rRes = await fetch(
+        `/api/projects?projectId=${encodeURIComponent(projectId)}&includeRuns=1`,
+        { cache: "no-store" }
+      );
       const rJson = await rRes.json();
       if (!rRes.ok || !rJson.ok) throw new Error(rJson.error || "Failed to load runs");
       setRuns(rJson.runs || []);
@@ -49,7 +53,6 @@ const [publishLog, setPublishLog] = useState<string>("");
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
   async function startAgent() {
@@ -62,23 +65,41 @@ const [publishLog, setPublishLog] = useState<string>("");
         body: JSON.stringify({ projectId, prompt }),
       });
 
-      const json = await res.json().catch(() => null);
+      const json = await res.json();
       if (!res.ok || !json?.ok) {
         throw new Error(json?.error || "Agent failed");
       }
 
-      // If API returns runId, jump to it
       if (json.runId) {
         router.push(`/dashboard/runs/${json.runId}`);
         return;
       }
 
-      // fallback: reload
       await load();
     } catch (e: any) {
       setRunLog(String(e?.message || e));
     } finally {
       setRunning(false);
+    }
+  }
+
+  async function publish() {
+    setPublishing(true);
+    setPublishLog("");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/publish`, { method: "GET" });
+      const json = await res.json();
+
+      if (json?.ok && json?.commitUrl) {
+        setPublishLog("✅ Published successfully:\n" + json.commitUrl);
+        window.open(json.commitUrl, "_blank");
+      } else {
+        setPublishLog("❌ Publish failed:\n" + (json?.error || "Unknown error"));
+      }
+    } catch (e: any) {
+      setPublishLog("❌ Publish failed:\n" + (e?.message || String(e)));
+    } finally {
+      setPublishing(false);
     }
   }
 
@@ -88,10 +109,10 @@ const [publishLog, setPublishLog] = useState<string>("");
 
   return (
     <div style={{ padding: 24, maxWidth: 900 }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
         <div>
           <h1 style={{ margin: 0 }}>{project.name}</h1>
-          <div style={{ opacity: 0.7, marginTop: 4 }}>Project ID: {project.id}</div>
+          <div style={{ opacity: 0.7 }}>Project ID: {project.id}</div>
         </div>
         <Link href="/dashboard" style={{ textDecoration: "underline" }}>
           Back to Dashboard
@@ -99,21 +120,20 @@ const [publishLog, setPublishLog] = useState<string>("");
       </div>
 
       <div style={{ marginTop: 24, padding: 16, border: "1px solid #333", borderRadius: 12 }}>
-        <h2 style={{ marginTop: 0 }}>Generate with Agent</h2>
-        <div style={{ opacity: 0.8, marginBottom: 8 }}>
-          Enter what you want. Click once. The agent will create a Run and generate files.
-        </div>
+        <h2>Generate with Agent</h2>
+
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           rows={5}
+          disabled={running || publishing}
           style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid #444" }}
-          disabled={running}
         />
+
         <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
           <button
             onClick={startAgent}
-            disabled={running}
+            disabled={running || publishing}
             style={{
               padding: "10px 14px",
               borderRadius: 10,
@@ -124,62 +144,21 @@ const [publishLog, setPublishLog] = useState<string>("");
           >
             {running ? "Running…" : "Generate website (Agent)"}
           </button>
+
           <button
-  onClick={async () => {
-    setPublishing(true);
-    setPublishLog("");
-    try {
-      const res = await fetch(`/api/projects/${projectId}/publish`, {
-        method: "GET",
-      });
-      const json = await res.json().catch(() => null);
-
-      if (json?.ok && json?.commitUrl) {
-        setPublishLog("✅ Published: " + json.commitUrl);
-        window.open(json.commitUrl, "_blank");
-      } else {
-        setPublishLog("❌ Publish failed: " + (json?.error || "Unknown error"));
-      }
-    } catch (e: any) {
-      setPublishLog("❌ Publish failed: " + (e?.message || String(e)));
-    } finally {
-      setPublishing(false);
-    }
-  }}
-  disabled={running || publishing}
-  style={{
-    padding: "10px 14px",
-    borderRadius: 10,
-    border: "1px solid #444",
-    cursor: running || publishing ? "not-allowed" : "pointer",
-    fontWeight: 600,
-    background: running || publishing ? "#e9e9e9" : "#f4f4f4",
-  }}
->
-  {publishing ? "Publishing…" : "Publish to GitHub"}
-</button>
-
-    const json = await res.json();
-
-    if (json?.ok && json?.commitUrl) {
-      alert("Published successfully!\n\nCommit:\n" + json.commitUrl);
-      window.open(json.commitUrl, "_blank");
-    } else {
-      alert("Publish failed:\n" + (json?.error || "Unknown error"));
-    }
-  }}
-  style={{
-    padding: "10px 14px",
-    borderRadius: 10,
-    border: "1px solid #444",
-    cursor: "pointer",
-    fontWeight: 600,
-    background: "#f4f4f4",
-  }}
->
-  Publish to GitHub
-</button>
-
+            onClick={publish}
+            disabled={running || publishing}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid #444",
+              cursor: publishing ? "not-allowed" : "pointer",
+              fontWeight: 600,
+              background: "#f4f4f4",
+            }}
+          >
+            {publishing ? "Publishing…" : "Publish to GitHub"}
+          </button>
 
           <Link
             href={`/dashboard/projects/${projectId}/new-run`}
@@ -189,27 +168,28 @@ const [publishLog, setPublishLog] = useState<string>("");
           </Link>
         </div>
 
-        {runLog ? (
-          <pre style={{ marginTop: 12, padding: 12, background: "#111", borderRadius: 10, overflowX: "auto" }}>
+        {runLog && (
+          <pre style={{ marginTop: 12, padding: 12, background: "#111", borderRadius: 10 }}>
             {runLog}
           </pre>
-        ) : null}
+        )}
+
+        {publishLog && (
+          <pre style={{ marginTop: 12, padding: 12, background: "#111", borderRadius: 10 }}>
+            {publishLog}
+          </pre>
+        )}
       </div>
 
       <div style={{ marginTop: 24 }}>
         <h2>Runs</h2>
         {runs.length === 0 ? (
-          <div style={{ opacity: 0.8 }}>
-            No runs yet. Use <b>Generate website (Agent)</b> above.
-          </div>
+          <div>No runs yet.</div>
         ) : (
-          <ul style={{ paddingLeft: 18 }}>
+          <ul>
             {runs.map((r) => (
               <li key={r.id}>
-                <Link href={`/dashboard/runs/${r.id}`} style={{ textDecoration: "underline" }}>
-                  {r.id}
-                </Link>{" "}
-                — {r.status}
+                <Link href={`/dashboard/runs/${r.id}`}>{r.id}</Link> — {r.status}
               </li>
             ))}
           </ul>
