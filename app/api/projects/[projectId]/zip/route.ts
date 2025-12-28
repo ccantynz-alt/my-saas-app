@@ -43,9 +43,10 @@ export async function GET(
     zip.file(path, content);
   }
 
-  const buf = await zip.generateAsync({ type: "nodebuffer" });
+  // ✅ Use Uint8Array so NextResponse typing is happy
+  const bytes = await zip.generateAsync({ type: "uint8array" });
 
-  return new NextResponse(buf, {
+  return new NextResponse(bytes, {
     status: 200,
     headers: {
       "Content-Type": "application/zip",
