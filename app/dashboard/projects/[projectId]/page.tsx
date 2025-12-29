@@ -1,63 +1,80 @@
-import { notFound } from "next/navigation";
+// app/dashboard/projects/[projectId]/page.tsx
+import "server-only";
+import Link from "next/link";
+import { getCurrentUserId } from "@/app/lib/demoAuth";
+import { getProject, listRuns } from "@/app/lib/store";
+import CreateRunForm from "./create-run-form";
 
-type Project = {
-  id?: string;
-  projectId?: string;
-  name?: string;
-};
-
-async function getProject(projectId: string): Promise<Project | null> {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/api/projects`, {
-    cache: "no-store",
-  });
-
-  if (!res.ok) return null;
-
-  const json = await res.json();
-  if (!json?.ok || !Array.isArray(json.projects)) return null;
-
-  return (
-    json.projects.find(
-      (p: Project) => p.id === projectId || p.projectId === projectId
-    ) ?? null
-  );
-}
-
-export default async function ProjectPage({
+export default async function ProjectDetailPage({
   params,
 }: {
   params: { projectId: string };
 }) {
-  const project = await getProject(params.projectId);
+  const userId = await getCurrentUserId();
+  const projectId = params.projectId;
+
+  const project = await getProject(userId, projectId);
 
   if (!project) {
-    notFound();
+    return (
+      <div style={{ padding: 24 }}>
+        <h1>Project not found</h1>
+        <Link href="/dashboard/projects" style={{ textDecoration: "underline" }}>
+          Back to projects
+        </Link>
+      </div>
+    );
   }
 
-  const id = project.id || project.projectId;
+  const runs = await listRuns(userId, projectId);
 
   return (
-    <div style={{ padding: 32 }}>
-      <h1 style={{ marginTop: 0 }}>
-        {project.name || "Untitled Project"}
-      </h1>
-
-      <div style={{ opacity: 0.7, marginBottom: 16 }}>
-        Project ID: <code>{id}</code>
+    <div style={{ padding: 24, maxWidth: 900, margin: "0 auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+        <div>
+          <h1 style={{ margin: 0 }}>{project.name}</h1>
+          <p style={{ marginTop: 6, color: "#666" }}>
+            Create a run to generate/update the website.
+          </p>
+        </div>
+        <Link href="/dashboard/projects" style={{ textDecoration: "underline" }}>
+          Back
+        </Link>
       </div>
 
-      <div
-        style={{
-          padding: 16,
-          borderRadius: 12,
-          border: "1px solid #ddd",
-          background: "#fff",
-        }}
-      >
-        <strong>✅ Project loaded successfully.</strong>
-        <div style={{ marginTop: 8 }}>
-          You are now inside the project workspace.
-        </div>
+      <div style={{ marginTop: 16 }}>
+        <CreateRunForm projectId={projectId} />
+      </div>
+
+      <div style={{ marginTop: 18 }}>
+        <h2 style={{ marginBottom: 8 }}>Runs</h2>
+        {runs.length === 0 ? (
+          <div style={{ padding: 14, border: "1px solid #e5e5e5", borderRadius: 10 }}>
+            <strong>No runs yet.</strong>
+            <div style={{ marginTop: 6, color: "#666" }}>
+              Create your first run above.
+            </div>
+          </div>
+        ) : (
+          <ul style={{ paddingLeft: 18 }}>
+            {runs.map((r) => (
+              <li key={r.id} style={{ marginBottom: 8 }}>
+                <code>{r.id}</code>{" "}
+                <span style={{ marginLeft: 8 }}>
+                  <strong>{r.status}</strong>
+                </span>
+                {r.createdAt ? (
+                  <span style={{ marginLeft: 10, color: "#777", fontSize: 12 }}>
+                    {new Date(r.createdAt).toLocaleString()}
+                  </span>
+                ) : null}
+                {r.prompt ? (
+                  <div style={{ marginTop: 4, color: "#444" }}>{r.prompt}</div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
