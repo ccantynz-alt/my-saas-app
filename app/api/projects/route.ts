@@ -1,22 +1,8 @@
 // app/api/projects/route.ts
 import { NextResponse } from "next/server";
-import { kv, kvJsonGet, kvJsonSet, kvNowISO } from "@/app/lib/kv";
+import { listProjects, createProject } from "@/app/lib/store";
 import { getCurrentUserId } from "@/app/lib/demoAuth";
 import { z } from "zod";
-import { randomUUID } from "crypto";
-
-function uid(prefix = ""): string {
-  const id = randomUUID().replace(/-/g, "");
-  return prefix ? `${prefix}_${id}` : id;
-}
-
-function indexKey(userId: string) {
-  return `projects:index:${userId}`;
-}
-
-function projectKey(userId: string, projectId: string) {
-  return `projects:${userId}:${projectId}`;
-}
 
 const CreateProjectSchema = z.object({
   name: z.string().min(1),
@@ -24,18 +10,7 @@ const CreateProjectSchema = z.object({
 
 export async function GET() {
   const userId = await getCurrentUserId();
-
-  const idsRaw = await kv.smembers(indexKey(userId)).catch(() => []);
-  const ids: string[] = Array.isArray(idsRaw) ? idsRaw.map(String).filter(Boolean) : [];
-
-  const projects: any[] = [];
-  for (const id of ids) {
-    const p = await kvJsonGet(projectKey(userId, id));
-    if (p) projects.push(p);
-  }
-
-  projects.sort((a: any, b: any) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-
+  const projects = await listProjects(userId);
   return NextResponse.json({ ok: true, projects });
 }
 
@@ -52,15 +27,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const projectId = uid("proj");
-  const project = {
-    id: projectId,
-    name: parsed.data.name,
-    createdAt: kvNowISO(),
-  };
-
-  await kvJsonSet(projectKey(userId, projectId), project);
-  await kv.sadd(indexKey(userId), projectId);
-
+  const project = await createProject(userId, parsed.data.name);
   return NextResponse.json({ ok: true, project });
 }
