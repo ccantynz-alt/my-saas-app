@@ -1,27 +1,13 @@
 // ProjectsRoute.ts
 import "server-only";
-
-import { z } from "zod";
-import { randomUUID } from "crypto";
-
-import { getCurrentUserId } from "./app/lib/demoAuth";
-import { kvJsonGet, kvJsonSet, kvNowISO, kv } from "./app/lib/kv";
+import { kv, kvJsonGet } from "@/app/lib/kv";
+import { getCurrentUserId } from "@/app/lib/demoAuth";
 
 export type Project = {
   id: string;
-  projectId: string; // MUST always exist and equal id
   name: string;
-  createdAt: string;
+  createdAt?: string;
 };
-
-const CreateProjectSchema = z.object({
-  name: z.string().min(1).max(120).optional(),
-});
-
-function uid(prefix = ""): string {
-  const id = randomUUID().replace(/-/g, "");
-  return prefix ? `${prefix}_${id}` : id;
-}
 
 function indexKey(userId: string) {
   return `projects:index:${userId}`;
@@ -31,66 +17,23 @@ function projectKey(userId: string, projectId: string) {
   return `projects:${userId}:${projectId}`;
 }
 
-function normalizeProject(raw: any): Project {
-  const id = String(raw?.projectId || raw?.id || "");
-  return {
-    id,
-    projectId: id,
-    name: String(raw?.name || "Untitled Project"),
-    createdAt: String(raw?.createdAt || kvNowISO()),
-  };
-}
-
-export async function listProjectsForCurrentUser(): Promise<Project[]> {
-  const userId = getCurrentUserId();
+export async function getProjects(): Promise<Project[]> {
+  const userId = await getCurrentUserId();
   if (!userId) return [];
 
-  const ids = (await kv.zrange(indexKey(userId), 0, -1)) as unknown as string[];
-  if (!ids || ids.length === 0) return [];
+  // ✅ SET index (REST compatible)
+  const idsRaw = await kv.smembers(indexKey(userId)).catch(() => []);
+  const ids: string[] = Array.isArray(idsRaw) ? idsRaw.map(String).filter(Boolean) : [];
 
-  const projects = await Promise.all(
-    ids.map(async (projectId) => {
-      const raw = await kvJsonGet(projectKey(userId, projectId));
-      if (!raw) return null;
-      return normalizeProject(raw);
-    })
-  );
+  if (ids.length === 0) return [];
 
-  return (projects.filter(Boolean) as Project[]).sort((a, b) =>
-    a.createdAt < b.createdAt ? 1 : -1
-  );
-}
-
-export async function createProjectForCurrentUser(input?: unknown): Promise<Project> {
-  const userId = getCurrentUserId();
-  if (!userId) {
-    throw new Error("Not authenticated");
+  const projects: Project[] = [];
+  for (const id of ids) {
+    const p = await kvJsonGet<Project>(projectKey(userId, id));
+    if (p && p.id && p.name) projects.push(p);
   }
 
-  const parsed = CreateProjectSchema.safeParse(input ?? {});
-  if (!parsed.success) {
-    throw new Error("Invalid project input");
-  }
+  projects.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
 
-  const projectId = uid("proj");
-  const createdAt = kvNowISO();
-  const name = parsed.data.name?.trim() || "Untitled Project";
-
-  const project: Project = {
-    id: projectId,
-    projectId,
-    name,
-    createdAt,
-  };
-
-  await kvJsonSet(projectKey(userId, projectId), project);
-  await kv.zadd(indexKey(userId), { score: Date.now(), member: projectId });
-
-  return project;
-}
-
-export async function ensureProjectForCurrentUser(): Promise<Project> {
-  const projects = await listProjectsForCurrentUser();
-  if (projects.length > 0) return projects[0];
-  return await createProjectForCurrentUser({ name: "Untitled Project" });
+  return projects;
 }
