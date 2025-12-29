@@ -8,77 +8,58 @@ type Project = {
   createdAt: string;
 };
 
-async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    // ensure this runs dynamically and never caches redirect decisions
-    cache: "no-store",
-    headers: {
-      "content-type": "application/json",
-      ...(init?.headers || {}),
-    },
-  });
-
+async function readJson(res: Response) {
   const text = await res.text();
-  let json: any = null;
   try {
-    json = text ? JSON.parse(text) : null;
+    return text ? JSON.parse(text) : null;
   } catch {
-    json = { ok: false, error: "Non-JSON response from API", raw: text };
+    return { ok: false, error: "Non-JSON response", raw: text };
   }
-
-  if (!res.ok) {
-    const msg = json?.error || `Request failed (${res.status})`;
-    throw new Error(msg);
-  }
-
-  return json as T;
 }
 
 export default async function DashboardPage() {
   try {
-    // 1) list projects
-    const list = await api<{ ok: true; projects: Project[] } | { ok: false; error: string }>(
-      `${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/projects`
-    );
+    // 1) Load projects
+    const listRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/projects`, {
+      cache: "no-store",
+    });
+    const listJson = await readJson(listRes);
 
-    if (!("ok" in list) || list.ok !== true) {
-      throw new Error((list as any)?.error || "Failed to load projects");
+    if (!listRes.ok || !listJson?.ok) {
+      throw new Error(listJson?.error || `Failed to load projects (${listRes.status})`);
     }
 
-    const projects = list.projects || [];
-
-    // 2) if none, create one
+    let projects: Project[] = Array.isArray(listJson.projects) ? listJson.projects : [];
     let project = projects[0];
+
+    // 2) If no projects, create one
     if (!project) {
-      const created = await api<
-        { ok: true; project: Project; id: string; projectId: string } | { ok: false; error: string }
-      >(`${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/projects`, {
+      const createRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/projects`, {
         method: "POST",
+        cache: "no-store",
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "Untitled Project" }),
       });
+      const createJson = await readJson(createRes);
 
-      if (!("ok" in created) || created.ok !== true) {
-        throw new Error((created as any)?.error || "Failed to create project");
+      if (!createRes.ok || !createJson?.ok) {
+        throw new Error(createJson?.error || `Failed to create project (${createRes.status})`);
       }
 
-      project = created.project;
+      project = createJson.project;
     }
 
-    // 3) normalize and redirect
-    const pid = project.projectId || project.id;
-    if (!pid) {
-      throw new Error("Project missing projectId/id after normalization");
-    }
+    const pid = project?.projectId || project?.id;
+    if (!pid) throw new Error("Project missing projectId/id");
 
     redirect(`/dashboard/projects/${pid}`);
   } catch (err: any) {
-    // Never crash into a digest page: show a readable error.
     return (
       <main style={{ padding: 24, fontFamily: "ui-sans-serif, system-ui" }}>
         <h1 style={{ fontSize: 20, fontWeight: 700 }}>Dashboard error</h1>
-        <p style={{ marginTop: 12 }}>
-          Something failed while loading your dashboard.
+        <p style={{ marginTop: 10 }}>
+          Something failed while loading your dashboard. This page is designed to show the real error instead
+          of a generic digest screen.
         </p>
         <pre
           style={{
@@ -94,7 +75,7 @@ export default async function DashboardPage() {
           {String(err?.message || err)}
         </pre>
         <p style={{ marginTop: 12 }}>
-          Next step: open <code>/api/projects</code> and <code>/api/kv-test</code> and paste the JSON here.
+          Check <code>/api/kv-test</code> and confirm <code>anyKvConfigured</code> is true.
         </p>
       </main>
     );
