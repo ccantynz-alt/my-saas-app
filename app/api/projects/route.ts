@@ -16,6 +16,13 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const userId = await getCurrentUserId();
+if (!userId) {
+  return NextResponse.json(
+    { ok: false, error: "Unauthorized" },
+    { status: 401 }
+  );
+}
+
 
   const body = await req.json().catch(() => ({}));
   const parsed = CreateProjectSchema.safeParse(body);
