@@ -19,26 +19,18 @@ function projectKey(userId: string, projectId: string) {
 }
 
 export default async function ProjectsIndexPage() {
-  // ✅ NEVER throw in production debugging — render the error instead.
   try {
     const userId = await getCurrentUserId();
 
-    // We store project IDs in a sorted set. If it doesn't exist, zrange returns [].
-    const idsRaw = await kv.zrange(indexKey(userId), 0, -1);
+    const idsRaw = await kv.smembers(indexKey(userId)).catch(() => []);
+    const ids: string[] = Array.isArray(idsRaw) ? idsRaw.map(String).filter(Boolean) : [];
 
-    const ids: string[] = Array.isArray(idsRaw)
-      ? idsRaw.map(String).filter(Boolean)
-      : [];
-
-    // Load each project by id
     const projects: Project[] = [];
-
     for (const id of ids) {
       const p = await kvJsonGet<Project>(projectKey(userId, id));
       if (p && p.id && p.name) projects.push(p);
     }
 
-    // Optional: show newest first if createdAt exists
     projects.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
 
     return (
@@ -71,9 +63,7 @@ export default async function ProjectsIndexPage() {
     return (
       <div style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
         <h1 style={{ marginTop: 0 }}>Projects</h1>
-        <p>
-          This is the real server error (rendered safely, not hidden behind a digest).
-        </p>
+        <p>This is the real server error (rendered safely, not hidden behind a digest).</p>
 
         <div
           style={{
@@ -95,10 +85,6 @@ export default async function ProjectsIndexPage() {
             Back to dashboard
           </Link>
         </div>
-
-        <p style={{ marginTop: 16 }}>
-          Next: open <code>/api/projects</code> and paste what it returns.
-        </p>
       </div>
     );
   }
