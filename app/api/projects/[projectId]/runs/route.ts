@@ -1,7 +1,9 @@
 // app/api/projects/[projectId]/runs/route.ts
 import { NextResponse } from "next/server";
-import { createRun, listRuns, getProject } from "@/app/lib/store";
 import { z } from "zod";
+
+// ✅ IMPORTANT: use relative imports (avoids @ alias resolving to the wrong root)
+import { createRun, listRuns, getProject } from "../../../../lib/store";
 
 const CreateRunSchema = z.object({
   prompt: z.string().min(1),
@@ -14,11 +16,10 @@ export async function GET(
   try {
     const projectId = params.projectId;
 
-    // ✅ getProject now only takes projectId
     const project = await getProject(projectId);
     if (!project) {
       return NextResponse.json(
-        { ok: false, error: "Project not found" },
+        { ok: false, error: "Project not found", projectId },
         { status: 404 }
       );
     }
@@ -44,11 +45,10 @@ export async function POST(
   try {
     const projectId = params.projectId;
 
-    // ✅ getProject now only takes projectId
     const project = await getProject(projectId);
     if (!project) {
       return NextResponse.json(
-        { ok: false, error: "Project not found" },
+        { ok: false, error: "Project not found", projectId },
         { status: 404 }
       );
     }
