@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { getProject, listRuns } from "@/app/lib/store";
 import RunCreator from "./RunCreator";
+
+// IMPORTANT: avoid alias resolution issues
+import { getProject, listRuns } from "../../../lib/store";
 
 export default async function ProjectPage({
   params,
@@ -8,6 +10,7 @@ export default async function ProjectPage({
   params: { projectId: string };
 }) {
   const projectId = params.projectId;
+
   const project = await getProject(projectId);
 
   if (!project) {
