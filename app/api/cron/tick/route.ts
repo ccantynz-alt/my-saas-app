@@ -6,7 +6,7 @@ import {
   setRun,
   appendRunLog,
   claimRunLock,
-} from "@/app/lib/runs";
+} from "@/lib/runs";
 
 async function executeRun(runId: string) {
   await appendRunLog(runId, "Worker claimed run.");
@@ -23,9 +23,7 @@ async function executeRun(runId: string) {
 }
 
 export async function POST(req: Request) {
-  const enabled =
-    (process.env.CRON_ENABLED ?? "").toLowerCase() === "true";
-
+  const enabled = (process.env.CRON_ENABLED ?? "").toLowerCase() === "true";
   if (!enabled) {
     return NextResponse.json({
       ok: true,
@@ -35,12 +33,8 @@ export async function POST(req: Request) {
 
   const secret = process.env.CRON_SECRET;
   const header = req.headers.get("x-cron-secret");
-
   if (secret && header !== secret) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 }
-    );
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const max = 3;
@@ -58,17 +52,11 @@ export async function POST(req: Request) {
 
     processed++;
 
-    await setRun(runId, {
-      status: "running",
-      startedAt: new Date().toISOString(),
-    });
+    await setRun(runId, { status: "running", startedAt: new Date().toISOString() });
 
     try {
       await executeRun(runId);
-      await setRun(runId, {
-        status: "done",
-        finishedAt: new Date().toISOString(),
-      });
+      await setRun(runId, { status: "done", finishedAt: new Date().toISOString() });
     } catch (e: any) {
       await appendRunLog(runId, `Error: ${e?.message ?? "unknown"}`);
       await setRun(runId, {
