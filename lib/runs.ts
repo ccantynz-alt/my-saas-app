@@ -6,18 +6,22 @@ import { randomUUID } from "crypto";
  * Runs = background jobs.
  * Stored as JSON in KV.
  *
- * IMPORTANT: This file only uses KV methods your wrapper exposes:
- * - kv.get / kv.set
+ * This file only uses KV methods your wrapper exposes:
  * - kv.sadd / kv.smembers
- * plus kvJsonGet / kvJsonSet for objects/arrays.
+ * - kvJsonGet / kvJsonSet
  */
 
 export type RunStatus = "queued" | "running" | "done" | "failed";
+
+export type AgentPersona = "general" | "planner" | "coder" | "reviewer" | "researcher";
 
 export type Run = {
   id: string;
   prompt: string;
   status: RunStatus;
+
+  // persona
+  agent: AgentPersona;
 
   // optional attachments
   projectId?: string;
@@ -38,6 +42,10 @@ export type RunLog = {
 
 function uid(prefix: string) {
   return `${prefix}_${randomUUID().replace(/-/g, "")}`;
+}
+
+function nowISO() {
+  return kvNowISO ? kvNowISO() : new Date().toISOString();
 }
 
 function runKey(runId: string) {
@@ -63,9 +71,52 @@ function queuedRunsKey() {
   return `runs:index:queued`;
 }
 
+function personaSystemPrompt(agent: AgentPersona) {
+  switch (agent) {
+    case "planner":
+      return [
+        "You are a planning agent.",
+        "Goal: turn the user’s request into a clear step-by-step plan.",
+        "Output format:",
+        "1) Goal",
+        "2) Assumptions",
+        "3) Steps (numbered)",
+        "4) Risks / unknowns",
+        "Be concise and practical.",
+      ].join("\n");
+    case "coder":
+      return [
+        "You are a senior software engineer agent.",
+        "Goal: produce correct, copy/paste-ready code with minimal commentary.",
+        "Prefer complete files over diffs when possible.",
+        "If requirements are missing, make reasonable assumptions and state them briefly.",
+      ].join("\n");
+    case "reviewer":
+      return [
+        "You are a strict code/reasoning reviewer agent.",
+        "Goal: find issues, edge cases, security risks, and propose improvements.",
+        "Output format: Findings (bullets) + Recommended changes (bullets).",
+        "Be specific and actionable.",
+      ].join("\n");
+    case "researcher":
+      return [
+        "You are a research agent.",
+        "Goal: synthesize a structured answer, highlight tradeoffs, and propose next actions.",
+        "If you lack data, say what you would look up and why (don’t invent facts).",
+      ].join("\n");
+    case "general":
+    default:
+      return [
+        "You are the background agent for this platform.",
+        "Be helpful, concise, and action-oriented.",
+      ].join("\n");
+  }
+}
+
 /** Create a new run (queued). */
 export async function createRun(input: {
   prompt: string;
+  agent?: AgentPersona;
   projectId?: string;
   threadId?: string;
 }): Promise<Run> {
@@ -74,16 +125,17 @@ export async function createRun(input: {
   const run: Run = {
     id,
     prompt: input.prompt,
+    agent: input.agent ?? "general",
     projectId: input.projectId,
     threadId: input.threadId,
     status: "queued",
-    createdAt: kvNowISO ? kvNowISO() : new Date().toISOString(),
+    createdAt: nowISO(),
   };
 
   // store run object
   await kvJsonSet(runKey(id), run);
 
-  // initialize logs to empty array (instead of kv.del)
+  // initialize logs to empty array
   await kvJsonSet(runLogsKey(id), []);
 
   // add to indexes
@@ -91,7 +143,7 @@ export async function createRun(input: {
   if (input.projectId) await kv.sadd(projectRunsIndexKey(input.projectId), id);
   if (input.threadId) await kv.sadd(threadRunsIndexKey(input.threadId), id);
 
-  await appendRunLog(id, "info", "Run created (queued).");
+  await appendRunLog(id, "info", `Run created (queued). agent=${run.agent}`);
   return run;
 }
 
@@ -117,11 +169,7 @@ export async function appendRunLog(
   message: string
 ) {
   const logs = await getRunLogs(runId);
-  logs.push({
-    ts: kvNowISO ? kvNowISO() : new Date().toISOString(),
-    level,
-    message,
-  });
+  logs.push({ ts: nowISO(), level, message });
   await kvJsonSet(runLogsKey(runId), logs);
 }
 
@@ -145,7 +193,6 @@ export async function listProjectRuns(projectId: string): Promise<Run[]> {
     const r = await getRun(id);
     if (r) runs.push(r);
   }
-  // newest first
   runs.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   return runs;
 }
@@ -165,7 +212,7 @@ export async function listThreadRuns(threadId: string): Promise<Run[]> {
 /** Mark run running. */
 async function markRunning(run: Run) {
   run.status = "running";
-  run.startedAt = kvNowISO ? kvNowISO() : new Date().toISOString();
+  run.startedAt = nowISO();
   run.error = undefined;
   await saveRun(run);
 }
@@ -173,69 +220,61 @@ async function markRunning(run: Run) {
 /** Mark run done. */
 async function markDone(run: Run) {
   run.status = "done";
-  run.finishedAt = kvNowISO ? kvNowISO() : new Date().toISOString();
+  run.finishedAt = nowISO();
   await saveRun(run);
 }
 
 /** Mark run failed. */
 async function markFailed(run: Run, err: unknown) {
   run.status = "failed";
-  run.finishedAt = kvNowISO ? kvNowISO() : new Date().toISOString();
+  run.finishedAt = nowISO();
   run.error = err instanceof Error ? err.message : String(err);
   await saveRun(run);
 }
 
 /**
- * Execute a run (INTENTIONALLY STUBBED).
- * Next phase: load thread messages, call OpenAI, write result back to thread.
+ * Execute a run.
+ * This assumes you already implemented the OpenAI + thread writeback pieces.
  */
 export async function executeRun(runId: string) {
   const run = await getRun(runId);
   if (!run) return;
-
-  // Only execute queued runs
   if (run.status !== "queued") return;
 
   await markRunning(run);
-  await appendRunLog(runId, "info", "Execution started.");
+  await appendRunLog(runId, "info", `Execution started. agent=${run.agent}`);
 
   try {
-    // --- REAL WORK ---
-if (!run.threadId) {
-  await appendRunLog(runId, "warn", "No threadId attached; nothing to read/write.");
-} else {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("Missing OPENAI_API_KEY env var");
+    if (!run.threadId) {
+      await appendRunLog(runId, "warn", "No threadId attached; nothing to read/write.");
+      await markDone(run);
+      return;
+    }
 
-  const { getThreadMessages, appendThreadMessage } = await import("@/app/lib/threadStore");
-  const { callOpenAIChat } = await import("@/app/lib/openai");
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("Missing OPENAI_API_KEY env var");
 
-  const threadMessages = await getThreadMessages(run.threadId);
+    const { getThreadMessages, appendThreadMessage } = await import("@/app/lib/threadStore");
+    const { callOpenAIChat } = await import("@/app/lib/openai");
 
-  // Build OpenAI messages
-  const messages = [
-    {
-      role: "system" as const,
-      content:
-        "You are the background agent for this platform. Be helpful, concise, and action-oriented.",
-    },
-    ...threadMessages.map((m) => ({
-      role: m.role as "user" | "assistant" | "system",
-      content: m.content,
-    })),
-    {
-      role: "user" as const,
-      content: run.prompt,
-    },
-  ];
+    const threadMessages = await getThreadMessages(run.threadId);
 
-  await appendRunLog(runId, "info", `Calling OpenAI with ${messages.length} messages...`);
-  const reply = await callOpenAIChat({ apiKey, messages });
+    const system = personaSystemPrompt(run.agent);
 
-  await appendRunLog(runId, "info", "Writing assistant reply back into thread...");
-  await appendThreadMessage(run.threadId, { role: "assistant", content: reply });
-}
-// ---------------
+    const messages = [
+      { role: "system" as const, content: system },
+      ...threadMessages.map((m: any) => ({
+        role: m.role as "user" | "assistant" | "system",
+        content: m.content,
+      })),
+      { role: "user" as const, content: run.prompt },
+    ];
+
+    await appendRunLog(runId, "info", `Calling OpenAI (${run.agent}) with ${messages.length} messages...`);
+    const reply = await callOpenAIChat({ apiKey, messages });
+
+    await appendRunLog(runId, "info", "Writing assistant reply back into thread...");
+    await appendThreadMessage(run.threadId, { role: "assistant", content: reply });
 
     await markDone(run);
     await appendRunLog(runId, "info", "Execution finished (done).");
@@ -263,9 +302,9 @@ export async function tickQueuedRuns(opts?: { limit?: number }) {
   for (const id of ids) {
     if (processed >= limit) break;
 
-    const run = await getRun(id);
-    if (!run) continue;
-    if (run.status !== "queued") continue;
+    const r = await getRun(id);
+    if (!r) continue;
+    if (r.status !== "queued") continue;
 
     await executeRun(id);
     processed++;
