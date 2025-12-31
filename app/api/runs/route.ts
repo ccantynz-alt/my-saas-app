@@ -1,7 +1,7 @@
 // app/api/runs/route.ts
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { ... } from "@/lib/runs";
+import { createRun } from "@/app/lib/runs";
 
 const CreateRunSchema = z.object({
   prompt: z.string().min(1),
@@ -12,8 +12,12 @@ const CreateRunSchema = z.object({
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const parsed = CreateRunSchema.safeParse(body);
+
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, error: "Invalid payload" }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "Invalid payload" },
+      { status: 400 }
+    );
   }
 
   const run = await createRun(parsed.data);
