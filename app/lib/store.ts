@@ -21,3 +21,17 @@ export async function storeKeys(prefix = ""): Promise<string[]> {
   }
   return out;
 }
+
+export async function getProject(userId: string, projectId: string) {
+  return await storeGet(`projects:${userId}:${projectId}`);
+}
+
+export async function listRuns(userId: string, projectId: string) {
+  const ids = (await storeGet<string[]>(`runs:index:${userId}:${projectId}`)) ?? [];
+  const runs: any[] = [];
+  for (const id of ids) {
+    const run = await storeGet<any>(`runs:${userId}:${id}`);
+    if (run) runs.push(run);
+  }
+  return runs;
+}
