@@ -13,15 +13,15 @@ export default async function AdminPage() {
       <div className="mx-auto max-w-4xl">
         <div className="text-2xl font-semibold">Admin</div>
         <div className="text-sm text-zinc-500 mt-1">
-          Owner tools will live here (usage, plans, model routing).
+          Owner-only controls will live here.
         </div>
 
         <div className="mt-6 border rounded-xl p-4">
           <div className="font-medium">Next admin features</div>
           <ul className="list-disc pl-5 text-sm text-zinc-700 mt-2 space-y-1">
             <li>Set user plans (starter / pro / elite)</li>
-            <li>View usage + costs</li>
-            <li>Model routing rules (Auto → Mini/Pro/Best)</li>
+            <li>Usage + costs</li>
+            <li>Model routing rules</li>
             <li>Run queue inspector</li>
           </ul>
         </div>
