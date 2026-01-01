@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
-import { kvNowISO } from "../../lib/kv";
+import { kvNowISO } from "../../../lib/kv";
+import { getCurrentUserId } from "../../../lib/demoAuth";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(
+  _req: Request,
+  { params }: { params: { projectId: string } }
+) {
   return NextResponse.json({
     ok: true,
-    fingerprint: "deploy-fingerprint-v1",
+    userId: getCurrentUserId(),
+    projectId: params.projectId,
     ts: kvNowISO()
   });
 }
