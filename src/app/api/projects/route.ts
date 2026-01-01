@@ -1,10 +1,5 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { createProject, listProjects } from "@/app/lib/store";
-
-const CreateProjectSchema = z.object({
-  name: z.string().min(1),
-});
 
 export async function GET() {
   const projects = await listProjects();
@@ -12,16 +7,25 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const body = await req.json();
-  const parsed = CreateProjectSchema.safeParse(body);
+  const contentType = req.headers.get("content-type") || "";
 
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, error: "Invalid payload" },
-      { status: 400 }
-    );
+  let name = "";
+  if (contentType.includes("application/json")) {
+    const body = await req.json();
+    name = String(body?.name || "").trim();
+  } else {
+    const form = await req.formData();
+    name = String(form.get("name") || "").trim();
   }
 
-  const project = await createProject(parsed.data.name);
+  if (!name) return NextResponse.json({ ok: false, error: "Missing name" }, { status: 400 });
+
+  const project = await createProject(name);
+
+  // If created from a form, redirect to the project page:
+  if (!contentType.includes("application/json")) {
+    return NextResponse.redirect(new URL(`/dashboard/projects/${project.id}`, req.url));
+  }
+
   return NextResponse.json({ ok: true, project });
 }
