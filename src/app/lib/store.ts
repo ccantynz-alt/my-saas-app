@@ -29,8 +29,8 @@ function projectKey(id: string) {
   return `project:${id}`;
 }
 
-function runKey(runId: string) {
-  return `run:${runId}`;
+function runKey(id: string) {
+  return `run:${id}`;
 }
 
 function runIndexKey(projectId: string) {
@@ -42,7 +42,7 @@ function runIndexKey(projectId: string) {
 ========================= */
 
 export async function listProjects(): Promise<Project[]> {
-  const ids = (await kv.lrange(PROJECT_INDEX_KEY, 0, -1)) as string[];
+  const ids = (await kv.smembers(PROJECT_INDEX_KEY)) as string[];
   if (!ids || ids.length === 0) return [];
 
   const projects = await Promise.all(
@@ -65,7 +65,7 @@ export async function createProject(name: string): Promise<Project> {
   };
 
   await kv.set(projectKey(id), project);
-  await kv.lpush(PROJECT_INDEX_KEY, id);
+  await kv.sadd(PROJECT_INDEX_KEY, id);
 
   return project;
 }
@@ -79,7 +79,7 @@ export async function getProject(id: string): Promise<Project | null> {
 ========================= */
 
 export async function listRuns(projectId: string): Promise<Run[]> {
-  const ids = (await kv.lrange(runIndexKey(projectId), 0, -1)) as string[];
+  const ids = (await kv.smembers(runIndexKey(projectId))) as string[];
   if (!ids || ids.length === 0) return [];
 
   const runs = await Promise.all(
@@ -107,7 +107,7 @@ export async function createRun(
   };
 
   await kv.set(runKey(id), run);
-  await kv.lpush(runIndexKey(projectId), id);
+  await kv.sadd(runIndexKey(projectId), id);
 
   return run;
 }
