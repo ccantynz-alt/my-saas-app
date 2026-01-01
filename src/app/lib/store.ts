@@ -47,8 +47,8 @@ export async function listProjects(): Promise<Project[]> {
 
   const projects = await Promise.all(
     ids.map(async (id) => {
-      const p = await kv.get<Project>(projectKey(id));
-      return p ?? null;
+      const p = (await kv.get(projectKey(id))) as Project | null;
+      return p;
     })
   );
 
@@ -71,7 +71,7 @@ export async function createProject(name: string): Promise<Project> {
 }
 
 export async function getProject(id: string): Promise<Project | null> {
-  return (await kv.get<Project>(projectKey(id))) ?? null;
+  return (await kv.get(projectKey(id))) as Project | null;
 }
 
 /* =========================
@@ -84,8 +84,8 @@ export async function listRuns(projectId: string): Promise<Run[]> {
 
   const runs = await Promise.all(
     ids.map(async (id) => {
-      const r = await kv.get<Run>(runKey(id));
-      return r ?? null;
+      const r = (await kv.get(runKey(id))) as Run | null;
+      return r;
     })
   );
 
