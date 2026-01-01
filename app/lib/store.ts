@@ -1,130 +1,23 @@
-// app/lib/store.ts
-import { randomUUID } from "crypto";
-import { kv, kvJsonGet, kvJsonSet, kvNowISO } from "./kv";
-import { getCurrentUserId } from "./demoAuth";
+type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
-export type Project = {
-  id: string;
-  name: string;
-  createdAt: string;
-};
+const mem = new Map<string, Json>();
 
-export type Run = {
-  id: string;
-  projectId: string;
-  status: string;
-  createdAt: string;
-  prompt?: string;
-};
-
-function uid(prefix = ""): string {
-  const id = randomUUID().replace(/-/g, "");
-  return prefix ? `${prefix}_${id}` : id;
+export async function storeGet<T = Json>(key: string): Promise<T | null> {
+  return (mem.get(key) as T) ?? null;
 }
 
-function projectsIndexKey(userId: string) {
-  return `projects:index:${userId}`;
+export async function storeSet<T = Json>(key: string, value: T): Promise<void> {
+  mem.set(key, value as unknown as Json);
 }
 
-function projectKey(userId: string, projectId: string) {
-  return `projects:${userId}:${projectId}`;
+export async function storeDel(key: string): Promise<void> {
+  mem.delete(key);
 }
 
-function runsIndexKey(userId: string, projectId: string) {
-  return `runs:index:${userId}:${projectId}`;
-}
-
-function runKey(userId: string, runId: string) {
-  return `runs:${userId}:${runId}`;
-}
-
-function asStringArray(v: unknown): string[] {
-  if (Array.isArray(v)) return v.map((x) => String(x));
-  return [];
-}
-
-// -------------------------
-// Projects
-// -------------------------
-
-export async function createProject(input: { name: string }): Promise<Project> {
-  const userId = await getCurrentUserId();
-  const id = uid("proj");
-  const createdAt = kvNowISO();
-
-  const project: Project = { id, name: input.name, createdAt };
-
-  await kvJsonSet(projectKey(userId, id), project);
-  await kv.sadd(projectsIndexKey(userId), id);
-
-  return project;
-}
-
-export async function listProjects(): Promise<Project[]> {
-  const userId = await getCurrentUserId();
-
-  // kv.smembers is typed as unknown in your wrapper, so normalize it
-  const rawIds = await kv.smembers(projectsIndexKey(userId));
-  const ids = asStringArray(rawIds);
-
-  if (ids.length === 0) return [];
-
-  const projects: Project[] = [];
-  for (const id of ids) {
-    const p = await kvJsonGet<Project>(projectKey(userId, id));
-    if (p) projects.push(p);
+export async function storeKeys(prefix = ""): Promise<string[]> {
+  const out: string[] = [];
+  for (const k of mem.keys()) {
+    if (!prefix || k.startsWith(prefix)) out.push(k);
   }
-
-  projects.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  return projects;
-}
-
-export async function getProject(projectId: string): Promise<Project | null> {
-  const userId = await getCurrentUserId();
-  return await kvJsonGet<Project>(projectKey(userId, projectId));
-}
-
-// -------------------------
-// Runs
-// -------------------------
-
-export async function createRun(input: {
-  projectId: string;
-  prompt: string;
-  status?: string;
-}): Promise<Run> {
-  const userId = await getCurrentUserId();
-  const id = uid("run");
-  const createdAt = kvNowISO();
-
-  const run: Run = {
-    id,
-    projectId: input.projectId,
-    status: input.status ?? "queued",
-    createdAt,
-    prompt: input.prompt,
-  };
-
-  await kvJsonSet(runKey(userId, id), run);
-  await kv.sadd(runsIndexKey(userId, input.projectId), id);
-
-  return run;
-}
-
-export async function listRuns(projectId: string): Promise<Run[]> {
-  const userId = await getCurrentUserId();
-
-  const rawIds = await kv.smembers(runsIndexKey(userId, projectId));
-  const ids = asStringArray(rawIds);
-
-  if (ids.length === 0) return [];
-
-  const runs: Run[] = [];
-  for (const id of ids) {
-    const r = await kvJsonGet<Run>(runKey(userId, id));
-    if (r) runs.push(r);
-  }
-
-  runs.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
-  return runs;
+  return out;
 }
