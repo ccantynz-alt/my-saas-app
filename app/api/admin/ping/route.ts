@@ -4,7 +4,12 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 export const runtime = "nodejs";
 
 export async function GET() {
-  auth().protect();
+  const session = await auth();
+
+  // Not signed in
+  if (!session.userId) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
 
   const user = await currentUser();
   if (!user) {
@@ -13,6 +18,7 @@ export async function GET() {
 
   const role = (user.publicMetadata?.role as string | undefined) ?? "user";
   if (role !== "owner") {
+    // Hide existence
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
