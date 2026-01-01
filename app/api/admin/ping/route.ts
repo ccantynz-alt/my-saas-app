@@ -13,7 +13,6 @@ export async function GET() {
 
   const role = (user.publicMetadata?.role as string | undefined) ?? "user";
   if (role !== "owner") {
-    // 404 hides the existence of admin routes
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
 
@@ -21,6 +20,6 @@ export async function GET() {
     ok: true,
     message: "Admin API is working",
     userId: user.id,
-    role,
+    role
   });
 }
