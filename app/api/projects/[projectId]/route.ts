@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { kvNowISO } from "@/app/lib/kv";
-import { getCurrentUserId } from "@/app/lib/demoAuth";
+import { kvNowISO } from "../../../lib/kv";
+import { getCurrentUserId } from "../../../lib/demoAuth";
 
 export const runtime = "nodejs";
 
@@ -8,11 +8,9 @@ export async function GET(
   _req: Request,
   { params }: { params: { projectId: string } }
 ) {
-  const userId = getCurrentUserId();
-
   return NextResponse.json({
     ok: true,
-    userId,
+    userId: getCurrentUserId(),
     projectId: params.projectId,
     ts: kvNowISO()
   });
