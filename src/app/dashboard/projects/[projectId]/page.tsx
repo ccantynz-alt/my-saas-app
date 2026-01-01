@@ -1,102 +1,160 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+
 type Run = {
   id: string;
   projectId: string;
   prompt: string;
   status: string;
-  createdAt: string;
+  createdAt?: string;
 };
 
-type Project = { id: string; name: string; createdAt: string };
-
-export default async function ProjectPage({
-  params,
-}: {
-  params: { projectId: string };
-}) {
+export default function ProjectRunsPage({ params }: { params: { projectId: string } }) {
   const projectId = params.projectId;
 
-  const projRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/api/projects`, {
-    cache: "no-store",
-  });
-  const projData = (await projRes.json()) as { ok: boolean; projects: Project[] };
-  const project = (projData.projects ?? []).find((p) => p.id === projectId);
-
-  const runsRes = await fetch(
-    `${process.env.NEXT_PUBLIC_BASE_URL ?? ""}/api/projects/${projectId}/runs`,
-    { cache: "no-store" }
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [prompt, setPrompt] = useState(
+    "Build a modern landing page with pricing, FAQ, and a contact form."
   );
-  const runsData = (await runsRes.json()) as { ok: boolean; runs: Run[] };
-  const runs = runsData?.runs ?? [];
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const sorted = useMemo(() => {
+    return [...runs].sort((a, b) => {
+      const ad = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bd = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bd - ad;
+    });
+  }, [runs]);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/runs`, { cache: "no-store" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to load runs");
+      setRuns(Array.isArray(data.runs) ? data.runs : []);
+    } catch (e: any) {
+      setError(e?.message || "Unknown error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function createRun() {
+    const trimmed = prompt.trim();
+    if (!trimmed) return;
+
+    setCreating(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/runs`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt: trimmed }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to create run");
+
+      if (data.run?.id) {
+        setRuns((prev) => [data.run as Run, ...prev]);
+      } else {
+        await load();
+      }
+    } catch (e: any) {
+      setError(e?.message || "Unknown error");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, [projectId]);
 
   return (
-    <main style={{ padding: "2rem", fontFamily: "system-ui" }}>
-      <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>
-        {project ? project.name : "Project"}
-      </h1>
-      <p style={{ color: "#666", marginBottom: "1.5rem" }}>
-        Project ID: <code>{projectId}</code>
-      </p>
+    <main className="mx-auto max-w-4xl p-6">
+      <header className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Project Runs</h1>
+          <Link href="/dashboard" className="rounded-xl border px-3 py-2 text-sm">
+            ← Back
+          </Link>
+        </div>
 
-      <section style={{ marginBottom: "2rem" }}>
-        <h2 style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}>Create Run</h2>
+        <p className="text-sm opacity-80">
+          <span className="opacity-70">Project ID:</span> {projectId}
+        </p>
+      </header>
 
-        <form
-          action={`/api/projects/${projectId}/runs`}
-          method="POST"
-          style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxWidth: "720px" }}
-        >
-          <textarea
-            name="prompt"
-            required
-            defaultValue="Build a modern landing page website with pricing, FAQ, and a contact form. Use clean, minimal styling."
-            rows={5}
-            style={{
-              padding: "0.75rem",
-              border: "1px solid #ddd",
-              borderRadius: "8px",
-              fontFamily: "system-ui",
-            }}
-          />
+      <section className="mt-6 rounded-2xl border p-4">
+        <h2 className="text-lg font-medium">Create a run</h2>
+
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          className="mt-3 min-h-[120px] w-full rounded-xl border bg-transparent p-3 outline-none"
+        />
+
+        <div className="mt-3 flex gap-2">
           <button
-            type="submit"
-            style={{
-              padding: "0.75rem 1.25rem",
-              background: "#000",
-              color: "#fff",
-              border: "none",
-              borderRadius: "8px",
-              cursor: "pointer",
-              width: "fit-content",
-            }}
+            onClick={createRun}
+            disabled={creating || !prompt.trim()}
+            className="rounded-xl border px-4 py-2 disabled:opacity-50"
           >
-            Create Run
+            {creating ? "Creating…" : "Create Run"}
           </button>
-        </form>
+
+          <button
+            onClick={load}
+            disabled={loading}
+            className="rounded-xl border px-4 py-2 disabled:opacity-50"
+          >
+            Refresh
+          </button>
+        </div>
+
+        {error ? (
+          <p className="mt-3 text-sm text-red-400">Error: {error}</p>
+        ) : null}
       </section>
 
-      <section>
-        <h2 style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}>Runs</h2>
+      <section className="mt-6 rounded-2xl border p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-medium">Runs</h2>
+          <span className="text-sm opacity-70">{sorted.length} total</span>
+        </div>
 
-        {runs.length === 0 ? (
-          <p>No runs yet.</p>
+        {loading ? (
+          <p className="mt-3 text-sm opacity-70">Loading…</p>
+        ) : sorted.length === 0 ? (
+          <p className="mt-3 text-sm opacity-70">
+            No runs yet — create one above.
+          </p>
         ) : (
-          <ul style={{ paddingLeft: "1.25rem" }}>
-            {runs
-              .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-              .map((r) => (
-                <li key={r.id} style={{ marginBottom: "0.75rem" }}>
-                  <div>
-                    <strong>{r.status}</strong>{" "}
-                    <span style={{ color: "#777" }}>
-                      ({new Date(r.createdAt).toLocaleString()})
+          <ul className="mt-3 grid gap-2">
+            {sorted.map((r) => (
+              <li key={r.id} className="rounded-xl border p-3">
+                <div className="flex flex-col gap-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{r.id}</span>
+                    <span className="rounded-full border px-2 py-0.5 text-xs opacity-80">
+                      {r.status}
                     </span>
+                    {r.createdAt ? (
+                      <span className="text-xs opacity-70">
+                        {new Date(r.createdAt).toLocaleString()}
+                      </span>
+                    ) : null}
                   </div>
-                  <div style={{ color: "#444" }}>
-                    <code>{r.id}</code>
-                  </div>
-                  <div style={{ marginTop: "0.25rem" }}>{r.prompt}</div>
-                </li>
-              ))}
+                  <p className="text-sm opacity-85">{r.prompt}</p>
+                </div>
+              </li>
+            ))}
           </ul>
         )}
       </section>
