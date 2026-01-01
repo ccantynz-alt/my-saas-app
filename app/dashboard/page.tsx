@@ -1,83 +1,55 @@
-// app/dashboard/page.tsx
-import { redirect } from "next/navigation";
-
-type Project = {
-  id: string;
-  projectId: string;
-  name: string;
-  createdAt: string;
-};
-
-async function readJson(res: Response) {
-  const text = await res.text();
-  try {
-    return text ? JSON.parse(text) : null;
-  } catch {
-    return { ok: false, error: "Non-JSON response", raw: text };
-  }
-}
+import Link from "next/link";
+import { auth, currentUser } from "@clerk/nextjs/server";
 
 export default async function DashboardPage() {
-  try {
-    // 1) Load projects
-    const listRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/projects`, {
-      cache: "no-store",
-    });
-    const listJson = await readJson(listRes);
+  auth().protect();
+  const user = await currentUser();
 
-    if (!listRes.ok || !listJson?.ok) {
-      throw new Error(listJson?.error || `Failed to load projects (${listRes.status})`);
-    }
+  return (
+    <div className="min-h-screen p-6">
+      <div className="mx-auto max-w-4xl">
+        <div className="text-2xl font-semibold">Dashboard</div>
+        <div className="text-sm text-zinc-500 mt-1">
+          Logged in as: {user?.emailAddresses?.[0]?.emailAddress ?? user?.id}
+        </div>
 
-    let projects: Project[] = Array.isArray(listJson.projects) ? listJson.projects : [];
-    let project = projects[0];
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <div className="border rounded-xl p-4">
+            <div className="font-medium">Build Studio (coming next)</div>
+            <div className="text-sm text-zinc-600 mt-1">
+              This is where projects will live.
+            </div>
+            <div className="mt-3">
+              <span className="text-xs text-zinc-500">Next step:</span>{" "}
+              <span className="text-sm">Projects + /studio/[projectId]</span>
+            </div>
+          </div>
 
-    // 2) If no projects, create one
-    if (!project) {
-      const createRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/projects`, {
-        method: "POST",
-        cache: "no-store",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: "Untitled Project" }),
-      });
-      const createJson = await readJson(createRes);
+          <div className="border rounded-xl p-4">
+            <div className="font-medium">Developer Area</div>
+            <div className="text-sm text-zinc-600 mt-1">
+              Your existing thread UI (engine room).
+            </div>
+            <div className="mt-3">
+              <Link className="border rounded-lg px-3 py-2 text-sm hover:bg-zinc-50 inline-block" href="/threads">
+                Open Threads
+              </Link>
+            </div>
+          </div>
+        </div>
 
-      if (!createRes.ok || !createJson?.ok) {
-        throw new Error(createJson?.error || `Failed to create project (${createRes.status})`);
-      }
-
-      project = createJson.project;
-    }
-
-    const pid = project?.projectId || project?.id;
-    if (!pid) throw new Error("Project missing projectId/id");
-
-    redirect(`/dashboard/projects/${pid}`);
-  } catch (err: any) {
-    return (
-      <main style={{ padding: 24, fontFamily: "ui-sans-serif, system-ui" }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700 }}>Dashboard error</h1>
-        <p style={{ marginTop: 10 }}>
-          Something failed while loading your dashboard. This page is designed to show the real error instead
-          of a generic digest screen.
-        </p>
-        <pre
-          style={{
-            marginTop: 12,
-            padding: 12,
-            background: "#111",
-            color: "#fff",
-            borderRadius: 8,
-            overflowX: "auto",
-            fontSize: 12,
-          }}
-        >
-          {String(err?.message || err)}
-        </pre>
-        <p style={{ marginTop: 12 }}>
-          Check <code>/api/kv-test</code> and confirm <code>anyKvConfigured</code> is true.
-        </p>
-      </main>
-    );
-  }
+        <div className="mt-6 border rounded-xl p-4">
+          <div className="font-medium">Owner/Admin</div>
+          <div className="text-sm text-zinc-600 mt-1">
+            If you mark your account as owner in Clerk metadata, you’ll unlock /admin.
+          </div>
+          <div className="mt-3">
+            <Link className="border rounded-lg px-3 py-2 text-sm hover:bg-zinc-50 inline-block" href="/admin">
+              Go to Admin (owner only)
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
