@@ -1,10 +1,6 @@
 import { kv } from "@vercel/kv";
 import { randomUUID } from "crypto";
 
-/* =====================
-   TYPES
-===================== */
-
 export type Project = {
   id: string;
   name: string;
@@ -15,89 +11,75 @@ export type Run = {
   id: string;
   projectId: string;
   prompt: string;
-  status: "queued" | "running" | "completed" | "failed";
+  status: "queued" | "running" | "complete" | "failed";
   createdAt: string;
 };
 
-/* =====================
-   KEYS
-===================== */
+const PROJECT_INDEX_KEY = "projects:index"; // set of project ids
+const RUNS_INDEX_KEY = (projectId: string) => `runs:index:${projectId}`; // set of run ids
+const PROJECT_KEY = (id: string) => `project:${id}`; // json string
+const RUN_KEY = (id: string) => `run:${id}`; // json string
 
-const projectKey = (id: string) => `project:${id}`;
-const projectIndexKey = "projects:index";
-const runKey = (id: string) => `run:${id}`;
-const runIndexKey = (projectId: string) => `runs:${projectId}`;
+function nowISO() {
+  return new Date().toISOString();
+}
 
-/* =====================
-   PROJECTS
-===================== */
+async function kvGetJson<T>(key: string): Promise<T | null> {
+  const raw = (await kv.get(key)) as unknown;
 
-export async function createProject(name: string): Promise<Project> {
-  const id = randomUUID();
+  if (raw == null) return null;
 
-  const project: Project = {
-    id,
-    name,
-    createdAt: new Date().toISOString(),
-  };
+  // If stored as a JSON string
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return null;
+    }
+  }
 
-  await kv.set(projectKey(id), JSON.stringify(project));
-  await kv.sadd(projectIndexKey, id);
+  // If kv returns an already-parsed object (some setups do)
+  if (typeof raw === "object") {
+    return raw as T;
+  }
 
-  return project;
+  return null;
+}
+
+async function kvSetJson(key: string, value: unknown) {
+  await kv.set(key, JSON.stringify(value));
 }
 
 export async function listProjects(): Promise<Project[]> {
-  const ids = await kv.smembers(projectIndexKey);
-
-  const projects = await Promise.all(
-    ids.map(async (id) => {
-      const raw = await kv.get(projectKey(id));
-      return raw ? JSON.parse(raw as string) : null;
-    })
-  );
-
+  const ids = (await kv.smembers(PROJECT_INDEX_KEY)) as unknown as string[];
+  if (!ids || ids.length === 0) return [];
+  const projects = await Promise.all(ids.map((id) => kvGetJson<Project>(PROJECT_KEY(id))));
   return projects.filter(Boolean) as Project[];
 }
 
 export async function getProject(id: string): Promise<Project | null> {
-  const raw = await kv.get(projectKey(id));
-  return raw ? JSON.parse(raw as string) : null;
+  return kvGetJson<Project>(PROJECT_KEY(id));
 }
 
-/* =====================
-   RUNS
-===================== */
-
-export async function createRun(
-  projectId: string,
-  prompt: string
-): Promise<Run> {
-  const id = randomUUID();
-
-  const run: Run = {
-    id,
-    projectId,
-    prompt,
-    status: "queued",
-    createdAt: new Date().toISOString(),
-  };
-
-  await kv.set(runKey(id), JSON.stringify(run));
-  await kv.sadd(runIndexKey(projectId), id);
-
-  return run;
+export async function createProject(name: string): Promise<Project> {
+  const id = `proj_${randomUUID().replace(/-/g, "")}`;
+  const project: Project = { id, name, createdAt: nowISO() };
+  await kvSetJson(PROJECT_KEY(id), project);
+  await kv.sadd(PROJECT_INDEX_KEY, id);
+  return project;
 }
 
 export async function listRuns(projectId: string): Promise<Run[]> {
-  const ids = await kv.smembers(runIndexKey(projectId));
-
-  const runs = await Promise.all(
-    ids.map(async (id) => {
-      const raw = await kv.get(runKey(id));
-      return raw ? JSON.parse(raw as string) : null;
-    })
-  );
-
+  const ids = (await kv.smembers(RUNS_INDEX_KEY(projectId))) as unknown as string[];
+  if (!ids || ids.length === 0) return [];
+  const runs = await Promise.all(ids.map((id) => kvGetJson<Run>(RUN_KEY(id))));
   return runs.filter(Boolean) as Run[];
+}
+
+export async function createRun(projectId: string, prompt: string): Promise<Run> {
+  const id = `run_${randomUUID().replace(/-/g, "")}`;
+  const run: Run = { id, projectId, prompt, status: "queued", createdAt: nowISO() };
+  await kvSetJson(RUN_KEY(id), run);
+  await kv.sadd(RUNS_INDEX_KEY(projectId), id);
+  return run;
 }
