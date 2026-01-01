@@ -1,17 +1,16 @@
 import "./globals.css";
-import { ClerkProvider } from "@clerk/nextjs";
 
 export const metadata = {
-  title: "My SaaS App",
-  description: "AI Agent Platform",
+  title: "my-saas-app",
+  description: "AI website builder",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body>{children}</body>
-      </html>
-    </ClerkProvider>
+    <html lang="en">
+      <body className="min-h-screen bg-white text-black">
+        {children}
+      </body>
+    </html>
   );
 }
