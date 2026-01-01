@@ -9,6 +9,11 @@ type Run = {
   prompt: string;
   status: string;
   createdAt?: string;
+  updatedAt?: string;
+  output?: {
+    summary?: string;
+    files?: { path: string; content: string }[];
+  };
 };
 
 export default function ProjectRunsPage({ params }: { params: { projectId: string } }) {
@@ -21,6 +26,8 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [openRunId, setOpenRunId] = useState<string | null>(null);
 
   const sorted = useMemo(() => {
     return [...runs].sort((a, b) => {
@@ -60,8 +67,18 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to create run");
 
-      if (data.run?.id) {
-        setRuns((prev) => [data.run as Run, ...prev]);
+      const newRun = data.run as Run | undefined;
+      if (newRun?.id) {
+        setRuns((prev) => [newRun, ...prev]);
+        setOpenRunId(newRun.id);
+
+        // 🔥 Kick off simulated agent
+        await fetch(`/api/projects/${projectId}/runs/${newRun.id}/simulate`, {
+          method: "POST",
+        });
+
+        // Reload to fetch updated run.output
+        await load();
       } else {
         await load();
       }
@@ -85,14 +102,13 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
             ← Back
           </Link>
         </div>
-
         <p className="text-sm opacity-80">
           <span className="opacity-70">Project ID:</span> {projectId}
         </p>
       </header>
 
       <section className="mt-6 rounded-2xl border p-4">
-        <h2 className="text-lg font-medium">Create a run</h2>
+        <h2 className="text-lg font-medium">Run the agent</h2>
 
         <textarea
           value={prompt}
@@ -106,7 +122,7 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
             disabled={creating || !prompt.trim()}
             className="rounded-xl border px-4 py-2 disabled:opacity-50"
           >
-            {creating ? "Creating…" : "Create Run"}
+            {creating ? "Running…" : "Run Agent"}
           </button>
 
           <button
@@ -130,27 +146,58 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
         {loading ? (
           <p className="mt-3 text-sm opacity-70">Loading…</p>
         ) : sorted.length === 0 ? (
-          <p className="mt-3 text-sm opacity-70">No runs yet — create one above.</p>
+          <p className="mt-3 text-sm opacity-70">No runs yet — run the agent above.</p>
         ) : (
           <ul className="mt-3 grid gap-2">
-            {sorted.map((r) => (
-              <li key={r.id} className="rounded-xl border p-3">
-                <div className="flex flex-col gap-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{r.id}</span>
-                    <span className="rounded-full border px-2 py-0.5 text-xs opacity-80">
-                      {r.status}
-                    </span>
-                    {r.createdAt ? (
-                      <span className="text-xs opacity-70">
-                        {new Date(r.createdAt).toLocaleString()}
+            {sorted.map((r) => {
+              const isOpen = openRunId === r.id;
+              return (
+                <li key={r.id} className="rounded-xl border p-3">
+                  <button
+                    className="w-full text-left"
+                    onClick={() => setOpenRunId(isOpen ? null : r.id)}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{r.id}</span>
+                      <span className="rounded-full border px-2 py-0.5 text-xs opacity-80">
+                        {r.status}
                       </span>
-                    ) : null}
-                  </div>
-                  <p className="text-sm opacity-85">{r.prompt}</p>
-                </div>
-              </li>
-            ))}
+                      {r.createdAt ? (
+                        <span className="text-xs opacity-70">
+                          {new Date(r.createdAt).toLocaleString()}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-1 text-sm opacity-85">{r.prompt}</p>
+                    <p className="mt-1 text-xs opacity-60">
+                      Click to {isOpen ? "hide" : "view"} output
+                    </p>
+                  </button>
+
+                  {isOpen ? (
+                    <div className="mt-3 rounded-xl border p-3">
+                      <div className="text-sm font-medium">Output</div>
+                      <div className="mt-2 text-sm opacity-85">
+                        {r.output?.summary || "No output yet."}
+                      </div>
+
+                      {r.output?.files?.length ? (
+                        <div className="mt-3 grid gap-2">
+                          {r.output.files.map((f) => (
+                            <div key={f.path} className="rounded-xl border p-3">
+                              <div className="text-xs opacity-70">{f.path}</div>
+                              <pre className="mt-2 overflow-x-auto text-xs opacity-90">
+                                {f.content}
+                              </pre>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
