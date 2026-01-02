@@ -26,6 +26,7 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [openRunId, setOpenRunId] = useState<string | null>(null);
   const [step, setStep] = useState<string | null>(null);
   const [applyingRunId, setApplyingRunId] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
   async function applyRun(runId: string) {
     setApplyingRunId(runId);
     setError(null);
+    setToast(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/runs/${runId}/apply`, {
         method: "POST",
@@ -63,8 +65,10 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to apply run");
 
-      // Send user to the preview page
-      window.location.href = "/generated";
+      setToast("Applied! Opening /generated…");
+      setTimeout(() => {
+        window.location.href = "/generated";
+      }, 300);
     } catch (e: any) {
       setError(e?.message || "Unknown error");
     } finally {
@@ -78,10 +82,10 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
 
     setCreating(true);
     setError(null);
+    setToast(null);
     setStep("Starting…");
 
     try {
-      // 1) Create run
       const res = await fetch(`/api/projects/${projectId}/runs`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -97,7 +101,6 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
         setRuns((prev) => [newRun, ...prev]);
         setOpenRunId(newRun.id);
 
-        // 2) Stream the run (live tokens)
         const streamRes = await fetch(
           `/api/projects/${projectId}/runs/${newRun.id}/run-stream`,
           { method: "POST" }
@@ -137,7 +140,6 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-
           const parts = buffer.split("\n\n");
           buffer = parts.pop() || "";
 
@@ -148,7 +150,6 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
 
             const event = eventLine?.slice(6).trim();
             const dataStr = dataLine?.slice(5).trim();
-
             if (!event || !dataStr) continue;
 
             let payload: any = null;
@@ -166,13 +167,9 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
               );
             }
 
-            if (event === "step" && payload?.label) {
-              setStep(payload.label);
-            }
+            if (event === "step" && payload?.label) setStep(payload.label);
 
-            if (event === "error") {
-              throw new Error(payload?.message || "Streaming error");
-            }
+            if (event === "error") throw new Error(payload?.message || "Streaming error");
 
             if (event === "done") {
               await load();
@@ -241,12 +238,25 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
             >
               Refresh
             </button>
+
+            <Link
+              href="/generated"
+              className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm hover:bg-white/10"
+            >
+              Open /generated
+            </Link>
           </div>
 
           {step ? (
             <div className="mt-3 text-sm text-zinc-400">
               <span className="opacity-70">Progress:</span>{" "}
               <span className="text-zinc-200">{step}</span>
+            </div>
+          ) : null}
+
+          {toast ? (
+            <div className="mt-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+              {toast}
             </div>
           ) : null}
 
@@ -273,7 +283,9 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
             {sorted.map((r) => {
               const isOpen = openRunId === r.id;
               const canApply =
-                r.status === "complete" && Array.isArray(r.output?.files) && r.output!.files!.length > 0;
+                r.status === "complete" &&
+                Array.isArray(r.output?.files) &&
+                (r.output?.files?.length || 0) > 0;
 
               return (
                 <li key={r.id} className="rounded-2xl border border-white/10 bg-zinc-950/40 p-4">
@@ -314,7 +326,9 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
                           </button>
                         ) : (
                           <span className="text-xs text-zinc-500">
-                            {r.status === "complete" ? "No files to apply" : "Complete the run to apply"}
+                            {r.status === "complete"
+                              ? "No files to apply"
+                              : "Complete the run to apply"}
                           </span>
                         )}
                       </div>
