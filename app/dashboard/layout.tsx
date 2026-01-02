@@ -1,7 +1,7 @@
 // app/dashboard/layout.tsx
 import { redirect } from "next/navigation";
-import { getPublicMode } from "../../lib/publicMode";
-import { isAdmin } from "../../lib/isAdmin";
+import { getPublicMode } from "../lib/publicMode";
+import { isAdmin } from "../lib/isAdmin";
 
 export default async function DashboardLayout({
   children,
