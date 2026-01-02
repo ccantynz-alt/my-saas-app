@@ -20,7 +20,7 @@ export default async function RootLayout({
 
   // Show admin navigation only when:
   // - Public mode is OFF (builder mode), OR
-  // - user is admin (logged in)
+  // - user is admin
   const showAdminNav = mode === "off" || admin;
 
   return (
@@ -86,10 +86,35 @@ export default async function RootLayout({
                 >
                   Generated
                 </Link>
+                <Link
+                  href="/admin"
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    fontSize: 14,
+                    opacity: 0.85,
+                  }}
+                >
+                  Admin
+                </Link>
               </nav>
             ) : (
-              <div style={{ fontSize: 12, opacity: 0.65 }}>
-                Public site mode
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <div style={{ fontSize: 12, opacity: 0.65 }}>
+                  Public site mode
+                </div>
+                <Link
+                  href="/admin"
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    fontSize: 14,
+                  }}
+                >
+                  Admin Login
+                </Link>
               </div>
             )}
           </div>
