@@ -1,18 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 
 type Result = any;
+
+function asRecordsText(dns: any) {
+  const apex = dns?.input?.apex || "example.com";
+  const www = dns?.input?.www || `www.${apex}`;
+
+  return [
+    `DNS records to add (recommended):`,
+    ``,
+    `Apex (${apex})`,
+    `- Type: A`,
+    `- Name/Host: @`,
+    `- Value: ${dns?.expected?.apexA || "76.76.21.21"}`,
+    `- TTL: Auto`,
+    ``,
+    `WWW (${www})`,
+    `- Type: CNAME`,
+    `- Name/Host: www`,
+    `- Value: ${dns?.expected?.wwwCname || "cname.vercel-dns.com"}`,
+    `- TTL: Auto`,
+    ``,
+    `If your hosting provider shows different values for your project, use those exact values instead.`,
+  ].join("\n");
+}
+
+async function copyToClipboard(text: string) {
+  if (navigator?.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const el = document.createElement("textarea");
+  el.value = text;
+  document.body.appendChild(el);
+  el.select();
+  document.execCommand("copy");
+  document.body.removeChild(el);
+}
 
 export default function AdminDnsCheckPage() {
   const [domain, setDomain] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+
+  const copyText = useMemo(() => (result ? asRecordsText(result) : ""), [result]);
 
   async function runCheck() {
     setErr(null);
+    setInfo(null);
     setResult(null);
     setBusy(true);
 
@@ -40,7 +80,7 @@ export default function AdminDnsCheckPage() {
         <div>
           <h1 className="text-3xl font-bold">AutoDetectDNS Console</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Paste a domain and we’ll detect common DNS + SSL problems and suggest next steps.
+            Paste a domain and we’ll detect provider + common DNS + SSL issues and suggest next steps.
           </p>
         </div>
 
@@ -50,6 +90,13 @@ export default function AdminDnsCheckPage() {
           </Link>
         </div>
       </div>
+
+      {info ? (
+        <div className="rounded-lg border p-4 text-sm">
+          <div className="font-semibold">Info</div>
+          <div className="text-muted-foreground mt-1">{info}</div>
+        </div>
+      ) : null}
 
       <section className="rounded-lg border p-4 space-y-3">
         <label className="text-sm font-semibold">Domain</label>
@@ -74,12 +121,29 @@ export default function AdminDnsCheckPage() {
             onClick={() => {
               setDomain("");
               setErr(null);
+              setInfo(null);
               setResult(null);
             }}
             disabled={busy}
             className="rounded-md border px-4 py-2 hover:bg-muted transition"
           >
             Clear
+          </button>
+
+          <button
+            onClick={async () => {
+              if (!copyText) return;
+              try {
+                await copyToClipboard(copyText);
+                setInfo("Copied DNS records to clipboard.");
+              } catch {
+                setErr("Could not copy to clipboard.");
+              }
+            }}
+            disabled={busy || !copyText}
+            className="rounded-md border px-4 py-2 hover:bg-muted transition"
+          >
+            Copy DNS records
           </button>
         </div>
 
@@ -101,8 +165,35 @@ export default function AdminDnsCheckPage() {
           </div>
 
           <div className="text-sm">
+            <div className="font-semibold">Provider</div>
+            <div className="text-muted-foreground mt-1">
+              {result?.provider?.message} ({result?.provider?.detected} • {result?.provider?.confidence})
+            </div>
+          </div>
+
+          {result?.diagnosis?.warnings?.length ? (
+            <div className="rounded-lg border p-3 text-sm">
+              <div className="font-semibold">Warnings</div>
+              <ul className="list-disc pl-5 text-muted-foreground mt-1 space-y-1">
+                {result.diagnosis.warnings.map((w: string, i: number) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <div className="text-sm">
             <div className="font-semibold">Message</div>
             <div className="text-muted-foreground mt-1">{result?.diagnosis?.message}</div>
+          </div>
+
+          <div className="text-sm">
+            <div className="font-semibold">Provider steps</div>
+            <ol className="list-decimal pl-5 text-muted-foreground mt-1 space-y-1">
+              {(result?.diagnosis?.providerSteps || []).map((s: string, i: number) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ol>
           </div>
 
           <div className="text-sm">
