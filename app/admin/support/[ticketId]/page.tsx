@@ -12,6 +12,15 @@ type Ticket = {
   email?: string;
   subject: string;
   messages: Array<{ id: string; at: string; from: "customer" | "admin"; text: string }>;
+  triage?: {
+    triagedAt: string;
+    category: string;
+    priority: string;
+    tags: string[];
+    summary: string;
+    suggestedStatus?: "open" | "pending" | "resolved" | "closed";
+    suggestedNextSteps?: string[];
+  };
 };
 
 export default function AdminTicketPage({ params }: { params: { ticketId: string } }) {
@@ -23,7 +32,6 @@ export default function AdminTicketPage({ params }: { params: { ticketId: string
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  // Optional admin notes to help the AI draft better
   const [adminNotes, setAdminNotes] = useState("");
 
   async function load() {
@@ -89,13 +97,36 @@ export default function AdminTicketPage({ params }: { params: { ticketId: string
       });
       const data = await res.json();
       if (!data?.ok) throw new Error(data?.error || "Failed to draft reply");
-      // Put the draft into the reply box (you can edit before sending)
       setReply(data.draft || "");
     } catch (e: any) {
       setErr(e?.message || "Failed");
     } finally {
       setBusy(null);
     }
+  }
+
+  async function autoTriage() {
+    setErr(null);
+    setBusy("triage");
+    try {
+      const res = await fetch(`/api/support/tickets/${ticketId}/triage`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ adminNotes }),
+      });
+      const data = await res.json();
+      if (!data?.ok) throw new Error(data?.error || "Failed to triage");
+      await load();
+    } catch (e: any) {
+      setErr(e?.message || "Failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function applySuggestedStatus() {
+    if (!ticket?.triage?.suggestedStatus) return;
+    await updateStatus(ticket.triage.suggestedStatus);
   }
 
   useEffect(() => {
@@ -114,10 +145,7 @@ export default function AdminTicketPage({ params }: { params: { ticketId: string
         </div>
 
         <div className="flex gap-2">
-          <Link
-            href="/admin/support"
-            className="rounded-md border px-4 py-2 hover:bg-muted transition"
-          >
+          <Link href="/admin/support" className="rounded-md border px-4 py-2 hover:bg-muted transition">
             Back to Inbox
           </Link>
           <button
@@ -159,6 +187,93 @@ export default function AdminTicketPage({ params }: { params: { ticketId: string
           </section>
 
           <section className="rounded-lg border p-4 space-y-3">
+            <h2 className="text-xl font-semibold">Auto-triage</h2>
+
+            {ticket.triage ? (
+              <div className="space-y-2">
+                <div className="text-xs text-muted-foreground">
+                  Triaged: {new Date(ticket.triage.triagedAt).toLocaleString()}
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
+                  <span className="text-xs rounded-full border px-2 py-1">
+                    {ticket.triage.priority}
+                  </span>
+                  <span className="text-xs rounded-full border px-2 py-1">
+                    {ticket.triage.category}
+                  </span>
+                  {(ticket.triage.tags || []).map((tag) => (
+                    <span key={tag} className="text-xs rounded-full border px-2 py-1">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-semibold">Summary:</span> {ticket.triage.summary}
+                </div>
+
+                {ticket.triage.suggestedNextSteps?.length ? (
+                  <div className="text-sm">
+                    <div className="font-semibold">Suggested next steps</div>
+                    <ul className="list-disc pl-5 text-muted-foreground mt-1 space-y-1">
+                      {ticket.triage.suggestedNextSteps.map((s, i) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {ticket.triage.suggestedStatus ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="text-sm text-muted-foreground">
+                      Suggested status:{" "}
+                      <span className="font-semibold">{ticket.triage.suggestedStatus}</span>
+                    </div>
+                    <button
+                      onClick={applySuggestedStatus}
+                      disabled={busy !== null}
+                      className="rounded-md border px-3 py-2 hover:bg-muted transition text-sm"
+                    >
+                      Apply suggested status
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                No triage yet. Click Auto-triage to generate category, priority, tags, and summary.
+              </div>
+            )}
+
+            <textarea
+              value={adminNotes}
+              onChange={(e) => setAdminNotes(e.target.value)}
+              className="border rounded-md px-3 py-2 w-full min-h-[90px]"
+              placeholder="Admin notes (optional)…"
+              disabled={busy !== null}
+            />
+
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={autoTriage}
+                disabled={busy !== null}
+                className="rounded-md border px-4 py-2 hover:bg-muted transition"
+              >
+                {busy === "triage" ? "Triaging..." : "Auto-triage"}
+              </button>
+
+              <button
+                onClick={draftWithAI}
+                disabled={busy !== null}
+                className="rounded-md border px-4 py-2 hover:bg-muted transition"
+              >
+                {busy === "draft" ? "Drafting..." : "Draft reply with AI"}
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-lg border p-4 space-y-3">
             <h2 className="text-xl font-semibold">Conversation</h2>
             <div className="space-y-3">
               {ticket.messages.map((m) => (
@@ -174,36 +289,12 @@ export default function AdminTicketPage({ params }: { params: { ticketId: string
           </section>
 
           <section className="rounded-lg border p-4 space-y-3">
-            <h2 className="text-xl font-semibold">AI Drafting (optional)</h2>
-            <p className="text-sm text-muted-foreground">
-              Add any notes you want the AI to consider (e.g. “Known DNS issue on Cloudflare”),
-              then click “Draft reply with AI”. It will fill the reply box below.
-            </p>
-
-            <textarea
-              value={adminNotes}
-              onChange={(e) => setAdminNotes(e.target.value)}
-              className="border rounded-md px-3 py-2 w-full min-h-[90px]"
-              placeholder="Admin notes (optional)…"
-              disabled={busy !== null}
-            />
-
-            <button
-              onClick={draftWithAI}
-              disabled={busy !== null}
-              className="rounded-md border px-4 py-2 hover:bg-muted transition"
-            >
-              {busy === "draft" ? "Drafting..." : "Draft reply with AI"}
-            </button>
-          </section>
-
-          <section className="rounded-lg border p-4 space-y-3">
             <h2 className="text-xl font-semibold">Reply</h2>
             <textarea
               value={reply}
               onChange={(e) => setReply(e.target.value)}
               className="border rounded-md px-3 py-2 w-full min-h-[160px]"
-              placeholder="Write a helpful step-by-step reply (or use AI draft above)..."
+              placeholder="Write a helpful step-by-step reply (or use AI draft)..."
               disabled={busy !== null}
             />
             <div className="flex gap-2 flex-wrap">
@@ -234,6 +325,14 @@ export default function AdminTicketPage({ params }: { params: { ticketId: string
               >
                 {busy === "status" ? "Updating..." : "Update Status"}
               </button>
+            </div>
+
+            <div className="text-xs text-muted-foreground">
+              Auto-status rules:
+              <ul className="list-disc pl-5 mt-1 space-y-1">
+                <li>Admin reply sets status to <span className="font-semibold">pending</span> (waiting on customer).</li>
+                <li>Customer reply sets status back to <span className="font-semibold">open</span>.</li>
+              </ul>
             </div>
           </section>
         </>
