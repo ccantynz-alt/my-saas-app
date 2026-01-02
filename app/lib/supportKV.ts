@@ -22,13 +22,17 @@ export type SupportTicket = {
   updatedAt: string;
 };
 
-const indexKey = "support:tickets";
+const INDEX_KEY = "support:tickets:index";
 
 function ticketKey(id: string) {
   return `support:ticket:${id}`;
 }
 
-export async function createTicket(data: Omit<SupportTicket, "id" | "createdAt" | "updatedAt">) {
+/* ---------------- CREATE ---------------- */
+
+export async function createTicket(
+  data: Omit<SupportTicket, "id" | "createdAt" | "updatedAt">
+) {
   const id = `ticket_${randomUUID()}`;
   const now = new Date().toISOString();
 
@@ -39,28 +43,33 @@ export async function createTicket(data: Omit<SupportTicket, "id" | "createdAt" 
     updatedAt: now,
   };
 
-  await kv.hset(ticketKey(id), ticket as any);
-  await kv.sadd(indexKey, id);
+  await kv.set(ticketKey(id), ticket);
+  await kv.sadd(INDEX_KEY, id);
 
   return ticket;
 }
 
+/* ---------------- READ ---------------- */
+
 export async function getTicket(id: string): Promise<SupportTicket | null> {
-  const ticket = await kv.hgetall<SupportTicket>(ticketKey(id));
-  return ticket && ticket.id ? ticket : null;
+  return await kv.get<SupportTicket>(ticketKey(id));
 }
 
 export async function listTickets(): Promise<SupportTicket[]> {
-  const ids = await kv.smembers(indexKey);
+  const ids = await kv.smembers<string>(INDEX_KEY);
   const tickets: SupportTicket[] = [];
 
   for (const id of ids) {
-    const t = await getTicket(id);
-    if (t) tickets.push(t);
+    const ticket = await getTicket(id);
+    if (ticket) tickets.push(ticket);
   }
 
-  return tickets.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return tickets.sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt)
+  );
 }
+
+/* ---------------- UPDATE ---------------- */
 
 export async function addMessage(
   ticketId: string,
@@ -75,5 +84,5 @@ export async function addMessage(
 
   if (newStatus) ticket.status = newStatus;
 
-  await kv.hset(ticketKey(ticketId), ticket as any);
+  await kv.set(ticketKey(ticketId), ticket);
 }
