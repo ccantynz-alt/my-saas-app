@@ -39,10 +39,15 @@ export async function upsertSeoPages(projectId: string, newPages: SeoPage[]) {
 
   for (const p of newPages) bySlug.set(p.slug, p);
 
-  const merged = Array.from(bySlug.values()).sort((a, b) =>
-    a.slug.localeCompare(b.slug)
-  );
+  const merged = Array.from(bySlug.values()).sort((a, b) => a.slug.localeCompare(b.slug));
 
   await kv.set(key(projectId), merged);
   return merged;
+}
+
+export async function deleteSeoPage(projectId: string, slug: string) {
+  const existing = await getSeoPages(projectId);
+  const next = existing.filter((p) => p.slug !== slug);
+  await kv.set(key(projectId), next);
+  return { deleted: existing.length - next.length };
 }
