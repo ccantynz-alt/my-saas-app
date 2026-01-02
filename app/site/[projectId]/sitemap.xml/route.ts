@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { storeGet } from "@/app/lib/store";
 import { isAdmin } from "@/app/lib/isAdmin";
 import { getProjectSEO, escapeHtml } from "@/app/lib/seo";
-import { LOCATIONS } from "@/app/lib/locations";
+import { PROGRAM_PAGES } from "@/app/lib/programmaticPages";
 
 type Visibility = "public" | "private";
 
@@ -35,7 +35,6 @@ export async function GET(
   const v = await storeGet(visibilityKey(params.projectId));
   const visibility: Visibility = v === "public" ? "public" : "private";
 
-  // Private sites shouldn't expose sitemap publicly
   if (visibility === "private" && !admin) {
     return new NextResponse("Not found", { status: 404 });
   }
@@ -51,9 +50,8 @@ export async function GET(
       ? ((latest as any).pages as Record<string, string>)
       : null;
 
-  // Standard site pages (under /site/<projectId>/...)
+  // Normal project pages
   const pagePaths = pages ? Object.keys(pages) : ["/"];
-
   const pageUrls = pagePaths
     .map((p) => {
       const suffix = p === "/" ? "" : p;
@@ -61,15 +59,12 @@ export async function GET(
     })
     .filter(Boolean);
 
-  // Location pages (under /site/<projectId>/location/<country>/<city>)
-  const locationUrls = LOCATIONS.map((l) =>
-    canonicalFor(
-      seo,
-      `/site/${params.projectId}/location/${l.country.toLowerCase()}/${l.slug}`
-    )
+  // Programmatic SaaS pages
+  const programUrls = PROGRAM_PAGES.map((p) =>
+    canonicalFor(seo, `/site/${params.projectId}/p/${p.category}/${p.slug}`)
   ).filter(Boolean);
 
-  const urls = [...pageUrls, ...locationUrls];
+  const urls = [...pageUrls, ...programUrls];
 
   const now = new Date().toISOString();
 
