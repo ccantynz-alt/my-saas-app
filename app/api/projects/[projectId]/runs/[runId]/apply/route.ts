@@ -1,7 +1,7 @@
 // app/api/projects/[projectId]/runs/[runId]/apply/route.ts
 import { NextResponse } from "next/server";
-import { storeGet, storeSet } from "../../../../lib/store";
-import { isAdmin } from "../../../../lib/isAdmin";
+import { storeGet, storeSet } from "../../../../../../lib/store";
+import { isAdmin } from "../../../../../../lib/isAdmin";
 
 type RunFile = { path: string; content: string };
 
