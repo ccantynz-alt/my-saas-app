@@ -49,15 +49,16 @@ export async function POST(
         controller.enqueue(encoder.encode(sse(event, data)));
       };
 
-      // Immediately tell the client we're alive
       send("status", { status: "running" });
+      send("step", { label: "Planning…" });
 
-      // Persist status in KV
       await storeSet(RUN_KEY(runId), { ...run, status: "running", updatedAt: nowISO() });
 
       let fullText = "";
 
       try {
+        send("step", { label: "Generating…" });
+
         const completionStream = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           stream: true,
@@ -66,7 +67,7 @@ export async function POST(
             {
               role: "system",
               content:
-                "You are an expert SaaS website generator. Always respond as strict JSON, no markdown, no extra text.",
+                "You are an expert SaaS website generator. Respond as STRICT JSON ONLY. No markdown. No extra text.",
             },
             {
               role: "user",
@@ -74,6 +75,7 @@ export async function POST(
 Generate:
 1) A short summary of what you built
 2) A Next.js page component at app/generated/page.tsx
+3) A standalone HTML preview at app/generated/preview.html (this should be a full HTML document with inline CSS so it looks great)
 
 Prompt:
 ${run.prompt}
@@ -82,7 +84,8 @@ Return STRICT JSON ONLY with this shape:
 {
   "summary": "...",
   "files": [
-    { "path": "app/generated/page.tsx", "content": "..." }
+    { "path": "app/generated/page.tsx", "content": "..." },
+    { "path": "app/generated/preview.html", "content": "..." }
   ]
 }
               `.trim(),
@@ -93,20 +96,17 @@ Return STRICT JSON ONLY with this shape:
         for await (const chunk of completionStream) {
           const delta = chunk.choices?.[0]?.delta?.content ?? "";
           if (!delta) continue;
-
           fullText += delta;
-
-          // Stream the live tokens to the client
           send("delta", { text: delta });
         }
 
-        // Parse and save the final JSON output
+        send("step", { label: "Writing files…" });
+
         let parsed: any = null;
         try {
           parsed = JSON.parse(fullText);
         } catch {
-          // If the model ever drifts, fail gracefully and show the raw text
-          throw new Error("AI returned non-JSON output. (We can harden this next.)");
+          throw new Error("AI returned non-JSON output.");
         }
 
         const completed: Run = {
@@ -121,6 +121,7 @@ Return STRICT JSON ONLY with this shape:
 
         await storeSet(RUN_KEY(runId), completed);
 
+        send("step", { label: "Complete ✅" });
         send("done", { ok: true, runId });
         controller.close();
       } catch (err: any) {
