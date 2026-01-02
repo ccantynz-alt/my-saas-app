@@ -54,21 +54,26 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
     }
   }
 
-  async function applyRun(runId: string) {
+  async function applyRun(runId: string, setHome: boolean) {
     setApplyingRunId(runId);
     setError(null);
     setToast(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/runs/${runId}/apply`, {
-        method: "POST",
-      });
+      const url = setHome
+        ? `/api/projects/${projectId}/runs/${runId}/apply?setHome=1`
+        : `/api/projects/${projectId}/runs/${runId}/apply`;
+
+      const res = await fetch(url, { method: "POST" });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.ok) throw new Error(data?.error || "Failed to apply run");
 
-      setToast("Applied! Opening /generated…");
-      setTimeout(() => {
-        window.location.href = "/generated";
-      }, 300);
+      if (setHome) {
+        setToast("Applied + set as Home! Opening / …");
+        setTimeout(() => (window.location.href = "/"), 300);
+      } else {
+        setToast("Applied! Opening /generated…");
+        setTimeout(() => (window.location.href = "/generated"), 300);
+      }
     } catch (e: any) {
       setError(e?.message || "Unknown error");
     } finally {
@@ -106,9 +111,7 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
           { method: "POST" }
         );
 
-        if (!streamRes.ok || !streamRes.body) {
-          throw new Error("Failed to start streaming run");
-        }
+        if (!streamRes.ok || !streamRes.body) throw new Error("Failed to start streaming run");
 
         const reader = streamRes.body.getReader();
         const decoder = new TextDecoder();
@@ -160,15 +163,12 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
             }
 
             if (event === "delta" && payload?.text) applyLive(payload.text);
-
             if (event === "status" && payload?.status) {
               setRuns((prev) =>
                 prev.map((r) => (r.id === newRun.id ? { ...r, status: payload.status } : r))
               );
             }
-
             if (event === "step" && payload?.label) setStep(payload.label);
-
             if (event === "error") throw new Error(payload?.message || "Streaming error");
 
             if (event === "done") {
@@ -240,10 +240,17 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
             </button>
 
             <Link
+              href="/"
+              className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm hover:bg-white/10"
+            >
+              Open Home /
+            </Link>
+
+            <Link
               href="/generated"
               className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm hover:bg-white/10"
             >
-              Open /generated
+              /generated
             </Link>
           </div>
 
@@ -317,13 +324,23 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
                         <div className="text-sm font-medium text-zinc-200">Output</div>
 
                         {canApply ? (
-                          <button
-                            onClick={() => applyRun(r.id)}
-                            disabled={applyingRunId === r.id}
-                            className="rounded-2xl border border-white/10 bg-white px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-zinc-200 disabled:opacity-60"
-                          >
-                            {applyingRunId === r.id ? "Applying…" : "Apply → /generated"}
-                          </button>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={() => applyRun(r.id, false)}
+                              disabled={applyingRunId === r.id}
+                              className="rounded-2xl border border-white/10 bg-white px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-zinc-200 disabled:opacity-60"
+                            >
+                              {applyingRunId === r.id ? "Applying…" : "Apply → /generated"}
+                            </button>
+
+                            <button
+                              onClick={() => applyRun(r.id, true)}
+                              disabled={applyingRunId === r.id}
+                              className="rounded-2xl border border-emerald-500/30 bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-60"
+                            >
+                              {applyingRunId === r.id ? "Setting…" : "Apply & Set Home"}
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-xs text-zinc-500">
                             {r.status === "complete"
@@ -336,22 +353,6 @@ export default function ProjectRunsPage({ params }: { params: { projectId: strin
                       <div className="mt-3 text-sm text-zinc-300">
                         {r.output?.summary || "No output yet."}
                       </div>
-
-                      {r.output?.files?.length ? (
-                        <div className="mt-4 grid gap-3">
-                          {r.output.files.map((f) => (
-                            <div
-                              key={f.path}
-                              className="rounded-2xl border border-white/10 bg-black/30 p-4"
-                            >
-                              <div className="text-xs text-zinc-400">{f.path}</div>
-                              <pre className="mt-3 overflow-x-auto text-xs text-zinc-200">
-                                {f.content}
-                              </pre>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
                     </div>
                   ) : null}
                 </li>
