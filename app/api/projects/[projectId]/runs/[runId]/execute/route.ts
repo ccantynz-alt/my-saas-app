@@ -32,12 +32,21 @@ export async function POST(
   const html = buildHtml(run.prompt, projectId, runId);
 
   // save generated HTML for /generated
-  await kv.set("generated:latest", {
-    projectId,
-    runId,
-    html,
-    createdAt: new Date().toISOString(),
-  });
+  // Save latest
+await kv.set("generated:latest", {
+  projectId,
+  runId,
+  html,
+  createdAt: new Date().toISOString(),
+});
+
+// Save per-run (so we can view any run later)
+await kv.set(`generated:run:${runId}`, {
+  projectId,
+  runId,
+  html,
+  createdAt: new Date().toISOString(),
+});
 
   // mark complete
   run.status = "complete";
