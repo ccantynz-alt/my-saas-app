@@ -41,8 +41,11 @@ function makeProjectId() {
 export default function TemplatesPage() {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function useTemplate(t: Template) {
+    setError(null);
+
     try {
       setBusyId(t.id);
 
@@ -51,7 +54,7 @@ export default function TemplatesPage() {
 
       const projectId = makeProjectId();
 
-      // Save selection locally so the Project page can show it + prefill prompt
+      // Save locally FIRST (fallback)
       try {
         localStorage.setItem(
           `project:${projectId}`,
@@ -68,6 +71,29 @@ export default function TemplatesPage() {
         // ignore if storage blocked
       }
 
+      // Then try to save on the server
+      try {
+        const res = await fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: projectId,
+            name: projectName.trim(),
+            templateId: t.id,
+            templateName: t.name,
+            seedPrompt: t.seedPrompt,
+          }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error || `Failed to create project (HTTP ${res.status})`);
+        }
+      } catch (e: any) {
+        // Keep going even if server fails — local fallback still works
+        setError(`Server save failed (local save still works): ${e?.message || "Unknown error"}`);
+      }
+
       router.push(`/projects/${projectId}`);
     } finally {
       setBusyId(null);
@@ -80,12 +106,34 @@ export default function TemplatesPage() {
         <div>
           <h1 style={{ fontSize: "2.5rem", margin: 0 }}>Templates</h1>
           <p style={{ marginTop: 10, color: "#555" }}>Choose a template to start a new project.</p>
+
+          {error && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: 12,
+                border: "1px solid #f2c200",
+                background: "#fff7d6",
+                borderRadius: 10,
+                color: "#3a2a00",
+                fontSize: 14,
+              }}
+            >
+              {error}
+            </div>
+          )}
         </div>
 
         <div style={{ display: "flex", gap: 12 }}>
-          <a href="/" style={linkStyle}>Home</a>
-          <a href="/projects" style={linkStyle}>Projects</a>
-          <a href="/dashboard" style={linkStyle}>Dashboard</a>
+          <a href="/" style={linkStyle}>
+            Home
+          </a>
+          <a href="/projects" style={linkStyle}>
+            Projects
+          </a>
+          <a href="/dashboard" style={linkStyle}>
+            Dashboard
+          </a>
         </div>
       </div>
 
