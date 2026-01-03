@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
-function safeString(v: unknown) {
+function escapeHtml(input: string) {
+  return input
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function safeString(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
@@ -55,7 +64,6 @@ function generateHtml(opts: { projectId: string; runId: string; prompt: string }
     .muted { opacity: 0.8; font-size: 13px; }
     code { background: #0b1220; border: 1px solid #233055; padding: 2px 6px; border-radius: 8px; }
     footer { padding: 24px 20px; text-align:center; border-top: 1px solid #1f2a44; opacity: 0.85; }
-    a { color: #93c5fd; }
   </style>
 </head>
 <body>
@@ -96,15 +104,6 @@ function generateHtml(opts: { projectId: string; runId: string; prompt: string }
 </html>`;
 }
 
-function escapeHtml(input: string) {
-  return input
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
 export async function POST(
   req: Request,
   { params }: { params: { projectId: string; runId: string } }
@@ -112,12 +111,22 @@ export async function POST(
   try {
     const { projectId, runId } = params;
 
-    // Read run to get prompt (fallback if missing)
+    // ✅ Always end up with a STRING prompt (never {})
     const runAny = await kv.get(`run:${runId}`);
-    const runPrompt =
-      (runAny && typeof runAny === "object" && safeString((runAny as any).prompt)) ||
-      safeString((await req.json().catch(() => ({})))?.prompt) ||
-      "Build a modern website. Clean minimal styling.";
+    let runPrompt = "";
+
+    if (runAny && typeof runAny === "object") {
+      runPrompt = safeString((runAny as any).prompt);
+    }
+
+    if (!runPrompt) {
+      const body = await req.json().catch(() => ({} as any));
+      runPrompt = safeString(body?.prompt);
+    }
+
+    if (!runPrompt) {
+      runPrompt = "Build a modern website. Clean minimal styling.";
+    }
 
     const html = generateHtml({ projectId, runId, prompt: runPrompt });
 
@@ -128,13 +137,13 @@ export async function POST(
       createdAt: new Date().toISOString(),
     };
 
-    // ✅ Save latest (keeps existing /generated working)
+    // ✅ Save latest
     await kv.set("generated:latest", payload);
 
-    // ✅ Save per-run (THIS is what /generated/<runId> reads)
+    // ✅ Save per-run
     await kv.set(`generated:run:${runId}`, payload);
 
-    // Update run status
+    // Update run status (optional, but good)
     if (runAny && typeof runAny === "object") {
       await kv.set(`run:${runId}`, {
         ...(runAny as any),
