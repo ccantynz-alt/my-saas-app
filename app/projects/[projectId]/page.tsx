@@ -1,172 +1,187 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-
-type Project = {
-  id: string;
-  name: string;
-  templateId?: string;
-  templateName?: string;
-  seedPrompt?: string;
-  createdAt?: string;
-};
+import Link from "next/link";
 
 type Run = {
   id: string;
-  projectId: string;
-  prompt: string;
   status: string;
+  prompt: string;
   createdAt: string;
-  completedAt?: string;
-  output?: string;
 };
 
-export default function ProjectDetailPage() {
-  const params = useParams();
-  const projectId = String(params?.projectId || "");
+export default function ProjectPage({ params }: { params: { projectId: string } }) {
+  const projectId = params.projectId;
 
-  const [project, setProject] = useState<Project | null>(null);
-  const [prompt, setPrompt] = useState("");
   const [runs, setRuns] = useState<Run[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState(
+    "Build a modern landing page with pricing, FAQ, and contact form. Clean minimal styling."
+  );
+  const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  async function load() {
-    setLoading(true);
-    setErr(null);
-
-    try {
-      const pRes = await fetch("/api/projects", { cache: "no-store" });
-      const pJson = await pRes.json();
-      const projects: Project[] = pJson?.projects || [];
-      const found = projects.find((p) => p.id === projectId) || null;
-
-      if (found) {
-        setProject(found);
-        if (found.seedPrompt) setPrompt(found.seedPrompt);
-      } else {
-        setProject({ id: projectId, name: `Project ${projectId.slice(0, 6)}` });
-      }
-
-      const rRes = await fetch(`/api/projects/${projectId}/runs`, { cache: "no-store" });
-      const rJson = await rRes.json();
-      setRuns(rJson?.runs || []);
-
-      setLoading(false);
-    } catch (e: any) {
-      setErr(e?.message || "Failed to load project");
-      setLoading(false);
+  async function loadRuns() {
+    const res = await fetch(`/api/projects/${projectId}/runs`, { cache: "no-store" });
+    const json = await res.json().catch(() => ({}));
+    if (json?.ok && Array.isArray(json.runs)) {
+      setRuns(json.runs);
     }
   }
 
-  useEffect(() => {
-    load();
-  }, [projectId]);
-
   async function createRun() {
-    setBusy("create");
-    setErr(null);
-
     try {
+      setErr(null);
+      setLoading(true);
+
       const res = await fetch(`/api/projects/${projectId}/runs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
       });
 
-      const json = await res.json();
-      if (!json?.ok) throw new Error("Failed to create run");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok || !json?.run?.id) {
+        throw new Error(json?.error || "Failed to create run");
+      }
 
-      await load();
-      setBusy(null);
+      setPrompt(prompt);
+      await loadRuns();
     } catch (e: any) {
       setErr(e?.message || "Failed to create run");
-      setBusy(null);
+    } finally {
+      setLoading(false);
     }
   }
 
   async function executeRun(runId: string) {
-    setBusy(runId);
-    setErr(null);
-
     try {
+      setErr(null);
+
       const res = await fetch(
         `/api/projects/${projectId}/runs/${runId}/execute`,
         { method: "POST" }
       );
 
-      const json = await res.json();
-      if (!json?.ok) throw new Error("Failed to execute run");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || "Execution failed");
+      }
 
-      await load();
-      window.location.href = `/generated/${runId}`;
+      await loadRuns();
+      alert("Run executed. You can now view the generated page.");
     } catch (e: any) {
-      setErr(e?.message || "Failed to execute run");
-      setBusy(null);
+      setErr(e?.message || "Execution failed");
     }
   }
 
+  useEffect(() => {
+    loadRuns();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
   return (
-    <main style={{ padding: "3rem", fontFamily: "sans-serif", maxWidth: 980, margin: "0 auto" }}>
-      <h1>{project?.name || "Project"}</h1>
-      <p>ID: <code>{projectId}</code></p>
+    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 16px" }}>
+      <h1 style={{ fontSize: 28, fontWeight: 800 }}>Project</h1>
+      <p style={{ opacity: 0.8 }}>ID: {projectId}</p>
 
-      {err && <p style={{ color: "crimson" }}>{err}</p>}
+      {err && (
+        <div
+          style={{
+            background: "#ffe5e5",
+            border: "1px solid #ffb3b3",
+            color: "#7a0000",
+            padding: 12,
+            borderRadius: 10,
+            margin: "12px 0",
+          }}
+        >
+          {err}
+        </div>
+      )}
 
-      <section>
-        <h2>Prompt</h2>
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          rows={8}
-          style={{ width: "100%", padding: 10 }}
-        />
-        <button onClick={createRun} disabled={busy === "create"}>
-          {busy === "create" ? "Creating…" : "Create Run"}
-        </button>
-      </section>
+      <h2 style={{ marginTop: 28 }}>Create Run</h2>
 
-      <section style={{ marginTop: 30 }}>
-        <h2>Runs</h2>
+      <textarea
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        rows={4}
+        style={{
+          width: "100%",
+          padding: 12,
+          borderRadius: 10,
+          border: "1px solid #ccc",
+          marginBottom: 10,
+        }}
+      />
 
-        {loading && <p>Loading…</p>}
+      <button
+        onClick={createRun}
+        disabled={loading}
+        style={{
+          padding: "10px 14px",
+          borderRadius: 10,
+          border: "1px solid #111",
+          background: "#111",
+          color: "#fff",
+          fontWeight: 700,
+          cursor: "pointer",
+        }}
+      >
+        {loading ? "Creating..." : "Create Run"}
+      </button>
 
-        {!loading && runs.map((r) => (
-          <div key={r.id} style={{ border: "1px solid #ddd", padding: 12, marginBottom: 12 }}>
-            <b>{r.status.toUpperCase()}</b>
-            <div>Run ID: <code>{r.id}</code></div>
+      <h2 style={{ marginTop: 36 }}>Runs</h2>
 
-            <div style={{ marginTop: 8, display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button
-                onClick={() => executeRun(r.id)}
-                disabled={busy === r.id}
-              >
-                {busy === r.id ? "Running…" : "Execute"}
-              </button>
+      {runs.length === 0 ? (
+        <p>No runs yet.</p>
+      ) : (
+        <div style={{ display: "grid", gap: 14 }}>
+          {runs.map((run) => (
+            <div
+              key={run.id}
+              style={{
+                border: "1px solid #e5e5e5",
+                borderRadius: 12,
+                padding: 14,
+              }}
+            >
+              <strong>{run.status.toUpperCase()}</strong>
+              <div style={{ opacity: 0.85 }}>Run ID: {run.id}</div>
 
-              <a
-                href={`/generated/${r.id}`}
-                style={{
-                  padding: "6px 12px",
-                  border: "1px solid #000",
-                  textDecoration: "none",
-                  borderRadius: 6,
-                }}
-              >
-                View Generated for this Run
-              </a>
+              <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
+                <button
+                  onClick={() => executeRun(run.id)}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #111",
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                  }}
+                >
+                  Execute
+                </button>
+
+                <Link
+                  href={`/generated/${run.id}`}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #111",
+                    background: "#fff",
+                    textDecoration: "none",
+                    color: "#000",
+                    fontWeight: 600,
+                  }}
+                >
+                  View Generated for this Run
+                </Link>
+              </div>
             </div>
-
-            <details style={{ marginTop: 10 }}>
-              <summary>View prompt / output</summary>
-              <pre>{r.prompt}</pre>
-              {r.output && <pre>{r.output}</pre>}
-            </details>
-          </div>
-        ))}
-      </section>
-    </main>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
