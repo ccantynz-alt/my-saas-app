@@ -1,50 +1,45 @@
 import { NextResponse } from "next/server";
+import { kvListProjects, kvSaveProject, type Project } from "@/lib/kvStore";
 
-type Project = {
-  id: string;
-  name: string;
-  templateId?: string;
-  templateName?: string;
-  seedPrompt?: string;
-  createdAt: string;
-};
+// fallback (only if KV is not configured)
+const memory = new Map<string, Project>();
 
-// In-memory store (temporary, resets on deploy)
-// This is OK for now — database comes later
-const projects = new Map<string, Project>();
-
-// GET /api/projects
 export async function GET() {
+  const kvProjects = await kvListProjects();
+
+  if (kvProjects !== null) {
+    return NextResponse.json({ ok: true, source: "kv", projects: kvProjects });
+  }
+
   return NextResponse.json({
     ok: true,
-    projects: Array.from(projects.values()),
+    source: "memory",
+    projects: Array.from(memory.values()),
   });
 }
 
-// POST /api/projects
 export async function POST(req: Request) {
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
 
   if (!body?.id || !body?.name) {
-    return NextResponse.json(
-      { ok: false, error: "Missing id or name" },
-      { status: 400 }
-    );
+    return NextResponse.json({ ok: false, error: "Missing id or name" }, { status: 400 });
   }
 
   const project: Project = {
-    id: body.id,
-    name: body.name,
-    templateId: body.templateId,
-    templateName: body.templateName,
-    seedPrompt: body.seedPrompt,
+    id: String(body.id),
+    name: String(body.name),
+    templateId: body.templateId ? String(body.templateId) : undefined,
+    templateName: body.templateName ? String(body.templateName) : undefined,
+    seedPrompt: body.seedPrompt ? String(body.seedPrompt) : undefined,
     createdAt: new Date().toISOString(),
   };
 
-  projects.set(project.id, project);
+  const saved = await kvSaveProject(project);
 
-  return NextResponse.json({
-    ok: true,
-    project,
-  });
+  if (saved !== null) {
+    return NextResponse.json({ ok: true, source: "kv", project: saved });
+  }
+
+  memory.set(project.id, project);
+  return NextResponse.json({ ok: true, source: "memory", project });
 }
