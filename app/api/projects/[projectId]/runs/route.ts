@@ -1,52 +1,98 @@
 import { NextResponse } from "next/server";
-import { createRun, listRuns } from "@/lib/runStore";
+import { kv } from "@vercel/kv";
 
-// force dynamic + no cache
-export const dynamic = "force-dynamic";
+type Run = {
+  id: string;
+  projectId: string;
+  status: "queued" | "running" | "completed" | "failed";
+  prompt: string;
+  createdAt: string;
+  completedAt?: string;
+  error?: string;
+};
 
-function noStore(data: any, status = 200) {
-  return NextResponse.json(data, {
-    status,
-    headers: {
-      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-      Pragma: "no-cache",
-      Expires: "0",
-    },
-  });
+function makeRunId() {
+  // Your UI already uses ids like run_...
+  return `run_${crypto.randomUUID().replace(/-/g, "")}`;
 }
 
-// GET /api/projects/:projectId/runs
+function safeString(v: unknown) {
+  return typeof v === "string" ? v.trim() : "";
+}
+
+async function getProject(projectId: string) {
+  // Common project key format used in your app
+  const project = await kv.get(`project:${projectId}`);
+  return project;
+}
+
+async function getProjectRuns(projectId: string): Promise<Run[]> {
+  const val = await kv.get(`project:${projectId}:runs`);
+  if (Array.isArray(val)) return val as Run[];
+  return [];
+}
+
+async function setProjectRuns(projectId: string, runs: Run[]) {
+  await kv.set(`project:${projectId}:runs`, runs);
+}
+
 export async function GET(
   _req: Request,
   { params }: { params: { projectId: string } }
 ) {
-  const runs = await listRuns(params.projectId);
+  try {
+    const projectId = params.projectId;
 
-  return noStore({
-    ok: true,
-    runs: runs ?? [],
-  });
+    const runs = await getProjectRuns(projectId);
+    return NextResponse.json({ ok: true, runs });
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: e?.message || "Failed to load runs" },
+      { status: 500 }
+    );
+  }
 }
 
-// POST /api/projects/:projectId/runs
 export async function POST(
   req: Request,
   { params }: { params: { projectId: string } }
 ) {
-  const body = await req.json().catch(() => null);
+  try {
+    const projectId = params.projectId;
 
-  if (!body?.prompt) {
-    return noStore({ ok: false, error: "Missing prompt" }, 400);
+    // Ensure project exists (so we don't create orphan runs)
+    const project = await getProject(projectId);
+    if (!project) {
+      return NextResponse.json(
+        { ok: false, error: "Project not found" },
+        { status: 404 }
+      );
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const prompt = safeString(body?.prompt) || "Build a modern landing page. Clean minimal styling.";
+
+    const run: Run = {
+      id: makeRunId(),
+      projectId,
+      status: "queued",
+      prompt,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Save run by id (global)
+    await kv.set(`run:${run.id}`, run);
+
+    // Add run to project run list
+    const runs = await getProjectRuns(projectId);
+    const updated = [run, ...runs];
+    await setProjectRuns(projectId, updated);
+
+    return NextResponse.json({ ok: true, run });
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: e?.message || "Failed to create run" },
+      { status: 500 }
+    );
   }
-
-  const run = await createRun(params.projectId, String(body.prompt));
-
-  if (!run) {
-    return noStore({ ok: false, error: "KV not available" }, 500);
-  }
-
-  return noStore({
-    ok: true,
-    run,
-  });
 }
