@@ -1,40 +1,40 @@
 import { NextResponse } from "next/server";
-import {
-  getProjectTemplate,
-  setProjectTemplate,
-  clearProjectTemplate,
-} from "@/app/lib/projectTemplateKV";
+import { auth } from "@clerk/nextjs/server";
 
+/**
+ * TEMP STUB:
+ * This endpoint depended on missing internal lib (projectTemplateKV) and alias imports.
+ * We'll implement project templates later.
+ */
 export async function GET(
-  _: Request,
+  _req: Request,
   { params }: { params: { projectId: string } }
 ) {
-  const sel = await getProjectTemplate(params.projectId);
-  return NextResponse.json({ ok: true, selection: sel });
+  const { userId } = auth();
+  if (!userId) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+
+  return NextResponse.json({
+    ok: true,
+    projectId: params.projectId,
+    template: null,
+    status: "stub",
+  });
 }
 
 export async function POST(
-  req: Request,
+  _req: Request,
   { params }: { params: { projectId: string } }
 ) {
-  const body = await req.json().catch(() => ({}));
-  const templateId = String(body?.templateId || "");
+  const { userId } = auth();
+  if (!userId) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
-  if (!templateId) {
-    return NextResponse.json(
-      { ok: false, error: "Missing templateId" },
-      { status: 400 }
-    );
-  }
-
-  const sel = await setProjectTemplate(params.projectId, templateId);
-  return NextResponse.json({ ok: true, selection: sel });
-}
-
-export async function DELETE(
-  _: Request,
-  { params }: { params: { projectId: string } }
-) {
-  await clearProjectTemplate(params.projectId);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json(
+    {
+      ok: false,
+      status: "not_implemented",
+      projectId: params.projectId,
+      message: "Project template save/apply not implemented yet.",
+    },
+    { status: 501 }
+  );
 }
