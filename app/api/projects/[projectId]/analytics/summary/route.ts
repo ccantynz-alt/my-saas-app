@@ -11,6 +11,7 @@ export async function GET(
 ) {
   const projectId = params.projectId;
 
+  // ✅ PROOF MARKER: ANALYTICS_SUMMARY_ROUTE_V2
   // ✅ Stubs have simplified signatures in this codebase
   const series = await getDailySeries(projectId);
   const topPages = await getTopPages(projectId);
@@ -22,7 +23,6 @@ export async function GET(
     series,
     topPages,
     recent,
-    note: "Analytics summary is stub-friendly. Wire real tracking later.",
+    marker: "ANALYTICS_SUMMARY_ROUTE_V2",
   });
 }
-
