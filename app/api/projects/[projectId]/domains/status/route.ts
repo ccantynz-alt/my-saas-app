@@ -1,10 +1,24 @@
 import { NextResponse } from "next/server";
-import { getDomainStatuses } from "@/app/lib/domainAttachKV";
+import { auth } from "@clerk/nextjs/server";
 
+/**
+ * TEMP STUB:
+ * This endpoint depended on missing internal libs and alias imports.
+ * We keep it compiling now. We'll implement real domain status later.
+ */
 export async function GET(
-  _: Request,
+  _req: Request,
   { params }: { params: { projectId: string } }
 ) {
-  const statuses = await getDomainStatuses(params.projectId);
-  return NextResponse.json({ ok: true, statuses });
+  const { userId } = auth();
+  if (!userId) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  return NextResponse.json({
+    ok: false,
+    status: "not_implemented",
+    projectId: params.projectId,
+    message: "Domain status is not implemented yet.",
+  });
 }
