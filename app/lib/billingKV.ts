@@ -1,13 +1,15 @@
-import { kv } from "@/app/lib/kv";
+import { kv } from "@vercel/kv";
 
-function key(userId: string) {
-  return `billing:subscription:${userId}`;
-}
-
-export async function setSubscription(userId: string, data: any) {
-  await kv.set(key(userId), data);
-}
-
-export async function getSubscription(userId: string) {
-  return await kv.get(key(userId));
+export async function setUserSubscriptionActive(params: {
+  clerkUserId: string;
+  customerId?: string | null;
+  subscriptionId?: string | null;
+}) {
+  await kv.hset(`sub:user:${params.clerkUserId}`, {
+    status: "active",
+    clerkUserId: params.clerkUserId,
+    customerId: params.customerId || null,
+    subscriptionId: params.subscriptionId || null,
+    updatedAt: Date.now(),
+  });
 }
