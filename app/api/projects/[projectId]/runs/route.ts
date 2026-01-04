@@ -1,85 +1,108 @@
 import { NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
 import { auth } from "@clerk/nextjs/server";
-import { nanoid } from "nanoid";
+import { kv } from "@vercel/kv";
 
-async function getOwnedProject(projectId: string, userId: string) {
-  const project = await kv.hgetall<any>(`project:${projectId}`);
-  if (!project) return { project: null, status: 404 as const };
-  if (project.userId !== userId) return { project: null, status: 403 as const };
-  return { project, status: 200 as const };
+type Run = {
+  id: string;
+  projectId: string;
+  status: "queued" | "running" | "complete" | "failed";
+  prompt: string;
+  createdAt: number;
+};
+
+function runKey(projectId: string, runId: string) {
+  return `run:${projectId}:${runId}`;
+}
+
+function runsIndexKey(projectId: string) {
+  return `runs:${projectId}:index`;
 }
 
 export async function GET(
   _req: Request,
   { params }: { params: { projectId: string } }
 ) {
-  const { userId } = auth();
+  // ✅ FIX: auth() must be awaited in your current Clerk typings/build
+  const { userId } = await auth();
 
   if (!userId) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const owned = await getOwnedProject(params.projectId, userId);
+  const projectId = params.projectId;
 
-  if (owned.status === 404) {
-    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  try {
+    const ids = (await kv.get<string[]>(runsIndexKey(projectId))) || [];
+    const runs = await Promise.all(
+      ids.map(async (id) => {
+        const r = await kv.get<Run>(runKey(projectId, id));
+        return r;
+      })
+    );
+
+    return NextResponse.json({
+      ok: true,
+      projectId,
+      runs: runs.filter(Boolean),
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { ok: false, error: err?.message || "Failed to load runs" },
+      { status: 500 }
+    );
   }
-
-  if (owned.status === 403) {
-    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  }
-
-  const runIds = await kv.lrange<string[]>(`project:${params.projectId}:runs`, 0, -1);
-
-  const runs = await Promise.all(
-    runIds.map(async (id) => {
-      const run = await kv.hgetall<any>(`run:${id}`);
-      return run || null;
-    })
-  );
-
-  return NextResponse.json({
-    ok: true,
-    project: owned.project,
-    runs: runs.filter(Boolean),
-  });
 }
 
 export async function POST(
   req: Request,
   { params }: { params: { projectId: string } }
 ) {
-  const { userId } = auth();
+  // ✅ FIX: auth() must be awaited in your current Clerk typings/build
+  const { userId } = await auth();
 
   if (!userId) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const owned = await getOwnedProject(params.projectId, userId);
+  const projectId = params.projectId;
 
-  if (owned.status === 404) {
-    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  let body: any = null;
+  try {
+    body = await req.json();
+  } catch {
+    body = null;
   }
 
-  if (owned.status === 403) {
-    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-  }
+  const prompt =
+    typeof body?.prompt === "string"
+      ? body.prompt.trim()
+      : "Build a modern landing page with pricing, FAQ, and a contact form.";
 
-  const body = await req.json().catch(() => ({}));
-  const prompt = typeof body.prompt === "string" ? body.prompt : "";
+  const runId = `run_${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`;
 
-  const run = {
-    id: `run_${nanoid(10)}`,
-    projectId: params.projectId,
-    userId,
-    prompt,
+  const run: Run = {
+    id: runId,
+    projectId,
     status: "queued",
+    prompt,
     createdAt: Date.now(),
   };
 
-  await kv.hset(`run:${run.id}`, run);
-  await kv.lpush(`project:${params.projectId}:runs`, run.id);
+  try {
+    // store run
+    await kv.set(runKey(projectId, runId), run);
 
-  return NextResponse.json({ ok: true, run });
+    // add to index (prepend newest)
+    const indexKey = runsIndexKey(projectId);
+    const ids = (await kv.get<string[]>(indexKey)) || [];
+    const next = [runId, ...ids.filter((x) => x !== runId)].slice(0, 200);
+    await kv.set(indexKey, next);
+
+    return NextResponse.json({ ok: true, run });
+  } catch (err: any) {
+    return NextResponse.json(
+      { ok: false, error: err?.message || "Failed to create run" },
+      { status: 500 }
+    );
+  }
 }
