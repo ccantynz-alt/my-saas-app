@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { isAdminUserId } from "@/lib/admin";
+import { isAdminUserId } from "../../../../lib/admin";
 
 export async function GET(req: Request) {
   const { userId } = auth();
@@ -10,15 +10,12 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-
-  // Optional pagination
   const limit = Math.min(Number(url.searchParams.get("limit") || "50"), 100);
   const offset = Math.max(Number(url.searchParams.get("offset") || "0"), 0);
 
   try {
     const client = await clerkClient();
 
-    // ✅ Clerk returns a paginated response object with `.data`
     const resp = await client.users.getUserList({
       limit,
       offset,
