@@ -1,187 +1,264 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 
+type Project = { id: string; name: string; userId?: string; createdAt?: number };
 type Run = {
   id: string;
+  projectId: string;
+  userId?: string;
   status: string;
-  prompt: string;
-  createdAt: string;
+  prompt?: string;
+  createdAt?: number;
 };
 
 export default function ProjectPage({ params }: { params: { projectId: string } }) {
-  const projectId = params.projectId;
+  const router = useRouter();
+  const { userId, isLoaded } = useAuth();
 
+  const projectId = useMemo(() => params.projectId, [params.projectId]);
+
+  const [project, setProject] = useState<Project | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
-  const [prompt, setPrompt] = useState(
-    "Build a modern landing page with pricing, FAQ, and contact form. Clean minimal styling."
-  );
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  async function loadRuns() {
-    const res = await fetch(`/api/projects/${projectId}/runs`, { cache: "no-store" });
-    const json = await res.json().catch(() => ({}));
-    if (json?.ok && Array.isArray(json.runs)) {
-      setRuns(json.runs);
+  const [prompt, setPrompt] = useState(
+    "Create a professional business website with hero, services, testimonials, about, and contact. Clean modern styling."
+  );
+  const [creatingRun, setCreatingRun] = useState(false);
+  const [executingRunId, setExecutingRunId] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    setErr(null);
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/runs`, { cache: "no-store" });
+
+      if (res.status === 401) {
+        router.push("/sign-in");
+        return;
+      }
+
+      if (res.status === 403) {
+        // ✅ This means the project exists but does NOT belong to this user
+        router.push("/projects");
+        return;
+      }
+
+      const data = await res.json();
+
+      if (!data?.ok) {
+        setErr(data?.error || "Failed to load project.");
+        setLoading(false);
+        return;
+      }
+
+      setProject(data.project || null);
+      setRuns(Array.isArray(data.runs) ? data.runs : []);
+      setLoading(false);
+    } catch (e: any) {
+      setErr(e?.message || "Something went wrong.");
+      setLoading(false);
     }
   }
 
-  async function createRun() {
-    try {
-      setErr(null);
-      setLoading(true);
+  useEffect(() => {
+    // Wait until Clerk is ready
+    if (!isLoaded) return;
 
+    // Not logged in -> go sign in
+    if (!userId) {
+      router.push("/sign-in");
+      return;
+    }
+
+    // Logged in -> load project + runs
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, userId, projectId]);
+
+  async function createRun() {
+    setCreatingRun(true);
+    setErr(null);
+
+    try {
       const res = await fetch(`/api/projects/${projectId}/runs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt }),
       });
 
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json?.ok || !json?.run?.id) {
-        throw new Error(json?.error || "Failed to create run");
+      if (res.status === 401) {
+        router.push("/sign-in");
+        return;
       }
 
-      setPrompt(prompt);
-      await loadRuns();
+      if (res.status === 403) {
+        router.push("/projects");
+        return;
+      }
+
+      const data = await res.json();
+
+      if (!data?.ok) {
+        setErr(data?.error || "Failed to create run.");
+        setCreatingRun(false);
+        return;
+      }
+
+      // Refresh
+      await load();
+      setCreatingRun(false);
     } catch (e: any) {
-      setErr(e?.message || "Failed to create run");
-    } finally {
-      setLoading(false);
+      setErr(e?.message || "Failed to create run.");
+      setCreatingRun(false);
     }
   }
 
   async function executeRun(runId: string) {
+    setExecutingRunId(runId);
+    setErr(null);
+
     try {
-      setErr(null);
+      const res = await fetch(`/api/projects/${projectId}/runs/${runId}/execute`, {
+        method: "POST",
+      });
 
-      const res = await fetch(
-        `/api/projects/${projectId}/runs/${runId}/execute`,
-        { method: "POST" }
-      );
-
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json?.ok) {
-        throw new Error(json?.error || "Execution failed");
+      if (res.status === 401) {
+        router.push("/sign-in");
+        return;
       }
 
-      await loadRuns();
-      alert("Run executed. You can now view the generated page.");
+      if (res.status === 403) {
+        router.push("/projects");
+        return;
+      }
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.ok) {
+        setErr(data?.error || "Failed to execute run.");
+        setExecutingRunId(null);
+        return;
+      }
+
+      await load();
+      setExecutingRunId(null);
     } catch (e: any) {
-      setErr(e?.message || "Execution failed");
+      setErr(e?.message || "Failed to execute run.");
+      setExecutingRunId(null);
     }
   }
 
-  useEffect(() => {
-    loadRuns();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
-
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 16px" }}>
-      <h1 style={{ fontSize: 28, fontWeight: 800 }}>Project</h1>
-      <p style={{ opacity: 0.8 }}>ID: {projectId}</p>
+    <div style={{ maxWidth: 980, margin: "0 auto", padding: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 28 }}>Project</h1>
+          <div style={{ opacity: 0.8, marginTop: 6 }}>
+            {project ? (
+              <>
+                <div><b>Name:</b> {project.name}</div>
+                <div style={{ fontSize: 12, marginTop: 4, opacity: 0.75 }}>
+                  <b>ID:</b> {project.id}
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: 12, opacity: 0.75 }}>{loading ? "Loading..." : "No project loaded"}</div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Link href="/projects" style={{ textDecoration: "underline" }}>Back to Projects</Link>
+          <Link href="/latest-run" style={{ textDecoration: "underline" }}>Latest Run</Link>
+          <Link href="/latest-generated" style={{ textDecoration: "underline" }}>Latest Generated</Link>
+        </div>
+      </div>
+
+      <hr style={{ margin: "18px 0" }} />
 
       {err && (
-        <div
-          style={{
-            background: "#ffe5e5",
-            border: "1px solid #ffb3b3",
-            color: "#7a0000",
-            padding: 12,
-            borderRadius: 10,
-            margin: "12px 0",
-          }}
-        >
-          {err}
+        <div style={{ background: "#ffe9e9", border: "1px solid #ffbcbc", padding: 12, borderRadius: 8 }}>
+          <b>Error:</b> {err}
         </div>
       )}
 
-      <h2 style={{ marginTop: 28 }}>Create Run</h2>
+      <section style={{ marginTop: 16 }}>
+        <h2 style={{ margin: "0 0 10px 0" }}>Create a Run</h2>
 
-      <textarea
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        rows={4}
-        style={{
-          width: "100%",
-          padding: 12,
-          borderRadius: 10,
-          border: "1px solid #ccc",
-          marginBottom: 10,
-        }}
-      />
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          rows={5}
+          style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #ddd" }}
+        />
 
-      <button
-        onClick={createRun}
-        disabled={loading}
-        style={{
-          padding: "10px 14px",
-          borderRadius: 10,
-          border: "1px solid #111",
-          background: "#111",
-          color: "#fff",
-          fontWeight: 700,
-          cursor: "pointer",
-        }}
-      >
-        {loading ? "Creating..." : "Create Run"}
-      </button>
+        <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+          <button
+            onClick={createRun}
+            disabled={creatingRun || !prompt.trim()}
+            style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #111", cursor: "pointer" }}
+          >
+            {creatingRun ? "Creating..." : "Create Run"}
+          </button>
 
-      <h2 style={{ marginTop: 36 }}>Runs</h2>
+          <button
+            onClick={load}
+            disabled={loading}
+            style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer" }}
+          >
+            Refresh
+          </button>
+        </div>
+      </section>
 
-      {runs.length === 0 ? (
-        <p>No runs yet.</p>
-      ) : (
-        <div style={{ display: "grid", gap: 14 }}>
-          {runs.map((run) => (
-            <div
-              key={run.id}
-              style={{
-                border: "1px solid #e5e5e5",
-                borderRadius: 12,
-                padding: 14,
-              }}
-            >
-              <strong>{run.status.toUpperCase()}</strong>
-              <div style={{ opacity: 0.85 }}>Run ID: {run.id}</div>
+      <section style={{ marginTop: 22 }}>
+        <h2 style={{ margin: "0 0 10px 0" }}>Run History</h2>
 
-              <div style={{ marginTop: 10, display: "flex", gap: 10 }}>
-                <button
-                  onClick={() => executeRun(run.id)}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: "1px solid #111",
-                    background: "#fff",
-                    cursor: "pointer",
-                    fontWeight: 600,
-                  }}
-                >
-                  Execute
-                </button>
+        {loading ? (
+          <div>Loading...</div>
+        ) : runs.length === 0 ? (
+          <div>No runs yet.</div>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {runs.map((r) => (
+              <div key={r.id} style={{ border: "1px solid #eee", borderRadius: 10, padding: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                  <div>
+                    <div><b>Run:</b> {r.id}</div>
+                    <div style={{ opacity: 0.8 }}><b>Status:</b> {r.status}</div>
+                    {r.prompt ? (
+                      <div style={{ marginTop: 6, opacity: 0.9 }}>
+                        <b>Prompt:</b> {r.prompt}
+                      </div>
+                    ) : null}
+                  </div>
 
-                <Link
-                  href={`/generated/${run.id}`}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: "1px solid #111",
-                    background: "#fff",
-                    textDecoration: "none",
-                    color: "#000",
-                    fontWeight: 600,
-                  }}
-                >
-                  View Generated for this Run
-                </Link>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    <Link href={`/generated/${r.id}`} style={{ textDecoration: "underline" }}>
+                      View Generated
+                    </Link>
+
+                    <button
+                      onClick={() => executeRun(r.id)}
+                      disabled={executingRunId === r.id}
+                      style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #111", cursor: "pointer" }}
+                    >
+                      {executingRunId === r.id ? "Executing..." : "Execute"}
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
