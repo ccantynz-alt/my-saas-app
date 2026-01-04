@@ -11,20 +11,21 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
 
-  // Optional pagination (Clerk supports paginated lists)
+  // Optional pagination
   const limit = Math.min(Number(url.searchParams.get("limit") || "50"), 100);
   const offset = Math.max(Number(url.searchParams.get("offset") || "0"), 0);
 
   try {
     const client = await clerkClient();
 
-    const users = await client.users.getUserList({
+    // ✅ Clerk returns a paginated response object with `.data`
+    const resp = await client.users.getUserList({
       limit,
       offset,
       orderBy: "-created_at",
     });
 
-    const shaped = users.map((u) => {
+    const shaped = resp.data.map((u) => {
       const primaryEmail =
         u.emailAddresses?.find((e) => e.id === u.primaryEmailAddressId)?.emailAddress ||
         u.emailAddresses?.[0]?.emailAddress ||
@@ -35,8 +36,8 @@ export async function GET(req: Request) {
         email: primaryEmail,
         firstName: u.firstName || "",
         lastName: u.lastName || "",
-        createdAt: u.createdAt,
-        lastSignInAt: u.lastSignInAt,
+        createdAt: u.createdAt ?? null,
+        lastSignInAt: u.lastSignInAt ?? null,
         banned: !!u.banned,
         locked: !!u.locked,
       };
