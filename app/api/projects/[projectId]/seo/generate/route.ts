@@ -1,19 +1,29 @@
 import { NextResponse } from "next/server";
-import { generateSeoPages } from "@/app/lib/seoGenerator";
-import { saveSeoPages } from "@/app/lib/seoKV";
+import { auth } from "@clerk/nextjs/server";
 
+/**
+ * TEMP STUB:
+ * This endpoint depended on missing internal libs (seoGenerator, seoKV) and alias imports.
+ * We keep the build green now. We'll implement real SEO generation later.
+ */
 export async function POST(
-  req: Request,
+  _req: Request,
   { params }: { params: { projectId: string } }
 ) {
-  const { keyword, count } = await req.json();
+  const { userId } = auth();
 
-  if (!keyword || !count) {
-    return NextResponse.json({ ok: false }, { status: 400 });
+  if (!userId) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const pages = generateSeoPages(keyword, count);
-  await saveSeoPages(params.projectId, pages);
-
-  return NextResponse.json({ ok: true, pagesCount: pages.length });
+  return NextResponse.json(
+    {
+      ok: false,
+      status: "not_implemented",
+      projectId: params.projectId,
+      message: "SEO generation is not implemented yet.",
+    },
+    { status: 501 }
+  );
 }
+
