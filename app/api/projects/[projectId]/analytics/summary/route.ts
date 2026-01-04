@@ -25,3 +25,4 @@ export async function GET(
     note: "Analytics summary is stub-friendly. Wire real tracking later.",
   });
 }
+
