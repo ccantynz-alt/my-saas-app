@@ -1,53 +1,17 @@
-import { kv } from "@/app/lib/kv";
+/**
+ * TEMP STUB:
+ * Original file depended on '@/app/lib/kv' alias which does not exist.
+ * Keep exports so imports won't break.
+ */
 
-export type SeoSection = {
-  heading: string;
-  content: string;
-};
-
-export type SeoPage = {
-  slug: string;
-  title: string;
-  description: string;
-  h1: string;
-  sections: SeoSection[];
-  keyword: string;
-  createdAt: string;
-  ai: {
-    model: string;
-    version: string;
-  };
-};
-
-function key(projectId: string) {
-  return `seo:pages:${projectId}`;
+export async function listSeoPages(_projectId: string) {
+  return { ok: true, status: "stub", pages: [] as any[] };
 }
 
-export async function getSeoPages(projectId: string): Promise<SeoPage[]> {
-  const pages = (await kv.get(key(projectId))) as SeoPage[] | null;
-  return Array.isArray(pages) ? pages : [];
+export async function getSeoPage(_projectId: string, _slug: string) {
+  return { ok: true, status: "stub", page: null as any };
 }
 
-export async function getSeoPageBySlug(projectId: string, slug: string): Promise<SeoPage | null> {
-  const pages = await getSeoPages(projectId);
-  return pages.find((p) => p.slug === slug) || null;
-}
-
-export async function upsertSeoPages(projectId: string, newPages: SeoPage[]) {
-  const existing = await getSeoPages(projectId);
-  const bySlug = new Map(existing.map((p) => [p.slug, p]));
-
-  for (const p of newPages) bySlug.set(p.slug, p);
-
-  const merged = Array.from(bySlug.values()).sort((a, b) => a.slug.localeCompare(b.slug));
-
-  await kv.set(key(projectId), merged);
-  return merged;
-}
-
-export async function deleteSeoPage(projectId: string, slug: string) {
-  const existing = await getSeoPages(projectId);
-  const next = existing.filter((p) => p.slug !== slug);
-  await kv.set(key(projectId), next);
-  return { deleted: existing.length - next.length };
+export async function saveSeoPage(_projectId: string, _slug: string, _data: any) {
+  return { ok: false, status: "not_implemented" };
 }
