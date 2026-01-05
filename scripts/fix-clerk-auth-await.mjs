@@ -19,50 +19,40 @@ function patchFile(filePath) {
   const original = fs.readFileSync(filePath, "utf8");
   let text = original;
 
-  // 1) Ensure server-side Clerk import
-  // Replace any @clerk/nextjs auth import with /server
+  // Fix import: ensure server-side Clerk auth
   text = text.replace(
     /import\s*\{\s*auth\s*\}\s*from\s*["']@clerk\/nextjs["'];?/g,
     `import { auth } from "@clerk/nextjs/server";`
   );
 
-  // If auth is imported from somewhere else incorrectly, we won't guess — only fix the common case.
-
-  // 2) Fix destructuring patterns without await
-  // const { userId } = auth();
+  // Fix destructuring without await
   text = text.replace(
     /const\s*\{\s*userId\s*\}\s*=\s*auth\(\)\s*;/g,
     "const { userId } = await auth();"
   );
 
-  // const { sessionClaims } = auth();
   text = text.replace(
     /const\s*\{\s*sessionClaims\s*\}\s*=\s*auth\(\)\s*;/g,
     "const { sessionClaims } = await auth();"
   );
 
-  // const { userId, sessionClaims } = auth();
   text = text.replace(
     /const\s*\{\s*userId\s*,\s*sessionClaims\s*\}\s*=\s*auth\(\)\s*;/g,
     "const { userId, sessionClaims } = await auth();"
   );
 
-  // const { sessionClaims, userId } = auth();
   text = text.replace(
     /const\s*\{\s*sessionClaims\s*,\s*userId\s*\}\s*=\s*auth\(\)\s*;/g,
     "const { sessionClaims, userId } = await auth();"
   );
 
-  // 3) Fix assignment patterns without await
-  // const authResult = auth();
+  // Fix assignment without await: const x = auth();
   text = text.replace(
     /const\s+(\w+)\s*=\s*auth\(\)\s*;/g,
     "const $1 = await auth();"
   );
 
-  // 4) Ensure route handlers are async if they use await auth()
-  // Convert "export function GET(" to "export async function GET("
-  // Only if the file contains "await auth()"
+  // Ensure handlers are async if we used await auth()
   if (text.includes("await auth()")) {
     text = text.replace(/export\s+function\s+GET\s*\(/g, "export async function GET(");
     text = text.replace(/export\s+function\s+POST\s*\(/g, "export async function POST(");
@@ -78,23 +68,16 @@ function patchFile(filePath) {
 
 function main() {
   const routes = walk(TARGET_DIR);
-  if (!routes.length) {
-    console.log(`No route.ts files found under ${TARGET_DIR}`);
-    process.exit(0);
-  }
 
   let changedCount = 0;
   for (const f of routes) {
-    const changed = patchFile(f);
-    if (changed) {
+    if (patchFile(f)) {
       changedCount++;
       console.log(`✅ fixed: ${path.relative(ROOT, f)}`);
     }
   }
 
-  console.log("\n==============================");
-  console.log(`Done. Updated ${changedCount} of ${routes.length} route.ts files.`);
-  console.log("==============================\n");
+  console.log(`\nDone. Updated ${changedCount} route.ts files.\n`);
 }
 
 main();
