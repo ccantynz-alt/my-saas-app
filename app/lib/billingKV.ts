@@ -14,8 +14,19 @@ export type BillingSubscription = {
 };
 
 export type UserSubscriptionRecord = BillingSubscription & {
-  userId: string;
+  userId?: string | null;
+  clerkUserId?: string | null;
+  customerId?: string | null;
+  subscriptionId?: string | null;
 };
+
+export type ActivateArgs =
+  | string
+  | {
+      clerkUserId?: any;
+      customerId?: any;
+      subscriptionId?: any;
+    };
 
 /**
  * Return the current user's subscription info.
@@ -27,10 +38,14 @@ export async function getSubscription(_userId: string): Promise<BillingSubscript
 
 /**
  * Mark a user's subscription as active.
+ * Accepts either:
+ *  - userId string
+ *  - object: { clerkUserId, customerId, subscriptionId }
+ *
  * Stub implementation: no-op.
  */
 export async function setUserSubscriptionActive(
-  _userId: string,
+  _arg: ActivateArgs,
   _data?: Partial<UserSubscriptionRecord>
 ): Promise<void> {
   // no-op (stub)
