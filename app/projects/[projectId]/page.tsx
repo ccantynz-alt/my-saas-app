@@ -1,6 +1,8 @@
 // app/p/[projectId]/page.tsx
+import PublishPanel from "./PublishPanel";
 import { kv } from "@vercel/kv";
 
+<PublishPanel projectId={params.projectId} />
 export default async function PublishedPage({ params }: { params: { projectId: string } }) {
   const html = await kv.get<string>(`published:${params.projectId}:latest`);
 
