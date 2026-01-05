@@ -1,59 +1,70 @@
 import { NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
 import { auth } from "@clerk/nextjs/server";
-import { nanoid } from "nanoid";
+import { kv } from "@vercel/kv";
 
 type Project = {
   id: string;
   name: string;
-  userId: string;
-  createdAt: number;
+  ownerId: string;
+  createdAt: string;
 };
 
-export async function POST(req: Request) {
-  const { userId } = auth();
+function nowIso() {
+  return new Date().toISOString();
+}
 
-  if (!userId) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
-
-  const body = await req.json().catch(() => ({}));
-  const name = typeof body.name === "string" && body.name.trim() ? body.name.trim() : "Untitled Project";
-
-  const project: Project = {
-    id: `proj_${nanoid(10)}`,
-    name,
-    userId,
-    createdAt: Date.now(),
-  };
-
-  // ✅ Store the project
-  await kv.hset(`project:${project.id}`, project);
-
-  // ✅ User-specific list (for normal users)
-  await kv.lpush(`projects:user:${userId}`, project.id);
-
-  // ✅ Global list (for admin)
-  await kv.lpush(`projects:all`, project.id);
-
-  return NextResponse.json({ ok: true, project });
+function makeId(prefix: string) {
+  return `${prefix}_${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`;
 }
 
 export async function GET() {
-  const { userId } = auth();
+  const { userId } = await auth();
 
   if (!userId) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const ids = await kv.lrange<string[]>(`projects:user:${userId}`, 0, -1);
+  // Store projects per-user so you only see your own
+  const listKey = `user:${userId}:projects`;
 
-  const projects = await Promise.all(
-    ids.map(async (id) => {
-      const p = await kv.hgetall<Project>(`project:${id}`);
-      return p || null;
-    })
-  );
+  const ids = (await kv.lrange(listKey, 0, -1)) as string[] | null;
+  const projectIds = Array.isArray(ids) ? ids : [];
 
-  return NextResponse.json({ ok: true, projects: projects.filter(Boolean) });
+  const projects: Project[] = [];
+  for (const id of projectIds) {
+    const p = (await kv.get(`project:${id}`)) as Project | null;
+    if (p) projects.push(p);
+  }
+
+  // Newest first
+  projects.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+
+  return NextResponse.json({ ok: true, projects });
+}
+
+export async function POST(req: Request) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = (await req.json().catch(() => ({}))) as { name?: string };
+  const name = (body?.name || "Untitled Project").toString().trim() || "Untitled Project";
+
+  const id = makeId("proj");
+  const project: Project = {
+    id,
+    name,
+    ownerId: userId,
+    createdAt: nowIso(),
+  };
+
+  await kv.set(`project:${id}`, project);
+
+  // Add to the user's project list
+  const listKey = `user:${userId}:projects`;
+  await kv.lpush(listKey, id);
+
+  return NextResponse.json({ ok: true, project });
 }
