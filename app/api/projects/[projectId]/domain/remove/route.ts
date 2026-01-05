@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
 
+export const dynamic = "force-dynamic";
+
 async function requireProjectOwner(userId: string, projectId: string) {
   const project = (await kv.hgetall(`project:${projectId}`)) as any;
   if (!project?.id) return { ok: false as const, error: "PROJECT_NOT_FOUND" as const };
@@ -10,7 +12,13 @@ async function requireProjectOwner(userId: string, projectId: string) {
   return { ok: true as const, project };
 }
 
-export const dynamic = "force-dynamic";
+export async function GET(_req: Request, ctx: { params: { projectId: string } }) {
+  return NextResponse.json({
+    ok: true,
+    route: "domain/remove",
+    projectId: ctx.params.projectId,
+  });
+}
 
 export async function POST(_req: Request, ctx: { params: { projectId: string } }) {
   try {
