@@ -1,5 +1,6 @@
 export default function HomePage() {
   return (
+    <a href="/templates">Go to Templates</a>
     <main style={{ padding: "4rem", fontFamily: "sans-serif" }}>
       <h1 style={{ fontSize: "3rem", marginBottom: "1rem" }}>
         Welcome to Your AI Website Builder
