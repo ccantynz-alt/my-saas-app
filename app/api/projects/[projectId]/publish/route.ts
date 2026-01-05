@@ -24,8 +24,27 @@ export async function POST(_req: Request, ctx: { params: { projectId: string } }
     return NextResponse.json({ ok: false, error: ownerCheck.error }, { status });
   }
 
-  // ✅ publish from global generated key for now
-  const latestHtml = (await kv.get("generated:latest")) as string | null;
+  const project = ownerCheck.project;
+  const latestRunId = String(project?.latestRunId || "").trim();
+
+  if (!latestRunId) {
+    return NextResponse.json(
+      { ok: false, error: "NO_RUN_AVAILABLE" },
+      { status: 400 }
+    );
+  }
+
+  const run = (await kv.hgetall(`run:${latestRunId}`)) as any;
+  const outputKey = String(run?.outputKey || "").trim();
+
+  if (!outputKey) {
+    return NextResponse.json(
+      { ok: false, error: "NO_GENERATED_OUTPUT_FOR_LATEST_RUN" },
+      { status: 400 }
+    );
+  }
+
+  const latestHtml = (await kv.get(outputKey)) as string | null;
 
   if (!latestHtml || typeof latestHtml !== "string" || latestHtml.trim().length < 20) {
     return NextResponse.json(
@@ -48,6 +67,8 @@ export async function POST(_req: Request, ctx: { params: { projectId: string } }
   return NextResponse.json({
     ok: true,
     projectId,
+    latestRunId,
+    outputKey,
     publishedKey,
     publishedAt: now,
     publicUrl: `/p/${projectId}`,
