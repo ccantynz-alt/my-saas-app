@@ -1,13 +1,17 @@
-import type { Config } from "tailwindcss";
+// tailwind.config.ts
+// NOTE: We avoid importing types from "tailwindcss" to prevent build/typecheck
+// failures when tailwindcss is not installed in this repo.
 
-export default {
+const config = {
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/**/*.{js,ts,jsx,tsx,mdx}", // harmless if unused
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {},
   },
   plugins: [],
-} satisfies Config;
+};
+
+export default config;
