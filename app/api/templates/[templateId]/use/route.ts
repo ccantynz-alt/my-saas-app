@@ -11,11 +11,8 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  // NOTE:
-  // This is a stub response to unblock the build.
-  // If you already have logic here (copy template -> project, etc),
-  // re-add it below, but keep the "await auth()" line.
-
+  // Stub response to unblock build.
+  // Keep await auth() pattern. Replace with real logic later.
   return NextResponse.json({
     ok: true,
     used: true,
