@@ -17,92 +17,111 @@ function normalizeDomain(input: string) {
 }
 
 function isValidDomain(domain: string) {
-  return (
-    domain.includes(".") &&
-    domain.length >= 4 &&
-    domain.length <= 253 &&
-    /^[a-z0-9.-]+$/.test(domain) &&
-    !domain.startsWith(".") &&
-    !domain.endsWith(".") &&
-    !domain.includes("..")
-  );
+  if (!domain.includes(".")) return false;
+  if (domain.length < 4 || domain.length > 253) return false;
+  if (!/^[a-z0-9.-]+$/.test(domain)) return false;
+  if (domain.startsWith(".") || domain.endsWith(".")) return false;
+  if (domain.includes("..")) return false;
+  return true;
 }
 
-/* =========================
-   GET — read domain
-========================= */
 export async function GET(_req: Request, ctx: { params: { projectId: string } }) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
-
-  const { projectId } = ctx.params;
-  const check = await requireProjectOwner(userId, projectId);
-  if (!check.ok) {
-    return NextResponse.json({ ok: false, error: check.error }, { status: 403 });
-  }
-
-  const project = check.project;
-
-  return NextResponse.json({
-    ok: true,
-    domain: project.domain || null,
-    domainStatus: project.domainStatus || null,
-  });
-}
-
-/* =========================
-   POST — attach domain
-========================= */
-export async function POST(req: Request, ctx: { params: { projectId: string } }) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
-
-  const { projectId } = ctx.params;
-  const check = await requireProjectOwner(userId, projectId);
-  if (!check.ok) {
-    return NextResponse.json({ ok: false, error: check.error }, { status: 403 });
-  }
-
-  let body: any = {};
   try {
-    body = await req.json();
-  } catch {}
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
 
-  const domain = normalizeDomain(String(body.domain || ""));
-  if (!isValidDomain(domain)) {
-    return NextResponse.json({ ok: false, error: "INVALID_DOMAIN" }, { status: 400 });
+    const projectId = ctx.params.projectId;
+    const check = await requireProjectOwner(userId, projectId);
+    if (!check.ok) {
+      const status = check.error === "PROJECT_NOT_FOUND" ? 404 : 403;
+      return NextResponse.json({ ok: false, error: check.error }, { status });
+    }
+
+    const project = check.project;
+
+    return NextResponse.json({
+      ok: true,
+      projectId,
+      domain: project.domain || null,
+      domainStatus: project.domainStatus || null,
+      domainUpdatedAt: project.domainUpdatedAt || null,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { ok: false, error: "DOMAIN_GET_FAILED", detail: String(err?.message || err) },
+      { status: 500 }
+    );
   }
-
-  const now = new Date().toISOString();
-
-  await kv.hset(`project:${projectId}`, {
-    domain,
-    domainStatus: "attached",
-    domainUpdatedAt: now,
-    updatedAt: now,
-  });
-
-  return NextResponse.json({ ok: true, domain });
 }
 
-/* =========================
-   DELETE — remove domain
-========================= */
-export async function DELETE(_req: Request, ctx: { params: { projectId: string } }) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+export async function POST(req: Request, ctx: { params: { projectId: string } }) {
+  try {
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
 
-  const { projectId } = ctx.params;
-  const check = await requireProjectOwner(userId, projectId);
-  if (!check.ok) {
-    return NextResponse.json({ ok: false, error: check.error }, { status: 403 });
+    const projectId = ctx.params.projectId;
+    const check = await requireProjectOwner(userId, projectId);
+    if (!check.ok) {
+      const status = check.error === "PROJECT_NOT_FOUND" ? 404 : 403;
+      return NextResponse.json({ ok: false, error: check.error }, { status });
+    }
+
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      body = {};
+    }
+
+    const domain = normalizeDomain(String(body.domain || ""));
+    if (!domain || !isValidDomain(domain)) {
+      return NextResponse.json({ ok: false, error: "INVALID_DOMAIN" }, { status: 400 });
+    }
+
+    const now = new Date().toISOString();
+
+    await kv.hset(`project:${projectId}`, {
+      domain,
+      domainStatus: "attached",
+      domainUpdatedAt: now,
+      updatedAt: now,
+    });
+
+    return NextResponse.json({ ok: true, projectId, domain });
+  } catch (err: any) {
+    return NextResponse.json(
+      { ok: false, error: "DOMAIN_POST_FAILED", detail: String(err?.message || err) },
+      { status: 500 }
+    );
   }
+}
 
-  await kv.hset(`project:${projectId}`, {
-    domain: "",
-    domainStatus: "",
-    updatedAt: new Date().toISOString(),
-  });
+export async function DELETE(_req: Request, ctx: { params: { projectId: string } }) {
+  try {
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
 
-  return NextResponse.json({ ok: true });
+    const projectId = ctx.params.projectId;
+    const check = await requireProjectOwner(userId, projectId);
+    if (!check.ok) {
+      const status = check.error === "PROJECT_NOT_FOUND" ? 404 : 403;
+      return NextResponse.json({ ok: false, error: check.error }, { status });
+    }
+
+    const now = new Date().toISOString();
+
+    await kv.hset(`project:${projectId}`, {
+      domain: "",
+      domainStatus: "",
+      domainUpdatedAt: now,
+      updatedAt: now,
+    });
+
+    return NextResponse.json({ ok: true, projectId });
+  } catch (err: any) {
+    return NextResponse.json(
+      { ok: false, error: "DOMAIN_DELETE_FAILED", detail: String(err?.message || err) },
+      { status: 500 }
+    );
+  }
 }
