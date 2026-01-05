@@ -2,6 +2,15 @@
 
 import { useEffect, useState } from "react";
 
+async function safeJson(res: Response) {
+  const text = await res.text();
+  try {
+    return { ok: true as const, data: JSON.parse(text), text };
+  } catch {
+    return { ok: false as const, data: null, text };
+  }
+}
+
 export default function DomainPanel({ projectId }: { projectId: string }) {
   const [domain, setDomain] = useState("");
   const [savedDomain, setSavedDomain] = useState<string | null>(null);
@@ -9,9 +18,23 @@ export default function DomainPanel({ projectId }: { projectId: string }) {
   const [busy, setBusy] = useState(false);
 
   async function load() {
-    const res = await fetch(`/api/projects/${projectId}/domain`);
-    const data = await res.json();
-    if (data.ok) setSavedDomain(data.domain);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/domain`, { cache: "no-store" });
+      const parsed = await safeJson(res);
+
+      if (!parsed.ok) {
+        setMsg(`❌ Non-JSON response (${res.status})`);
+        return;
+      }
+
+      if (parsed.data?.ok) {
+        setSavedDomain(parsed.data.domain || null);
+      } else {
+        setMsg(`❌ ${parsed.data?.error || "Failed to load domain"}`);
+      }
+    } catch (e: any) {
+      setMsg(`❌ ${e.message}`);
+    }
   }
 
   useEffect(() => {
@@ -27,9 +50,17 @@ export default function DomainPanel({ projectId }: { projectId: string }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ domain }),
       });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error);
-      setSavedDomain(data.domain);
+
+      const parsed = await safeJson(res);
+
+      if (!parsed.ok) {
+        throw new Error(`Non-JSON response (${res.status})`);
+      }
+      if (!parsed.data?.ok) {
+        throw new Error(parsed.data?.error || "Attach failed");
+      }
+
+      setSavedDomain(parsed.data.domain);
       setMsg("✅ Domain attached");
     } catch (e: any) {
       setMsg(`❌ ${e.message}`);
@@ -42,9 +73,19 @@ export default function DomainPanel({ projectId }: { projectId: string }) {
     setBusy(true);
     setMsg(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/domain`, { method: "DELETE" });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error);
+      const res = await fetch(`/api/projects/${projectId}/domain`, {
+        method: "DELETE",
+      });
+
+      const parsed = await safeJson(res);
+
+      if (!parsed.ok) {
+        throw new Error(`Non-JSON response (${res.status})`);
+      }
+      if (!parsed.data?.ok) {
+        throw new Error(parsed.data?.error || "Remove failed");
+      }
+
       setSavedDomain(null);
       setDomain("");
       setMsg("✅ Domain removed");
@@ -66,7 +107,10 @@ export default function DomainPanel({ projectId }: { projectId: string }) {
         style={{ padding: 8, marginRight: 8 }}
       />
 
-      <button onClick={attach} disabled={busy}>Attach</button>
+      <button onClick={attach} disabled={busy}>
+        Attach
+      </button>
+
       <button onClick={remove} disabled={busy || !savedDomain} style={{ marginLeft: 8 }}>
         Remove
       </button>
