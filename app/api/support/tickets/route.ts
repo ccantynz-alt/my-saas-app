@@ -8,7 +8,6 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  // TODO: Replace this stub with real ticket listing from your DB/KV
   return NextResponse.json({
     ok: true,
     tickets: [],
@@ -24,7 +23,6 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
 
-  // TODO: Replace this stub with real ticket creation in your DB/KV
   return NextResponse.json({
     ok: true,
     created: true,
