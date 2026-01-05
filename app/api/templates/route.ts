@@ -5,3 +5,4 @@ import { TEMPLATES } from "./templates";
 export async function GET() {
   return NextResponse.json({ ok: true, templates: TEMPLATES });
 }
+
