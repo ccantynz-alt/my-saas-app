@@ -10,6 +10,8 @@ async function requireProjectOwner(userId: string, projectId: string) {
   return { ok: true as const, project };
 }
 
+export const dynamic = "force-dynamic";
+
 export async function POST(_req: Request, ctx: { params: { projectId: string } }) {
   try {
     const { userId } = await auth();
