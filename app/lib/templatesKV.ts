@@ -33,3 +33,4 @@ export const TEMPLATES: Template[] = [
 export function getTemplateById(id: string) {
   return TEMPLATES.find((t) => t.id === id) || null;
 }
+
