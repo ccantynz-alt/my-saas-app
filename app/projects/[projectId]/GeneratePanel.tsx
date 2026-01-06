@@ -10,14 +10,13 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
   const [status, setStatus] = useState<string>("");
   const [body, setBody] = useState<string>("");
 
-  async function generate() {
+  async function generateAndPublish() {
     setLoading(true);
     setStatus("");
     setBody("");
 
     try {
-      // For now we generate a simple but real HTML page from the prompt.
-      // (Next step later: swap this with your AI run output.)
+      // --- 1️⃣ Generate REAL HTML ---
       const safeTitle = prompt.slice(0, 60).replace(/</g, "").replace(/>/g, "");
       const html = `<!doctype html>
 <html>
@@ -43,7 +42,7 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
     <header>
       <div class="wrap">
         <h1>${safeTitle || "Generated Website"}</h1>
-        <p class="muted">This HTML is stored per-project and will be shown on your public /p page after publishing.</p>
+        <p class="muted">This page was generated and auto-published.</p>
         <a class="btn" href="#contact">Get Started</a>
       </div>
     </header>
@@ -61,8 +60,7 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
 
     <section id="contact">
       <div class="wrap">
-        <h2>Contact</h2>
-        <p class="muted">Reply to this prompt to customize the page further:</p>
+        <h2>Prompt Used</h2>
         <pre style="white-space:pre-wrap;background:rgba(255,255,255,.06);padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,.10)">${prompt
           .replace(/</g, "")
           .replace(/>/g, "")}</pre>
@@ -71,16 +69,35 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
   </body>
 </html>`;
 
-      // Save HTML to your per-project key via your API
-      const res = await fetch(`/api/projects/${projectId}/html`, {
+      // --- 2️⃣ Save HTML to project ---
+      const saveRes = await fetch(`/api/projects/${projectId}/html`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ html }),
       });
 
-      const text = await res.text();
-      setStatus(String(res.status));
-      setBody(text);
+      const saveText = await saveRes.text();
+      if (!saveRes.ok) {
+        setStatus(String(saveRes.status));
+        setBody(saveText);
+        setLoading(false);
+        return;
+      }
+
+      // --- 3️⃣ AUTO-PUBLISH ---
+      const publishRes = await fetch(
+        `/api/projects/${projectId}/publish`,
+        { method: "POST" }
+      );
+
+      const publishText = await publishRes.text();
+      setStatus(String(publishRes.status));
+      setBody(publishText);
+
+      if (publishRes.ok) {
+        // --- 4️⃣ Open public page ---
+        window.open(`/p/${projectId}`, "_blank");
+      }
     } catch (e: any) {
       setStatus("ERROR");
       setBody(e?.message || "Unknown error");
@@ -99,7 +116,9 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
         maxWidth: 900,
       }}
     >
-      <h2 style={{ margin: 0, marginBottom: 10 }}>Generate</h2>
+      <h2 style={{ margin: 0, marginBottom: 10 }}>
+        Generate & Publish
+      </h2>
 
       <label style={{ display: "block", fontWeight: 600, marginBottom: 8 }}>
         Prompt
@@ -118,9 +137,9 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
         }}
       />
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 12 }}>
+      <div style={{ marginTop: 12 }}>
         <button
-          onClick={generate}
+          onClick={generateAndPublish}
           disabled={loading}
           style={{
             padding: "10px 14px",
@@ -131,19 +150,13 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
             fontWeight: 600,
           }}
         >
-          {loading ? "Generating..." : "Generate HTML"}
+          {loading ? "Generating & Publishing..." : "Generate & Publish"}
         </button>
-
-        <a href={`/p/${projectId}`} target="_blank" rel="noreferrer">
-          Open public page
-        </a>
       </div>
 
       {status ? (
-        <div style={{ marginTop: 12, fontFamily: "system-ui" }}>
-          <div>
-            <b>Status:</b> {status}
-          </div>
+        <div style={{ marginTop: 12 }}>
+          <b>Status:</b> {status}
           {body ? (
             <pre
               style={{
