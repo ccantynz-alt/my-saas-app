@@ -12,15 +12,6 @@ function makeId(prefix: string) {
   return `${prefix}_${crypto.randomUUID().replace(/-/g, "")}`;
 }
 
-async function safeReadIndexIds(): Promise<string[]> {
-  try {
-    const ids = await kv.lrange<string>("projects:index", 0, 200);
-    return Array.isArray(ids) ? ids.filter(Boolean) : [];
-  } catch {
-    return [];
-  }
-}
-
 async function readProjectAny(projectId: string) {
   const key = `project:${projectId}`;
 
@@ -29,10 +20,10 @@ async function readProjectAny(projectId: string) {
     const hash = await kv.hgetall<any>(key);
     if (hash && Object.keys(hash).length > 0) return hash;
   } catch {
-    // ignore
+    // ignore (WRONGTYPE etc)
   }
 
-  // Fallback older json format
+  // Fallback json/string format
   try {
     const obj = await kv.get<any>(key);
     if (obj) return obj;
@@ -43,12 +34,33 @@ async function readProjectAny(projectId: string) {
   return null;
 }
 
+async function readIndexIds(limit = 200): Promise<string[]> {
+  try {
+    const ids = await kv.lrange<string>("projects:index", 0, limit - 1);
+    return Array.isArray(ids) ? ids.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function dedupePreserveOrder(ids: string[]) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of ids) {
+    if (!seen.has(id)) {
+      seen.add(id);
+      out.push(id);
+    }
+  }
+  return out;
+}
+
 export async function GET() {
   try {
-    const ids = await safeReadIndexIds();
+    const idsRaw = await readIndexIds(500);
+    const ids = dedupePreserveOrder(idsRaw);
 
     if (ids.length === 0) {
-      // If no index exists, return empty (safe)
       return json({ ok: true, projects: [] });
     }
 
@@ -94,16 +106,16 @@ export async function POST(req: Request) {
       domainStatus: null,
     };
 
-    const key = `project:${id}`;
+    // Store as hash (preferred)
+    await kv.hset(`project:${id}`, project as any);
 
-    // IMPORTANT: store as HASH so hgetall works everywhere
-    await kv.hset(key, project as any);
-
-    // index (newest first)
+    // IMPORTANT: maintain index (newest first)
+    // Even if duplicates happen, GET dedupes.
     try {
       await kv.lpush("projects:index", id);
-    } catch {
-      // ignore
+    } catch (e) {
+      console.error("LPUSH projects:index failed:", e);
+      // still return ok, project exists
     }
 
     return json({ ok: true, project });
