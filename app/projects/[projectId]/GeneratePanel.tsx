@@ -9,11 +9,13 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string>("");
   const [body, setBody] = useState<string>("");
+  const [publicUrl, setPublicUrl] = useState<string>("");
 
   async function generateAndPublish() {
     setLoading(true);
     setStatus("");
     setBody("");
+    setPublicUrl("");
 
     try {
       // 1) Generate via AI
@@ -81,7 +83,18 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
       setBody(publishText);
 
       if (publishRes.ok) {
-        window.open(`/p/${projectId}`, "_blank");
+        // Always set publicUrl so user can click it (no popups needed)
+        const url = `/p/${projectId}`;
+        setPublicUrl(url);
+
+        // Try to open a new tab, but don't rely on it (may be blocked)
+        try {
+          window.open(url, "_blank");
+        } catch {}
+
+        // Also navigate in the SAME tab after success (guaranteed)
+        // Comment this out if you prefer staying on the project page.
+        window.location.href = url;
       }
     } catch (e: any) {
       setStatus("ERROR");
@@ -120,7 +133,7 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
         }}
       />
 
-      <div style={{ marginTop: 12 }}>
+      <div style={{ marginTop: 12, display: "flex", gap: 12, alignItems: "center" }}>
         <button
           onClick={generateAndPublish}
           disabled={loading}
@@ -135,7 +148,21 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
         >
           {loading ? "Generating & Publishing..." : "Generate & Publish"}
         </button>
+
+        {/* Always useful even if popup blocked */}
+        <a href={`/p/${projectId}`} target="_blank" rel="noreferrer">
+          Open public page
+        </a>
       </div>
+
+      {publicUrl ? (
+        <div style={{ marginTop: 12 }}>
+          ✅ Published. Open:{" "}
+          <a href={publicUrl} target="_blank" rel="noreferrer">
+            {publicUrl}
+          </a>
+        </div>
+      ) : null}
 
       {status ? (
         <div style={{ marginTop: 12 }}>
