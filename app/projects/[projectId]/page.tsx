@@ -17,13 +17,13 @@ export default async function ProjectPage({
       {/* ✅ Publish button */}
       <PublishButton projectId={projectId} />
 
-      {/* Existing panels */}
+      {/* ✅ Existing panels (PASS projectId) */}
       <div style={{ marginTop: 24 }}>
-        <RunDemoPanel />
+        <RunDemoPanel projectId={projectId} />
       </div>
 
       <div style={{ marginTop: 24 }}>
-        <DomainPanel />
+        <DomainPanel projectId={projectId} />
       </div>
     </main>
   );
