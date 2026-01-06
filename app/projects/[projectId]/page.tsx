@@ -1,8 +1,11 @@
 // app/projects/[projectId]/page.tsx
+import PublishButton from "./PublishButton";
 import { kv } from "@vercel/kv";
 import PublishPanel from "./PublishPanel";
 import RunDemoPanel from "./RunDemoPanel";
 import DomainPanel from "./DomainPanel";
+<PublishButton projectId={projectId} />
+
 
 export default async function ProjectPage({
   params,
