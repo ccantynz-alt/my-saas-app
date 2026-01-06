@@ -1,70 +1,78 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
-
-type Project = {
-  id: string;
-  name: string;
-  ownerId: string;
-  createdAt: string;
-};
-
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function makeId(prefix: string) {
-  return `${prefix}_${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`;
-}
+import { nanoid } from "nanoid";
 
 export async function GET() {
   const { userId } = await auth();
-
   if (!userId) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, error: "unauthorized" },
+      { status: 401 }
+    );
   }
 
-  // Store projects per-user so you only see your own
-  const listKey = `user:${userId}:projects`;
+  const ids = await kv.smembers(`user:${userId}:projects`);
+  const projects: any[] = [];
 
-  const ids = (await kv.lrange(listKey, 0, -1)) as string[] | null;
-  const projectIds = Array.isArray(ids) ? ids : [];
+  for (const id of ids) {
+    const p = await kv.hgetall<any>(`project:${id}`);
+    if (!p) continue;
 
-  const projects: Project[] = [];
-  for (const id of projectIds) {
-    const p = (await kv.get(`project:${id}`)) as Project | null;
-    if (p) projects.push(p);
+    projects.push({
+      id,
+      name: p.name || "Untitled project",
+
+      // DOMAIN
+      domain: p.domain || "",
+      domainStatus: p.domainStatus || "",
+      domainUpdatedAt: p.domainUpdatedAt || "",
+
+      // PUBLISH
+      publishedUrl: p.publishedUrl || "",
+      publishedStatus: p.publishedStatus || "",
+      publishedAt: p.publishedAt || "",
+
+      // META
+      status: p.status || "",
+      createdAt: p.createdAt || "",
+      updatedAt: p.updatedAt || "",
+    });
   }
-
-  // Newest first
-  projects.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
   return NextResponse.json({ ok: true, projects });
 }
 
 export async function POST(req: Request) {
   const { userId } = await auth();
-
   if (!userId) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, error: "unauthorized" },
+      { status: 401 }
+    );
   }
 
-  const body = (await req.json().catch(() => ({}))) as { name?: string };
-  const name = (body?.name || "Untitled Project").toString().trim() || "Untitled Project";
+  let body: any = {};
+  try {
+    body = await req.json();
+  } catch {}
 
-  const id = makeId("proj");
-  const project: Project = {
-    id,
-    name,
-    ownerId: userId,
-    createdAt: nowIso(),
-  };
+  const projectId = `proj_${nanoid()}`;
+  const now = new Date().toISOString();
 
-  await kv.set(`project:${id}`, project);
+  await kv.hset(`project:${projectId}`, {
+    id: projectId,
+    userId,
+    name: body?.name || "Untitled project",
+    status: "draft",
+    createdAt: now,
+    updatedAt: now,
+  });
 
-  // Add to the user's project list
-  const listKey = `user:${userId}:projects`;
-  await kv.lpush(listKey, id);
+  await kv.sadd(`user:${userId}:projects`, projectId);
 
-  return NextResponse.json({ ok: true, project });
+  return NextResponse.json({
+    ok: true,
+    project: { id: projectId },
+  });
 }
