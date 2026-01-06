@@ -1,50 +1,61 @@
 import { kv } from "@vercel/kv";
-import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-type Props = {
-  params: { projectId: string };
-};
+type Params = { projectId: string };
 
-export default async function PublicProjectPage({ params }: Props) {
-  const projectId = params.projectId;
+export default async function PublicProjectPage(props: {
+  params: Promise<Params>;
+}) {
+  const { projectId } = await props.params;
+
+  if (!projectId || !projectId.startsWith("proj_")) {
+    return (
+      <main style={{ padding: 24, fontFamily: "system-ui" }}>
+        <h1>Invalid project</h1>
+      </main>
+    );
+  }
 
   // Load project
   const project = await kv.hgetall<any>(`project:${projectId}`);
-  if (!project) return notFound();
 
-  // Must be published
+  if (!project) {
+    return (
+      <main style={{ padding: 24, fontFamily: "system-ui" }}>
+        <h1>Not found</h1>
+        <p>This project does not exist.</p>
+      </main>
+    );
+  }
+
   if (project.publishedStatus !== "published") {
     return (
-      <main style={{ padding: 40, fontFamily: "sans-serif" }}>
+      <main style={{ padding: 24, fontFamily: "system-ui" }}>
         <h1>Not published</h1>
-        <p>This project has not been published yet.</p>
+        <p>This project hasn’t been published yet.</p>
       </main>
     );
   }
 
-  // Load latest generated HTML
-  const html = await kv.get<string>(
-    `generated:project:${projectId}:latest`
-  );
+  // 🔑 IMPORTANT: read ONLY the per-project published HTML
+  const htmlKey = `generated:project:${projectId}:latest`;
+  const html = await kv.get<string>(htmlKey);
 
-  if (!html) {
+  if (!html || typeof html !== "string") {
     return (
-      <main style={{ padding: 40, fontFamily: "sans-serif" }}>
-        <h1>Site not ready</h1>
-        <p>The site is published but content is still generating.</p>
+      <main style={{ padding: 24, fontFamily: "system-ui" }}>
+        <h1>Published, but no HTML found</h1>
+        <p>Expected HTML at:</p>
+        <pre>{htmlKey}</pre>
       </main>
     );
   }
 
-  // Render raw HTML
   return (
-    <html>
-      <head>
-        <title>{project.name || "Rovez Site"}</title>
-      </head>
-      <body dangerouslySetInnerHTML={{ __html: html }} />
-    </html>
+    <div
+      dangerouslySetInnerHTML={{ __html: html }}
+      suppressHydrationWarning
+    />
   );
 }
