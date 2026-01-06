@@ -1,67 +1,38 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function json(data: any, status = 200) {
+  return NextResponse.json(data, { status });
+}
 
 export async function POST(
   _req: Request,
-  { params }: { params: { projectId: string; versionId: string } }
+  ctx: { params: { projectId: string; versionId: string } }
 ) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+    const { projectId, versionId } = ctx.params;
 
-    const { projectId, versionId } = params;
+    const versionKey = `generated:project:${projectId}:v:${versionId}`;
+    const html = await kv.get<string>(versionKey);
 
-    const project = await kv.hgetall<any>(`project:${projectId}`);
-    if (!project) {
-      return NextResponse.json({ ok: false, error: "Project not found" }, { status: 404 });
-    }
-    if (project.userId !== userId) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
-    }
-
-    const versionHtmlKey = `generated:project:${projectId}:v:${versionId}`;
-    const html = await kv.get<string>(versionHtmlKey);
-
-    if (!html || typeof html !== "string") {
-      return NextResponse.json(
-        { ok: false, error: "Version HTML not found" },
-        { status: 404 }
-      );
+    if (!html) {
+      return json({ ok: false, error: "Version not found" }, 404);
     }
 
     const latestKey = `generated:project:${projectId}:latest`;
     await kv.set(latestKey, html);
 
-    const now = new Date().toISOString();
-    await kv.hset(`project:${projectId}`, {
-      updatedAt: now,
-      lastRolledBackAt: now,
-      lastRolledBackVersionId: versionId,
-    });
-
-    // Optional: publish after rollback if already published
-    if (project.publishedStatus === "published") {
-      await kv.hset(`project:${projectId}`, {
-        updatedAt: now,
-        publishedStatus: "published",
-      });
-    }
-
-    return NextResponse.json({
+    return json({
       ok: true,
       projectId,
-      rolledBackTo: versionId,
-      latestKey,
+      versionId,
+      rolledBack: true,
     });
-  } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || "Failed to rollback" },
-      { status: 500 }
-    );
+  } catch (err) {
+    console.error("Rollback error:", err);
+    return json({ ok: false, error: "Rollback failed" }, 500);
   }
 }
