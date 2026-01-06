@@ -29,6 +29,15 @@ async function readProjectAny(projectId: string) {
   return null;
 }
 
+async function registerInIndex(projectId: string) {
+  // Best-effort: add to index so /api/projects can list it
+  try {
+    await kv.lpush("projects:index", projectId);
+  } catch {
+    // ignore
+  }
+}
+
 export default async function ProjectPage({
   params,
 }: {
@@ -55,11 +64,21 @@ export default async function ProjectPage({
     );
   }
 
+  // ✅ Backfill index automatically (so projects page can list it)
+  await registerInIndex(projectId);
+
   const name = project.name ?? "Untitled";
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 900, marginBottom: 6 }}>
             {name}
@@ -90,11 +109,6 @@ export default async function ProjectPage({
 
       <div style={{ marginTop: 18 }}>
         <GeneratePanel projectId={projectId} />
-      </div>
-
-      <div style={{ marginTop: 16, fontSize: 12, color: "#6b7280" }}>
-        If you want, we can re-add Versions / Domain / Admin panels here next
-        after the crash is gone.
       </div>
     </div>
   );
