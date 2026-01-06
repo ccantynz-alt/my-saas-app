@@ -17,7 +17,6 @@ export default async function PublicProjectPage(props: {
     );
   }
 
-  // Load project
   const project = await kv.hgetall<any>(`project:${projectId}`);
 
   if (!project) {
@@ -33,12 +32,11 @@ export default async function PublicProjectPage(props: {
     return (
       <main style={{ padding: 24, fontFamily: "system-ui" }}>
         <h1>Not published</h1>
-        <p>This project hasn’t been published yet.</p>
+        <p>This project isn’t published yet.</p>
       </main>
     );
   }
 
-  // 🔑 IMPORTANT: read ONLY the per-project published HTML
   const htmlKey = `generated:project:${projectId}:latest`;
   const html = await kv.get<string>(htmlKey);
 
