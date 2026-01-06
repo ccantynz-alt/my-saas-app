@@ -1,34 +1,36 @@
+// lib/safeFetchJson.ts
 export async function safeFetchJson<T = any>(
-  input: RequestInfo | URL,
-  init?: RequestInit
-): Promise<
-  | { ok: true; data: T }
-  | { ok: false; status: number; error: string; bodyPreview: string }
-> {
-  const res = await fetch(input, init);
+  url: string,
+  options?: RequestInit
+): Promise<T | null> {
+  const res = await fetch(url, options);
 
   const contentType = res.headers.get("content-type") || "";
   const text = await res.text();
 
-  // If server did not return JSON, show the first part of the body to debug
+  // If the server returned HTML instead of JSON, STOP SAFELY
   if (!contentType.includes("application/json")) {
-    return {
-      ok: false,
-      status: res.status,
-      error: `Non-JSON response (${res.status}). Expected JSON but got: ${contentType || "unknown content-type"}`,
-      bodyPreview: text.slice(0, 500),
-    };
+    console.error("❌ Non-JSON response");
+    console.error("Status:", res.status);
+    console.error("Content-Type:", contentType);
+    console.error("Body preview:", text.slice(0, 500));
+
+    alert(
+      "Something went wrong, but the app did NOT crash.\n\n" +
+      "This usually means a page (HTML) was returned instead of JSON.\n\n" +
+      "Check the console for details."
+    );
+
+    return null;
   }
 
   try {
-    const data = JSON.parse(text) as T;
-    return { ok: true, data };
+    return JSON.parse(text) as T;
   } catch {
-    return {
-      ok: false,
-      status: res.status,
-      error: `Invalid JSON (${res.status}). Could not parse JSON body.`,
-      bodyPreview: text.slice(0, 500),
-    };
+    console.error("❌ Failed to parse JSON");
+    console.error("Body preview:", text.slice(0, 500));
+
+    alert("Server returned invalid JSON. Check console.");
+    return null;
   }
 }
