@@ -16,49 +16,32 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
     setBody("");
 
     try {
-      // --- 1️⃣ Generate HTML ---
-      const safeTitle = prompt.slice(0, 60).replace(/</g, "").replace(/>/g, "");
-      const html = `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>${safeTitle || "Generated Site"}</title>
-    <style>
-      body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#0b1220;color:#e8eefc}
-      header{padding:64px 24px;background:linear-gradient(135deg,#182a4d,#0b1220)}
-      .wrap{max-width:980px;margin:0 auto}
-      h1{font-size:44px;line-height:1.1;margin:0 0 12px}
-      p{opacity:.9;line-height:1.6;margin:0 0 18px}
-      .btn{display:inline-block;background:#4f7cff;color:#fff;text-decoration:none;padding:12px 16px;border-radius:12px;font-weight:600}
-      section{padding:48px 24px;border-top:1px solid rgba(255,255,255,.08)}
-      .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-      .card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:18px}
-      .muted{opacity:.8}
-      @media(max-width:900px){.grid{grid-template-columns:1fr}}
-    </style>
-  </head>
-  <body>
-    <header>
-      <div class="wrap">
-        <h1>${safeTitle || "Generated Website"}</h1>
-        <p class="muted">This page was generated, versioned, and auto-published.</p>
-        <a class="btn" href="#contact">Get Started</a>
-      </div>
-    </header>
+      // 1) Generate via AI
+      const genRes = await fetch(`/api/projects/${projectId}/generate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
 
-    <section id="contact">
-      <div class="wrap">
-        <h2>Prompt Used</h2>
-        <pre style="white-space:pre-wrap;background:rgba(255,255,255,.06);padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,.10)">${prompt
-          .replace(/</g, "")
-          .replace(/>/g, "")}</pre>
-      </div>
-    </section>
-  </body>
-</html>`;
+      const genText = await genRes.text();
+      if (!genRes.ok) {
+        setStatus(String(genRes.status));
+        setBody(genText);
+        setLoading(false);
+        return;
+      }
 
-      // --- 2️⃣ Save a VERSION (history) ---
+      const genJson = JSON.parse(genText);
+      const html = String(genJson.html || "");
+
+      if (!html || html.length < 200) {
+        setStatus("ERROR");
+        setBody("AI did not return usable HTML.");
+        setLoading(false);
+        return;
+      }
+
+      // 2) Save a VERSION (history)
       const verRes = await fetch(`/api/projects/${projectId}/versions`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -73,7 +56,7 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
         return;
       }
 
-      // --- 3️⃣ Set LATEST (live draft) ---
+      // 3) Set LATEST (live draft)
       const saveRes = await fetch(`/api/projects/${projectId}/html`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -88,7 +71,7 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
         return;
       }
 
-      // --- 4️⃣ AUTO-PUBLISH ---
+      // 4) Auto-publish
       const publishRes = await fetch(`/api/projects/${projectId}/publish`, {
         method: "POST",
       });
@@ -118,7 +101,7 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
         maxWidth: 900,
       }}
     >
-      <h2 style={{ margin: 0, marginBottom: 10 }}>Generate & Publish</h2>
+      <h2 style={{ margin: 0, marginBottom: 10 }}>Generate & Publish (AI)</h2>
 
       <label style={{ display: "block", fontWeight: 600, marginBottom: 8 }}>
         Prompt
