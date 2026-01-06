@@ -16,7 +16,7 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
     setBody("");
 
     try {
-      // --- 1️⃣ Generate REAL HTML ---
+      // --- 1️⃣ Generate HTML ---
       const safeTitle = prompt.slice(0, 60).replace(/</g, "").replace(/>/g, "");
       const html = `<!doctype html>
 <html>
@@ -42,21 +42,10 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
     <header>
       <div class="wrap">
         <h1>${safeTitle || "Generated Website"}</h1>
-        <p class="muted">This page was generated and auto-published.</p>
+        <p class="muted">This page was generated, versioned, and auto-published.</p>
         <a class="btn" href="#contact">Get Started</a>
       </div>
     </header>
-
-    <section>
-      <div class="wrap">
-        <h2>Services</h2>
-        <div class="grid">
-          <div class="card"><h3>AI Website Creation</h3><p class="muted">Generate landing pages in minutes.</p></div>
-          <div class="card"><h3>Custom Domains</h3><p class="muted">Publish to your own domain.</p></div>
-          <div class="card"><h3>Fast Hosting</h3><p class="muted">Optimized delivery on Vercel.</p></div>
-        </div>
-      </div>
-    </section>
 
     <section id="contact">
       <div class="wrap">
@@ -69,7 +58,22 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
   </body>
 </html>`;
 
-      // --- 2️⃣ Save HTML to project ---
+      // --- 2️⃣ Save a VERSION (history) ---
+      const verRes = await fetch(`/api/projects/${projectId}/versions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ html, prompt }),
+      });
+
+      const verText = await verRes.text();
+      if (!verRes.ok) {
+        setStatus(String(verRes.status));
+        setBody(verText);
+        setLoading(false);
+        return;
+      }
+
+      // --- 3️⃣ Set LATEST (live draft) ---
       const saveRes = await fetch(`/api/projects/${projectId}/html`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -84,18 +88,16 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
         return;
       }
 
-      // --- 3️⃣ AUTO-PUBLISH ---
-      const publishRes = await fetch(
-        `/api/projects/${projectId}/publish`,
-        { method: "POST" }
-      );
+      // --- 4️⃣ AUTO-PUBLISH ---
+      const publishRes = await fetch(`/api/projects/${projectId}/publish`, {
+        method: "POST",
+      });
 
       const publishText = await publishRes.text();
       setStatus(String(publishRes.status));
       setBody(publishText);
 
       if (publishRes.ok) {
-        // --- 4️⃣ Open public page ---
         window.open(`/p/${projectId}`, "_blank");
       }
     } catch (e: any) {
@@ -116,9 +118,7 @@ export default function GeneratePanel({ projectId }: { projectId: string }) {
         maxWidth: 900,
       }}
     >
-      <h2 style={{ margin: 0, marginBottom: 10 }}>
-        Generate & Publish
-      </h2>
+      <h2 style={{ margin: 0, marginBottom: 10 }}>Generate & Publish</h2>
 
       <label style={{ display: "block", fontWeight: 600, marginBottom: 8 }}>
         Prompt
