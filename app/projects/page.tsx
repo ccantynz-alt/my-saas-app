@@ -1,95 +1,100 @@
-// app/projects/page.tsx
-import Link from "next/link";
-import { auth } from "@clerk/nextjs/server";
-import { kv } from "@vercel/kv";
+"use client";
 
-export default async function ProjectsPage() {
-  const { userId } = await auth();
+import React, { useEffect, useState } from "react";
+import ProjectCard from "./ProjectCard";
 
-  if (!userId) {
-    return (
-      <main style={{ padding: 24, fontFamily: "sans-serif" }}>
-        <h1 style={{ fontSize: 28, fontWeight: 800 }}>Projects</h1>
-        <p style={{ opacity: 0.8 }}>Please sign in.</p>
-        <p>
-          <a href="/sign-in">Go to sign in</a>
-        </p>
-      </main>
-    );
+type ProjectsApiResponse =
+  | { ok: true; projects: any[] }
+  | { ok: false; error?: string };
+
+export default function ProjectsPage() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
+  const [projects, setProjects] = useState<any[]>([]);
+
+  async function loadProjects() {
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/projects", {
+        method: "GET",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+      });
+
+      const data = (await res.json()) as ProjectsApiResponse;
+
+      if (!res.ok || !("ok" in data) || data.ok !== true) {
+        const msg =
+          (data as any)?.error ||
+          `Failed to load projects (status ${res.status})`;
+        setError(msg);
+        setProjects([]);
+        return;
+      }
+
+      setProjects(Array.isArray(data.projects) ? data.projects : []);
+    } catch (e: any) {
+      setError(e?.message || "Failed to load projects");
+      setProjects([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const ids = (await kv.lrange(`user:${userId}:projects`, 0, 50)) as string[];
-  const projects: any[] = [];
-
-  for (const id of ids || []) {
-    const p = (await kv.hgetall(`project:${id}`)) as any;
-    if (p?.id) projects.push(p);
-  }
+  useEffect(() => {
+    loadProjects();
+  }, []);
 
   return (
-    <main style={{ padding: 24, fontFamily: "sans-serif", maxWidth: 1100, margin: "0 auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 16 }}>
+    <div className="mx-auto max-w-5xl p-6">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 style={{ fontSize: 32, fontWeight: 900, margin: 0 }}>Projects</h1>
-          <p style={{ opacity: 0.75, marginTop: 8 }}>Click a project to open its dashboard.</p>
+          <h1 className="text-2xl font-bold">Projects</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            Your projects list with domain + published status.
+          </p>
         </div>
 
-        <div style={{ display: "flex", gap: 14 }}>
-          <a href="/templates">Templates</a>
-          <a href="/projects">Dashboard</a>
-        </div>
-      </div>
-
-      <div style={{ marginTop: 18 }}>
-        <a
-          href="/projects"
-          style={{
-            display: "inline-block",
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: "1px solid #ddd",
-            textDecoration: "none",
-            color: "inherit",
-            fontWeight: 600,
-          }}
+        <button
+          onClick={loadProjects}
+          className="inline-flex items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium hover:bg-gray-50"
         >
           Refresh
-        </a>
+        </button>
       </div>
 
-      <div
-        style={{
-          marginTop: 18,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-          gap: 16,
-        }}
-      >
-        {projects.map((p) => {
-          const id = String(p.id || "");
-          const safeHref = `/projects/${encodeURIComponent(id)}`;
-
-          return (
-            <Link key={id} href={safeHref} style={{ textDecoration: "none", color: "inherit" }}>
-              <div
-                style={{
-                  border: "1px solid #e5e5e5",
-                  borderRadius: 12,
-                  padding: 16,
-                  background: "white",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ fontSize: 18, fontWeight: 800 }}>{p.name || "Untitled Project"}</div>
-                <div style={{ marginTop: 6, opacity: 0.85 }}>
-                  Template: {p.templateId || "unknown"}
-                </div>
-                <div style={{ marginTop: 10, fontSize: 12, opacity: 0.6 }}>{id}</div>
-              </div>
-            </Link>
-          );
-        })}
+      <div className="mt-6">
+        {loading ? (
+          <div className="rounded-xl border bg-white p-4 text-sm text-gray-700">
+            Loading projects…
+          </div>
+        ) : error ? (
+          <div className="rounded-xl border bg-white p-4">
+            <div className="text-sm font-semibold text-red-600">
+              Could not load projects
+            </div>
+            <div className="mt-1 text-sm text-gray-700">{error}</div>
+            <button
+              onClick={loadProjects}
+              className="mt-3 inline-flex items-center justify-center rounded-lg bg-black px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+            >
+              Try again
+            </button>
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="rounded-xl border bg-white p-4 text-sm text-gray-700">
+            No projects yet.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            {projects.map((p: any) => (
+              <ProjectCard key={p.id} project={p} />
+            ))}
+          </div>
+        )}
       </div>
-    </main>
+    </div>
   );
 }
