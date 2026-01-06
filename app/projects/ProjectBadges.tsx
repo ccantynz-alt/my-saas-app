@@ -19,7 +19,7 @@ export default function ProjectBadges({
           padding: "4px 8px",
           borderRadius: 6,
           fontSize: 12,
-          fontWeight: 600,
+          fontWeight: 700,
           background: published ? "#16a34a" : "#9ca3af",
           color: "white",
         }}
@@ -34,15 +34,13 @@ export default function ProjectBadges({
             padding: "4px 8px",
             borderRadius: 6,
             fontSize: 12,
-            fontWeight: 600,
-            background:
-              domainStatus === "verified" ? "#2563eb" : "#f59e0b",
+            fontWeight: 700,
+            background: domainStatus === "verified" ? "#2563eb" : "#f59e0b",
             color: "white",
           }}
+          title={domainStatus === "verified" ? "Verified domain" : "Domain pending"}
         >
-          {domainStatus === "verified"
-            ? `Domain: ${domain}`
-            : `Domain Pending`}
+          {domainStatus === "verified" ? `Domain: ${domain}` : "Domain: Pending"}
         </span>
       ) : (
         <span
@@ -50,7 +48,7 @@ export default function ProjectBadges({
             padding: "4px 8px",
             borderRadius: 6,
             fontSize: 12,
-            fontWeight: 600,
+            fontWeight: 700,
             background: "#e5e7eb",
             color: "#374151",
           }}
