@@ -21,10 +21,10 @@ export default function PublishButton({ projectId }: { projectId: string }) {
       setStatus(String(res.status));
       setBody(text);
 
-      if (!res.ok) return;
-
-      // If publish succeeded, open the public page in a new tab
-      window.open(`/p/${projectId}`, "_blank");
+      if (res.ok) {
+        // Open the public page in a new tab
+        window.open(`/p/${projectId}`, "_blank");
+      }
     } catch (e: any) {
       setStatus("ERROR");
       setBody(e?.message || "Unknown error");
@@ -34,36 +34,44 @@ export default function PublishButton({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div style={{ marginTop: 16 }}>
-      <button
-        onClick={publish}
-        disabled={loading}
-        style={{
-          padding: "10px 14px",
-          borderRadius: 10,
-          border: "1px solid #ddd",
-          background: loading ? "#f3f3f3" : "white",
-          cursor: loading ? "not-allowed" : "pointer",
-          fontWeight: 600,
-        }}
-      >
-        {loading ? "Publishing..." : "Publish"}
-      </button>
+    <section
+      style={{
+        border: "1px solid #e5e5e5",
+        borderRadius: 12,
+        padding: 16,
+        marginTop: 16,
+        maxWidth: 900,
+      }}
+    >
+      <h2 style={{ margin: 0, marginBottom: 10 }}>Publish</h2>
 
-      <a
-        href={`/p/${projectId}`}
-        target="_blank"
-        rel="noreferrer"
-        style={{ marginLeft: 12, fontSize: 14 }}
-      >
-        Open public page
-      </a>
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <button
+          onClick={publish}
+          disabled={loading}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 10,
+            border: "1px solid #ddd",
+            background: loading ? "#f3f3f3" : "white",
+            cursor: loading ? "not-allowed" : "pointer",
+            fontWeight: 600,
+          }}
+        >
+          {loading ? "Publishing..." : "Publish"}
+        </button>
+
+        <a href={`/p/${projectId}`} target="_blank" rel="noreferrer">
+          Open public page
+        </a>
+      </div>
 
       {status ? (
         <div style={{ marginTop: 12, fontFamily: "system-ui" }}>
           <div>
-            <b>Publish status:</b> {status}
+            <b>Status:</b> {status}
           </div>
+
           {body ? (
             <pre
               style={{
@@ -80,6 +88,6 @@ export default function PublishButton({ projectId }: { projectId: string }) {
           ) : null}
         </div>
       ) : null}
-    </div>
+    </section>
   );
 }
