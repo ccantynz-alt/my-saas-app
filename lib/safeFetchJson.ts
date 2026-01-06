@@ -1,31 +1,34 @@
 export async function safeFetchJson<T = any>(
   input: RequestInfo | URL,
   init?: RequestInit
-): Promise<{ ok: true; data: T } | { ok: false; error: string; status: number; body: string }> {
+): Promise<
+  | { ok: true; data: T }
+  | { ok: false; status: number; error: string; bodyPreview: string }
+> {
   const res = await fetch(input, init);
 
   const contentType = res.headers.get("content-type") || "";
-  const bodyText = await res.text();
+  const text = await res.text();
 
-  // If it isn't JSON, return a helpful error that includes the response body (trimmed)
+  // If server did not return JSON, show the first part of the body to debug
   if (!contentType.includes("application/json")) {
     return {
       ok: false,
       status: res.status,
-      error: `Non-JSON response (${res.status}). Content-Type: ${contentType || "unknown"}`,
-      body: bodyText.slice(0, 8000),
+      error: `Non-JSON response (${res.status}). Expected JSON but got: ${contentType || "unknown content-type"}`,
+      bodyPreview: text.slice(0, 500),
     };
   }
 
   try {
-    const data = JSON.parse(bodyText) as T;
+    const data = JSON.parse(text) as T;
     return { ok: true, data };
   } catch {
     return {
       ok: false,
       status: res.status,
-      error: `Invalid JSON (${res.status}). Could not parse response body.`,
-      body: bodyText.slice(0, 8000),
+      error: `Invalid JSON (${res.status}). Could not parse JSON body.`,
+      bodyPreview: text.slice(0, 500),
     };
   }
 }
