@@ -17,7 +17,7 @@ export default async function ProjectPage({
       {/* ✅ Publish button */}
       <PublishButton projectId={projectId} />
 
-      {/* ✅ Existing panels (PASS projectId) */}
+      {/* ✅ IMPORTANT: these TWO lines must pass projectId */}
       <div style={{ marginTop: 24 }}>
         <RunDemoPanel projectId={projectId} />
       </div>
