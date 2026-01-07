@@ -1,48 +1,44 @@
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
-// IMPORTANT: force Node runtime (Edge can cause KV issues)
 export const runtime = "nodejs";
 
+// 🔥 Change this string if you re-deploy again
+const VERSION = "register-v3";
+
 function asStringArray(value: unknown): string[] {
-  // handles: undefined, array, json-string, single string
   if (!value) return [];
   if (Array.isArray(value)) return value.filter((x) => typeof x === "string") as string[];
 
   if (typeof value === "string") {
-    // might be JSON string like '["proj_..."]' or just 'proj_...'
     try {
       const parsed = JSON.parse(value);
       if (Array.isArray(parsed)) {
         return parsed.filter((x) => typeof x === "string") as string[];
       }
-      // single string stored
       return [value];
     } catch {
-      // not JSON, just a string
       return [value];
     }
   }
 
-  // unknown object type -> ignore safely
   return [];
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({} as any));
-    const projectId = (body?.projectId || "").trim();
+    const projectId = String(body?.projectId || "").trim();
 
-    if (!projectId || !projectId.startsWith("proj_")) {
+    if (!projectId.startsWith("proj_")) {
       return NextResponse.json(
-        { ok: false, error: "Invalid projectId" },
+        { ok: false, error: "Invalid projectId", version: VERSION },
         { status: 400 }
       );
     }
 
     const projectKey = `project:${projectId}`;
 
-    // If project hash doesn't exist yet, create a minimal shell record
     const exists = await kv.exists(projectKey);
     if (!exists) {
       await kv.hset(projectKey, {
@@ -52,25 +48,27 @@ export async function POST(req: Request) {
       });
     }
 
-    // Update index (safe even if stored as JSON string or array)
     const indexKey = "projects:index";
     const raw = await kv.get(indexKey);
     const current = asStringArray(raw);
 
     if (!current.includes(projectId)) {
-      const next = [projectId, ...current];
-      await kv.set(indexKey, next);
+      await kv.set(indexKey, [projectId, ...current]);
     }
 
-    return NextResponse.json({ ok: true, projectId });
+    return NextResponse.json({ ok: true, projectId, version: VERSION });
   } catch (err: any) {
-    // Log the actual root cause to Vercel logs
     console.error("REGISTER PROJECT ERROR:", err?.message || err, err?.stack);
 
-    // Return the real error message (helps debugging)
     return NextResponse.json(
-      { ok: false, error: "Register failed", details: err?.message || String(err) },
+      {
+        ok: false,
+        error: "Register failed",
+        details: err?.message || String(err),
+        version: VERSION,
+      },
       { status: 500 }
     );
   }
 }
+
