@@ -1,10 +1,9 @@
 // app/api/stripe/webhook/route.ts
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { stripe } from "../../../lib/stripe";
 import { kv } from "@vercel/kv";
 
-export const runtime = "nodejs"; // IMPORTANT for Stripe signature verification
+export const runtime = "nodejs";
 
 async function upsertSubscriptionForUser(params: {
   clerkUserId: string;
@@ -39,12 +38,34 @@ export async function POST(req: Request) {
   const sig = req.headers.get("stripe-signature");
   const whsec = process.env.STRIPE_WEBHOOK_SECRET;
 
+  // ✅ Log missing secret/signature instead of crashing
   if (!sig || !whsec) {
+    await kv.lpush("stripe:webhook:errors", {
+      at: new Date().toISOString(),
+      error: "Missing stripe-signature header or STRIPE_WEBHOOK_SECRET env var",
+      hasStripeSignatureHeader: !!sig,
+      hasWebhookSecretEnv: !!whsec,
+    });
+
     return NextResponse.json(
       { ok: false, error: "Missing stripe-signature header or STRIPE_WEBHOOK_SECRET env var" },
       { status: 400 }
     );
   }
+
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  if (!secretKey) {
+    await kv.lpush("stripe:webhook:errors", {
+      at: new Date().toISOString(),
+      error: "Missing STRIPE_SECRET_KEY env var",
+    });
+
+    return NextResponse.json({ ok: false, error: "Missing STRIPE_SECRET_KEY env var" }, { status: 500 });
+  }
+
+  const stripe = new Stripe(secretKey, {
+    apiVersion: "2025-02-24.acacia",
+  });
 
   const rawBody = await req.text();
 
@@ -52,11 +73,25 @@ export async function POST(req: Request) {
   try {
     event = stripe.webhooks.constructEvent(rawBody, sig, whsec);
   } catch (err: any) {
+    await kv.lpush("stripe:webhook:errors", {
+      at: new Date().toISOString(),
+      error: "Signature verification failed",
+      message: err?.message ?? "unknown",
+    });
+
     return NextResponse.json(
       { ok: false, error: `Webhook signature verification failed: ${err?.message ?? "unknown"}` },
       { status: 400 }
     );
   }
+
+  // ✅ Always record that we received an event
+  await kv.lpush("stripe:webhook:received", {
+    at: new Date().toISOString(),
+    id: event.id,
+    type: event.type,
+    created: event.created,
+  });
 
   try {
     switch (event.type) {
@@ -70,19 +105,12 @@ export async function POST(req: Request) {
 
         if (!clerkUserId) {
           await kv.lpush("stripe:webhook:unlinked", {
+            at: new Date().toISOString(),
             type: event.type,
-            id: event.id,
-            created: event.created,
+            eventId: event.id,
             stripeCustomerId,
           });
           break;
-        }
-
-        // ✅ Ensure customer also has clerkUserId for safety
-        if (stripeCustomerId) {
-          await stripe.customers.update(stripeCustomerId, {
-            metadata: { clerkUserId },
-          });
         }
 
         const subId = typeof session.subscription === "string" ? session.subscription : null;
@@ -106,7 +134,6 @@ export async function POST(req: Request) {
         const stripeCustomerId =
           typeof sub.customer === "string" ? sub.customer : sub.customer?.id ?? null;
 
-        // Prefer subscription metadata, fallback to customer metadata
         let clerkUserId = (sub.metadata?.clerkUserId as string) || null;
 
         if (!clerkUserId && stripeCustomerId) {
@@ -118,9 +145,9 @@ export async function POST(req: Request) {
 
         if (!clerkUserId) {
           await kv.lpush("stripe:webhook:unlinked", {
+            at: new Date().toISOString(),
             type: event.type,
-            id: event.id,
-            created: event.created,
+            eventId: event.id,
             stripeCustomerId,
             stripeSubscriptionId: sub.id,
           });
@@ -144,14 +171,20 @@ export async function POST(req: Request) {
       }
 
       default:
+        // ignore others
         break;
     }
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message ?? "Webhook handler failed" },
-      { status: 500 }
-    );
+    await kv.lpush("stripe:webhook:errors", {
+      at: new Date().toISOString(),
+      error: "Webhook handler failed",
+      message: err?.message ?? "unknown",
+      eventType: event.type,
+      eventId: event.id,
+    });
+
+    return NextResponse.json({ ok: false, error: err?.message ?? "Webhook handler failed" }, { status: 500 });
   }
 }
