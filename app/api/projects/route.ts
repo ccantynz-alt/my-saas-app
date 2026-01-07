@@ -15,26 +15,22 @@ function makeId(prefix: string) {
 async function readProjectAny(projectId: string) {
   const key = `project:${projectId}`;
 
-  // Prefer hash format
+  // Prefer hash
   try {
     const hash = await kv.hgetall<any>(key);
     if (hash && Object.keys(hash).length > 0) return hash;
-  } catch {
-    // ignore (WRONGTYPE etc)
-  }
+  } catch {}
 
-  // Fallback json/string format
+  // Fallback json/string
   try {
     const obj = await kv.get<any>(key);
     if (obj) return obj;
-  } catch {
-    // ignore
-  }
+  } catch {}
 
   return null;
 }
 
-async function readIndexIds(limit = 200): Promise<string[]> {
+async function readIndexIds(limit = 300): Promise<string[]> {
   try {
     const ids = await kv.lrange<string>("projects:index", 0, limit - 1);
     return Array.isArray(ids) ? ids.filter(Boolean) : [];
@@ -69,13 +65,26 @@ export async function GET() {
         const project = await readProjectAny(id);
         if (!project) return null;
 
+        // compute hasHtml (latest key exists)
+        const htmlKey = `generated:project:${id}:latest`;
+        let hasHtml = false;
+        try {
+          const html = await kv.get<string>(htmlKey);
+          hasHtml = typeof html === "string" && html.trim().length > 0;
+        } catch {
+          hasHtml = false;
+        }
+
         return {
           id: project.id ?? id,
           name: project.name ?? "Untitled",
           createdAt: project.createdAt ?? null,
+
           published: project.published === true,
           domain: project.domain ?? null,
           domainStatus: project.domainStatus ?? null,
+
+          hasHtml,
         };
       })
     );
@@ -109,13 +118,11 @@ export async function POST(req: Request) {
     // Store as hash (preferred)
     await kv.hset(`project:${id}`, project as any);
 
-    // IMPORTANT: maintain index (newest first)
-    // Even if duplicates happen, GET dedupes.
+    // Maintain index (newest first)
     try {
       await kv.lpush("projects:index", id);
-    } catch (e) {
-      console.error("LPUSH projects:index failed:", e);
-      // still return ok, project exists
+    } catch {
+      // ignore
     }
 
     return json({ ok: true, project });
