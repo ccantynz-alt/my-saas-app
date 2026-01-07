@@ -1,136 +1,63 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
-type ProjectRow = {
+type Project = {
   id: string;
-  name: string;
-  createdAt?: string | null;
-
-  published: boolean;
-  hasHtml: boolean;
-
-  domain?: string | null;
-  domainStatus?: "pending" | "verified" | null;
+  name?: string;
+  published?: string | boolean;
+  domain?: string;
 };
 
-function Badge({
-  text,
-  bg,
-  color,
-  title,
-}: {
-  text: string;
-  bg: string;
-  color: string;
-  title?: string;
-}) {
-  return (
-    <span
-      title={title}
-      style={{
-        padding: "6px 10px",
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 900,
-        background: bg,
-        color,
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-      }}
-    >
-      {text}
-    </span>
-  );
-}
-
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
-  const [recovering, setRecovering] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const [name, setName] = useState("");
   const [recoverId, setRecoverId] = useState("");
 
   async function loadProjects() {
-    setLoading(true);
-    setError(null);
-
     try {
+      setLoading(true);
+      setError(null);
+
       const res = await fetch("/api/projects", { cache: "no-store" });
       const data = await res.json();
 
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || "Failed to load projects");
+      if (!data?.ok || !Array.isArray(data.projects)) {
+        throw new Error("Invalid projects response");
       }
 
-      setProjects(data.projects || []);
-    } catch (e: any) {
-      setError(e?.message || "Failed to load projects");
+      setProjects(data.projects);
+    } catch (err: any) {
+      console.error("Failed to load projects:", err);
+      setError("Failed to load projects");
+      setProjects([]);
     } finally {
       setLoading(false);
     }
   }
 
-  async function createProject() {
-    if (creating) return;
-    setCreating(true);
-    setError(null);
-
-    try {
-      const res = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: name.trim() || "New project" }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data?.ok || !data.project?.id) {
-        throw new Error(data?.error || "Project creation failed");
-      }
-
-      window.location.href = `/projects/${data.project.id}`;
-    } catch (e: any) {
-      setError(e?.message || "Failed to create project");
-      setCreating(false);
-    }
-  }
-
   async function recoverProject() {
-    if (recovering) return;
-
-    const id = recoverId.trim();
-    if (!id.startsWith("proj_")) {
-      setError("Recover project: please paste a proj_… ID");
-      return;
-    }
-
-    setRecovering(true);
-    setError(null);
+    if (!recoverId.trim()) return;
 
     try {
       const res = await fetch("/api/projects/register", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ projectId: id }),
+        body: JSON.stringify({ projectId: recoverId.trim() }),
       });
 
       const data = await res.json();
 
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || "Recover failed");
+      if (!data?.ok) {
+        throw new Error(data?.error || "Register failed");
       }
 
       setRecoverId("");
       await loadProjects();
-    } catch (e: any) {
-      setError(e?.message || "Recover failed");
-    } finally {
-      setRecovering(false);
+    } catch (err: any) {
+      alert(err.message || "Register failed");
     }
   }
 
@@ -139,217 +66,70 @@ export default function ProjectsPage() {
   }, []);
 
   return (
-    <div style={{ maxWidth: 980, margin: "0 auto", padding: 24 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 12,
-          flexWrap: "wrap",
-          marginBottom: 14,
-        }}
-      >
-        <h1 style={{ fontSize: 28, fontWeight: 900, margin: 0 }}>Projects</h1>
+    <main style={{ padding: 24, maxWidth: 900 }}>
+      <h1 style={{ fontSize: 28, fontWeight: 700 }}>Projects</h1>
 
-        <button
-          onClick={loadProjects}
-          disabled={loading}
-          style={{
-            padding: "10px 14px",
-            borderRadius: 12,
-            border: "1px solid #d1d5db",
-            background: loading ? "#f3f4f6" : "white",
-            fontWeight: 900,
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
-        >
-          {loading ? "Refreshing…" : "Refresh"}
-        </button>
+      <div style={{ marginTop: 16 }}>
+        <button onClick={loadProjects}>Refresh</button>
       </div>
 
-      {/* Create new */}
-      <div
-        style={{
-          border: "1px solid #e5e7eb",
-          borderRadius: 14,
-          padding: 16,
-          background: "white",
-          marginBottom: 12,
-        }}
-      >
-        <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 8 }}>
-          Create a new project
-        </div>
+      <hr style={{ margin: "24px 0" }} />
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Project name (optional)"
-            style={{
-              flex: "1 1 280px",
-              padding: "10px 12px",
-              borderRadius: 12,
-              border: "1px solid #d1d5db",
-              fontSize: 14,
-            }}
-          />
+      <h2>Create a new project</h2>
+      <p>(Use your existing create flow)</p>
 
-          <button
-            onClick={createProject}
-            disabled={creating}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 12,
-              border: "1px solid #111827",
-              background: creating ? "#9ca3af" : "#111827",
-              color: "white",
-              fontWeight: 900,
-              cursor: creating ? "not-allowed" : "pointer",
-            }}
-          >
-            {creating ? "Creating…" : "Create project"}
-          </button>
-        </div>
-      </div>
+      <hr style={{ margin: "24px 0" }} />
 
-      {/* Recover */}
-      <div
-        style={{
-          border: "1px solid #e5e7eb",
-          borderRadius: 14,
-          padding: 16,
-          background: "white",
-          marginBottom: 16,
-        }}
-      >
-        <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 8 }}>
-          Recover an existing project (paste a proj_… id)
-        </div>
+      <h2>Recover an existing project</h2>
 
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <input
-            value={recoverId}
-            onChange={(e) => setRecoverId(e.target.value)}
-            placeholder="proj_123…"
-            style={{
-              flex: "1 1 280px",
-              padding: "10px 12px",
-              borderRadius: 12,
-              border: "1px solid #d1d5db",
-              fontSize: 14,
-            }}
-          />
+      <input
+        value={recoverId}
+        onChange={(e) => setRecoverId(e.target.value)}
+        placeholder="proj_..."
+        style={{ width: 420, marginRight: 8 }}
+      />
 
-          <button
-            onClick={recoverProject}
-            disabled={recovering}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 12,
-              border: "1px solid #111827",
-              background: recovering ? "#9ca3af" : "white",
-              color: "#111827",
-              fontWeight: 900,
-              cursor: recovering ? "not-allowed" : "pointer",
-            }}
-          >
-            {recovering ? "Recovering…" : "Recover project"}
-          </button>
-        </div>
+      <button onClick={recoverProject}>Recover project</button>
 
-        <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280", fontWeight: 800 }}>
-          Tip: Open any project page once and it will auto-appear in this list.
-        </div>
+      <p style={{ fontSize: 12, opacity: 0.7, marginTop: 8 }}>
+        Tip: Open any project page once and it will auto-appear in this list.
+      </p>
 
-        {error ? (
-          <div style={{ marginTop: 10, color: "#991b1b", fontWeight: 900 }}>
-            {error}
-          </div>
-        ) : null}
-      </div>
+      <hr style={{ margin: "24px 0" }} />
 
-      {/* List */}
-      {loading ? (
-        <div style={{ fontWeight: 900, color: "#6b7280" }}>Loading…</div>
-      ) : projects.length === 0 ? (
-        <div style={{ fontWeight: 900, color: "#6b7280" }}>
-          No projects yet. (Create one, or recover an existing proj_… id above.)
-        </div>
-      ) : (
-        <div style={{ display: "grid", gap: 12 }}>
-          {projects.map((p) => (
-            <div
-              key={p.id}
-              style={{
-                border: "1px solid #e5e7eb",
-                borderRadius: 14,
-                padding: 16,
-                background: "white",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: 12,
-                  flexWrap: "wrap",
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 900 }}>{p.name}</div>
-                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                    {p.id}
-                  </div>
-                </div>
+      {loading && <p>Loading projects…</p>}
+      {error && <p style={{ color: "red" }}>{error}</p>}
 
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {p.published ? (
-                    <Badge text="Published" bg="#16a34a" color="white" />
-                  ) : (
-                    <Badge text="Unpublished" bg="#9ca3af" color="white" />
-                  )}
-
-                  {p.hasHtml ? (
-                    <Badge text="Has HTML" bg="#111827" color="white" />
-                  ) : (
-                    <Badge text="No HTML" bg="#e5e7eb" color="#374151" />
-                  )}
-
-                  {p.domain ? (
-                    p.domainStatus === "verified" ? (
-                      <Badge text={`Domain: ${p.domain}`} bg="#2563eb" color="white" />
-                    ) : (
-                      <Badge text="Domain: Pending" bg="#f59e0b" color="white" title={p.domain} />
-                    )
-                  ) : (
-                    <Badge text="No domain" bg="#e5e7eb" color="#374151" />
-                  )}
-                </div>
-              </div>
-
-              <div style={{ marginTop: 14, display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <a href={`/projects/${p.id}`} style={{ color: "#2563eb", fontWeight: 900 }}>
-                  Open project →
-                </a>
-
-                {p.published ? (
-                  <a
-                    href={`/p/${p.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: "#16a34a", fontWeight: 900 }}
-                  >
-                    Open public →
-                  </a>
-                ) : null}
-              </div>
-            </div>
-          ))}
-        </div>
+      {!loading && projects.length === 0 && (
+        <p>No projects yet. (Create one, or recover an existing proj_… id above.)</p>
       )}
-    </div>
+
+      {projects.length > 0 && (
+        <ul style={{ marginTop: 16 }}>
+          {projects.map((p) => (
+            <li key={p.id} style={{ marginBottom: 12 }}>
+              <strong>{p.name || p.id}</strong>
+
+              <div style={{ fontSize: 12, opacity: 0.8 }}>
+                {p.published ? "Published" : "Unpublished"}
+                {p.domain ? ` · ${p.domain}` : ""}
+              </div>
+
+              <div style={{ marginTop: 4 }}>
+                <Link href={`/projects/${p.id}`}>Open project →</Link>
+                {p.published && (
+                  <>
+                    {" · "}
+                    <Link href={`/p/${p.id}`} target="_blank">
+                      Open public →
+                    </Link>
+                  </>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </main>
   );
 }
