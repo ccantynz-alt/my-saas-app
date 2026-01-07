@@ -47,23 +47,15 @@ async function getUserIdFromCustomer(stripeCustomerId: string): Promise<string |
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      return new Response("Missing STRIPE_SECRET_KEY", { status: 500 });
-    }
-    if (!process.env.STRIPE_WEBHOOK_SECRET) {
-      return new Response("Missing STRIPE_WEBHOOK_SECRET", { status: 500 });
-    }
+    if (!process.env.STRIPE_SECRET_KEY) return new Response("Missing STRIPE_SECRET_KEY", { status: 500 });
+    if (!process.env.STRIPE_WEBHOOK_SECRET) return new Response("Missing STRIPE_WEBHOOK_SECRET", { status: 500 });
 
     const sig = req.headers.get("stripe-signature");
     if (!sig) return new Response("Missing stripe-signature", { status: 400 });
 
     const body = await req.text();
 
-    const event = stripe.webhooks.constructEvent(
-      body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
+    const event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET);
 
     // Always log last webhook
     await kv.set("billing:webhook:last", {
@@ -74,23 +66,7 @@ export async function POST(req: Request) {
       receivedAt: new Date().toISOString(),
     });
 
-    // Track billing-related
-    if (
-      event.type === "checkout.session.completed" ||
-      event.type === "customer.subscription.created" ||
-      event.type === "customer.subscription.updated" ||
-      event.type === "customer.subscription.deleted"
-    ) {
-      await kv.set("billing:webhook:last_billing", {
-        type: event.type,
-        id: event.id,
-        created: event.created,
-        livemode: event.livemode,
-        receivedAt: new Date().toISOString(),
-      });
-    }
-
-    // 1) Checkout completed: link Stripe customer -> Clerk user and set Pro
+    // ---- IMPORTANT: handle checkout.session.completed FIRST (this creates the link) ----
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
 
@@ -98,10 +74,25 @@ export async function POST(req: Request) {
       const customerId = typeof session.customer === "string" ? session.customer : null;
       const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
 
+      // Log what we actually received (so we can debug in webhook-health)
+      await kv.set("billing:webhook:last_checkout", {
+        eventId: event.id,
+        type: event.type,
+        clerkUserId: clerkUserId || null,
+        customerId,
+        subscriptionId,
+        receivedAt: new Date().toISOString(),
+      });
+
+      // If metadata is missing, we cannot upgrade anyone — but we return 200 so Stripe stops retrying.
       if (!clerkUserId) {
-        // This means your checkout route is NOT sending metadata correctly.
-        // We still return 200 so Stripe stops retrying.
-        return NextResponse.json({ ok: true, warning: "Missing session.metadata.clerkUserId" });
+        await kv.set("billing:webhook:last_billing", {
+          type: event.type,
+          id: event.id,
+          warning: "Missing session.metadata.clerkUserId",
+          receivedAt: new Date().toISOString(),
+        });
+        return NextResponse.json({ ok: true });
       }
 
       if (customerId) {
@@ -127,10 +118,20 @@ export async function POST(req: Request) {
         sourceEvent: { id: event.id, type: event.type },
       });
 
+      await kv.set("billing:webhook:last_billing", {
+        type: event.type,
+        id: event.id,
+        clerkUserId,
+        customerId,
+        subscriptionId,
+        status,
+        receivedAt: new Date().toISOString(),
+      });
+
       return NextResponse.json({ ok: true });
     }
 
-    // 2) Subscription events: find linked Clerk user by customer id and update plan
+    // ---- Subscription events: upgrade/downgrade using the linked customer -> user mapping ----
     if (
       event.type === "customer.subscription.created" ||
       event.type === "customer.subscription.updated" ||
@@ -142,10 +143,29 @@ export async function POST(req: Request) {
       if (!customerId) return NextResponse.json({ ok: true });
 
       const clerkUserId = await getUserIdFromCustomer(customerId);
+
+      // Log what happened
+      await kv.set("billing:webhook:last_subscription", {
+        eventId: event.id,
+        type: event.type,
+        customerId,
+        foundClerkUserId: clerkUserId,
+        subscriptionId: sub.id,
+        status: sub.status,
+        receivedAt: new Date().toISOString(),
+      });
+
+      // If not linked yet, we can't apply billing to any user.
       if (!clerkUserId) {
-        // Not linked yet — means checkout.session.completed never linked the customer.
-        // Usually because metadata.clerkUserId wasn't present or you upgraded before this code was deployed.
-        return NextResponse.json({ ok: true, warning: "No linked clerkUserId for customer" });
+        await kv.set("billing:webhook:last_billing", {
+          type: event.type,
+          id: event.id,
+          customerId,
+          subscriptionId: sub.id,
+          warning: "No linked clerkUserId for customer (need checkout.session.completed with metadata)",
+          receivedAt: new Date().toISOString(),
+        });
+        return NextResponse.json({ ok: true });
       }
 
       const subStatus = toStatus(sub.status);
@@ -161,14 +181,22 @@ export async function POST(req: Request) {
         sourceEvent: { id: event.id, type: event.type },
       });
 
+      await kv.set("billing:webhook:last_billing", {
+        type: event.type,
+        id: event.id,
+        clerkUserId,
+        customerId,
+        subscriptionId: sub.id,
+        status: sub.status,
+        receivedAt: new Date().toISOString(),
+      });
+
       return NextResponse.json({ ok: true });
     }
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    return new Response(`Webhook handler error: ${err?.message || "unknown"}`, {
-      status: 400,
-    });
+    return new Response(`Webhook handler error: ${err?.message || "unknown"}`, { status: 400 });
   }
 }
 
