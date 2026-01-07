@@ -1,35 +1,17 @@
-"use client";
+// /app/billing/page.tsx
+import { UpgradeToProButton } from "@/components/UpgradeToProButton";
 
 export default function BillingPage() {
-  async function subscribe() {
-    const userId = "demo-user"; // replace later with real auth
-
-    const res = await fetch("/api/stripe/checkout", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ userId }),
-    });
-
-    const data = await res.json();
-
-    if (data?.url) {
-      window.location.href = data.url;
-    } else {
-      alert("Failed to start checkout");
-    }
-  }
-
   return (
-    <main style={{ padding: 40 }}>
-      <h1>Upgrade</h1>
-      <p>Subscribe to unlock full access.</p>
+    <main style={{ padding: 24, maxWidth: 800 }}>
+      <h1 style={{ fontSize: 28, fontWeight: 700 }}>Billing</h1>
+      <p style={{ marginTop: 12 }}>
+        Upgrade to Pro to unlock higher limits.
+      </p>
 
-      <button
-        onClick={subscribe}
-        style={{ padding: "12px 20px", marginTop: 16 }}
-      >
-        Subscribe
-      </button>
+      <div style={{ marginTop: 18 }}>
+        <UpgradeToProButton />
+      </div>
     </main>
   );
 }
