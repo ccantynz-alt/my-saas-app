@@ -1,7 +1,7 @@
 // app/api/stripe/checkout/route.ts
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { stripe } from "../_lib/stripe";
+import { stripe } from "../../../lib/stripe";
 
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -49,6 +49,7 @@ export async function POST(req: Request) {
       },
     },
 
+    // ✅ Make sure customer exists
     customer_creation: "always",
   });
 
