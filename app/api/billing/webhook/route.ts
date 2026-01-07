@@ -44,13 +44,21 @@ export async function POST(req: Request) {
     // We set this during checkout:
     // client_reference_id = clerk userId
     const setPro = async (clerkUserId: string, stripeCustomerId?: string | null, subId?: string | null) => {
-      await kv.hset(`billing:user:${clerkUserId}`, {
-        plan: "pro",
-        stripeCustomerId: stripeCustomerId ?? "",
-        stripeSubscriptionId: subId ?? "",
-        updatedAt: new Date().toISOString(),
-      });
-    };
+       try {
+    const rawBody = await req.text();
+    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+
+    // ✅ Save last received event for debugging
+    await kv.set("billing:webhook:last", {
+      type: event.type,
+      id: event.id,
+      created: event.created,
+      livemode: event.livemode,
+      receivedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    ...
+  }
 
     const setFree = async (clerkUserId: string) => {
       await kv.hset(`billing:user:${clerkUserId}`, {
