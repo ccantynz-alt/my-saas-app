@@ -1,62 +1,48 @@
 import Stripe from "stripe";
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 
-export const runtime = "nodejs";
+export const runtime = "nodejs"; // Stripe needs Node runtime (not Edge)
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
-export async function POST() {
-  // IMPORTANT: in your Clerk version, auth() is async
-  const { userId } = await auth();
+export async function POST(req: Request) {
+  try {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return Response.json(
+        { ok: false, error: "Missing STRIPE_SECRET_KEY" },
+        { status: 500 }
+      );
+    }
 
-  if (!userId) {
-    return NextResponse.json(
-      { ok: false, error: "Not authenticated" },
-      { status: 401 }
-    );
-  }
+    if (!process.env.STRIPE_PRICE_PRO) {
+      return Response.json(
+        { ok: false, error: "Missing STRIPE_PRICE_PRO (price_...)" },
+        { status: 500 }
+      );
+    }
 
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return NextResponse.json(
-      { ok: false, error: "Missing STRIPE_SECRET_KEY" },
+    // Derive origin safely (works on Vercel)
+    const origin =
+      req.headers.get("origin") ||
+      `https://${req.headers.get("host") || "my-saas-app-5eyw.vercel.app"}`;
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      line_items: [
+        {
+          price: process.env.STRIPE_PRICE_PRO,
+          quantity: 1,
+        },
+      ],
+      success_url: `${origin}/billing?success=1`,
+      cancel_url: `${origin}/billing?canceled=1`,
+      metadata: {},
+    });
+
+    return Response.json({ ok: true, url: session.url }, { status: 200 });
+  } catch (err: any) {
+    return Response.json(
+      { ok: false, error: err?.message || String(err) },
       { status: 500 }
     );
   }
-
-  if (!process.env.STRIPE_PRO_PRICE_ID) {
-    return NextResponse.json(
-      { ok: false, error: "Missing STRIPE_PRO_PRICE_ID" },
-      { status: 500 }
-    );
-  }
-
-  if (!process.env.NEXT_PUBLIC_APP_URL) {
-    return NextResponse.json(
-      { ok: false, error: "Missing NEXT_PUBLIC_APP_URL" },
-      { status: 500 }
-    );
-  }
-
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    payment_method_types: ["card"],
-
-    // 🔑 THIS is the link between Stripe and your Clerk user
-    metadata: {
-      clerkUserId: userId,
-    },
-
-    line_items: [
-      {
-        price: process.env.STRIPE_PRO_PRICE_ID,
-        quantity: 1,
-      },
-    ],
-
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?upgraded=1`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
-  });
-
-  return NextResponse.json({ ok: true, url: session.url });
 }
