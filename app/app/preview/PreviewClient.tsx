@@ -22,8 +22,10 @@ export default function PreviewClient() {
         setLoading(false);
         return;
       }
+
       setErr(null);
       setLoading(true);
+
       try {
         const data = await apiGetLatestHtml(projectId);
         if (!data.ok || !data.html) throw new Error(data.error || "No generated website HTML found");
@@ -34,13 +36,16 @@ export default function PreviewClient() {
         setLoading(false);
       }
     }
+
     load();
   }, [projectId]);
 
   async function onPublish() {
     if (!projectId) return;
+
     setPublishing(true);
     setErr(null);
+
     try {
       const data = await apiPublish(projectId);
       if (!data.ok) throw new Error(data.error || "Publish failed");
@@ -58,8 +63,10 @@ export default function PreviewClient() {
 
   async function onRegenerate() {
     if (!projectId) return;
+
     setErr(null);
     setLoading(true);
+
     try {
       const prompt =
         "Create a professional business website with a hero section, services, testimonials, about, and contact page. Clean, modern design.";
@@ -88,7 +95,12 @@ export default function PreviewClient() {
         <button
           onClick={onPublish}
           disabled={publishing || loading}
-          style={{ padding: "12px 16px", fontSize: 16, borderRadius: 12, border: "1px solid rgba(0,0,0,0.15)" }}
+          style={{
+            padding: "12px 16px",
+            fontSize: 16,
+            borderRadius: 12,
+            border: "1px solid rgba(0,0,0,0.15)",
+          }}
         >
           {publishing ? "Publishing…" : "Publish Website"}
         </button>
