@@ -59,9 +59,13 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
   const [onboarding, setOnboarding] = useState<OnboardingRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [generating, setGenerating] = useState(false);
+  const [generatedOk, setGeneratedOk] = useState(false);
+
   async function load() {
     setLoading(true);
     setError(null);
+    setGeneratedOk(false);
 
     try {
       // Load project
@@ -73,15 +77,11 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
       }
       setProject(data.project as Project);
 
-      // Load onboarding (optional)
+      // Load onboarding
       const oRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/onboarding`, { method: 'GET' });
       const oData = await oRes.json().catch(() => null);
-
-      if (oRes.ok && oData?.ok) {
-        setOnboarding(oData.record || null);
-      } else {
-        setOnboarding(null);
-      }
+      if (oRes.ok && oData?.ok) setOnboarding(oData.record || null);
+      else setOnboarding(null);
     } catch (e: any) {
       setProject(null);
       setOnboarding(null);
@@ -95,6 +95,27 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+
+  async function generate() {
+    setGenerating(true);
+    setError(null);
+    setGeneratedOk(false);
+
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/generate`, { method: 'POST' });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || `Generate failed (HTTP ${res.status})`);
+      }
+
+      setGeneratedOk(true);
+    } catch (e: any) {
+      setError(e?.message || 'Generate failed');
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -122,7 +143,7 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                 <div className="mt-2 h-4 w-72 animate-pulse rounded-lg bg-neutral-200" />
               </div>
             </Card>
-          ) : error ? (
+          ) : error && !project ? (
             <Card>
               <div className="p-6">
                 <div className="text-lg font-semibold text-neutral-900">Error</div>
@@ -143,6 +164,18 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
             </Card>
           ) : project ? (
             <div className="grid grid-cols-1 gap-4">
+              {error ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 whitespace-pre-wrap">
+                  {error}
+                </div>
+              ) : null}
+
+              {generatedOk ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                  ✅ Generated! Open Preview to see the website.
+                </div>
+              ) : null}
+
               <Card>
                 <div className="p-6">
                   <div className="text-sm font-semibold text-neutral-700">Name</div>
@@ -166,16 +199,27 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                           ✅ Onboarding saved: <span className="font-medium">{formatDate(onboarding.updatedAt)}</span>
                         </>
                       ) : (
-                        <>No onboarding answers yet.</>
+                        <>No onboarding answers yet. Start AI Walk first.</>
                       )}
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <a
                         href={`/projects/${encodeURIComponent(projectId)}/build`}
-                        className="inline-flex items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+                        className="inline-flex items-center justify-center rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-black hover:bg-neutral-50"
                       >
                         {onboarding ? 'Edit AI Walk' : 'Start AI Walk'}
+                      </a>
+
+                      <Button onClick={generate} disabled={!onboarding || generating}>
+                        {generating ? 'Generating…' : 'Generate Website'}
+                      </Button>
+
+                      <a
+                        href={`/projects/${encodeURIComponent(projectId)}/preview`}
+                        className="inline-flex items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+                      >
+                        Preview
                       </a>
 
                       <Button variant="secondary" onClick={load}>
@@ -186,14 +230,13 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
 
                   {onboarding?.prompt ? (
                     <div className="mt-5 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
-                      <div className="text-xs font-semibold text-neutral-700">Saved generation prompt (for next step)</div>
+                      <div className="text-xs font-semibold text-neutral-700">Saved generation prompt</div>
                       <div className="mt-2 whitespace-pre-wrap text-xs text-neutral-700">{onboarding.prompt}</div>
                     </div>
                   ) : null}
 
                   <div className="mt-6 text-sm text-neutral-600">
-                    Next step after this page: add a “Generate Website” button that uses the saved prompt and creates the
-                    generated site + preview + publish.
+                    Next step after this: create a real “Publish” flow to a public URL (like <b>/p/&lt;projectId&gt;</b>).
                   </div>
                 </div>
               </Card>
