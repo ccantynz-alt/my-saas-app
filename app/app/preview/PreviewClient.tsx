@@ -47,7 +47,9 @@ export default function PreviewClient() {
     setErr(null);
 
     try {
-      const data = await apiPublish(projectId);
+      if (!html) throw new Error("No HTML to publish.");
+
+      const data = await apiPublish(projectId, html);
       if (!data.ok) throw new Error(data.error || "Publish failed");
 
       router.push(
