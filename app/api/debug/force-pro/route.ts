@@ -1,27 +1,26 @@
 // app/api/debug/force-pro/route.ts
 
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
+import { requireAdmin } from "@/app/lib/admin-guard";
 
 export async function GET() {
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
+
   return NextResponse.json({
     ok: true,
     route: "/api/debug/force-pro",
     methods: ["GET", "POST"],
-    note: "POST will set your plan to pro in KV.",
+    note: "POST sets YOUR plan to pro (admin-only).",
   });
 }
 
 export async function POST() {
-  const { userId } = await auth();
+  const gate = await requireAdmin();
+  if (!gate.ok) return gate.response;
 
-  if (!userId) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 }
-    );
-  }
+  const { userId } = gate;
 
   const key = `plan:clerk:${userId}`;
   await kv.set(key, "pro");
