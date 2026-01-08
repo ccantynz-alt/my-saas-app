@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { apiCreateProject } from "@/lib/customerFlowApi";
 import { useState } from "react";
+import { apiCreateProject } from "@/lib/customerFlowApi";
 
 export default function AppDashboardPage() {
   const router = useRouter();
@@ -12,9 +12,11 @@ export default function AppDashboardPage() {
   async function onCreate() {
     setErr(null);
     setLoading(true);
+
     try {
       const data = await apiCreateProject();
       if (!data.ok || !data.projectId) throw new Error(data.error || "Failed to create project");
+
       router.push(`/app/create?projectId=${encodeURIComponent(data.projectId)}`);
     } catch (e: any) {
       setErr(e?.message || "Something went wrong");
