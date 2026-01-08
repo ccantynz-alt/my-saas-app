@@ -10,6 +10,15 @@ type Project = {
   updatedAt: number;
 };
 
+type OnboardingRecord = {
+  projectId: string;
+  userId: string;
+  answers: any;
+  prompt: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
 function formatDate(ts: number) {
   if (!ts) return '';
   try {
@@ -47,6 +56,7 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
 
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<Project | null>(null);
+  const [onboarding, setOnboarding] = useState<OnboardingRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
@@ -54,16 +64,27 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
     setError(null);
 
     try {
+      // Load project
       const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, { method: 'GET' });
       const data = await res.json().catch(() => null);
 
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || `Project not found or you do not have access.`);
       }
-
       setProject(data.project as Project);
+
+      // Load onboarding (optional)
+      const oRes = await fetch(`/api/projects/${encodeURIComponent(projectId)}/onboarding`, { method: 'GET' });
+      const oData = await oRes.json().catch(() => null);
+
+      if (oRes.ok && oData?.ok) {
+        setOnboarding(oData.record || null);
+      } else {
+        setOnboarding(null);
+      }
     } catch (e: any) {
       setProject(null);
+      setOnboarding(null);
       setError(e?.message || 'Project not found or you do not have access.');
     } finally {
       setLoading(false);
@@ -138,8 +159,41 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                     </div>
                   </div>
 
+                  <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-sm text-neutral-600">
+                      {onboarding ? (
+                        <>
+                          ✅ Onboarding saved: <span className="font-medium">{formatDate(onboarding.updatedAt)}</span>
+                        </>
+                      ) : (
+                        <>No onboarding answers yet.</>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <a
+                        href={`/projects/${encodeURIComponent(projectId)}/build`}
+                        className="inline-flex items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+                      >
+                        {onboarding ? 'Edit AI Walk' : 'Start AI Walk'}
+                      </a>
+
+                      <Button variant="secondary" onClick={load}>
+                        Refresh
+                      </Button>
+                    </div>
+                  </div>
+
+                  {onboarding?.prompt ? (
+                    <div className="mt-5 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+                      <div className="text-xs font-semibold text-neutral-700">Saved generation prompt (for next step)</div>
+                      <div className="mt-2 whitespace-pre-wrap text-xs text-neutral-700">{onboarding.prompt}</div>
+                    </div>
+                  ) : null}
+
                   <div className="mt-6 text-sm text-neutral-600">
-                    Next product step (later): show generated HTML, versions, and publish status here.
+                    Next step after this page: add a “Generate Website” button that uses the saved prompt and creates the
+                    generated site + preview + publish.
                   </div>
                 </div>
               </Card>
