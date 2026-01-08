@@ -2,7 +2,10 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { apiGenerate } from "@/lib/customerFlowApi";
+
+function keyPrompt(projectId: string) {
+  return `prompt:${projectId}`;
+}
 
 export default function CreateClient() {
   const router = useRouter();
@@ -13,31 +16,18 @@ export default function CreateClient() {
   const [prompt, setPrompt] = useState(
     "Create a professional business website with a hero section, services, testimonials, about, and contact page. Clean, modern design."
   );
-  const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  async function onGenerate() {
+  function onGenerate() {
     if (!projectId) {
       setErr("Missing projectId. Go back to Dashboard and click Create Website again.");
       return;
     }
 
     setErr(null);
-    setLoading(true);
+    sessionStorage.setItem(keyPrompt(projectId), prompt);
 
-    try {
-      const data = await apiGenerate(projectId, prompt);
-      if (!data.ok || !data.runId) throw new Error(data.error || "Failed to start generation");
-
-      router.push(
-        `/app/generate?projectId=${encodeURIComponent(projectId)}&runId=${encodeURIComponent(
-          data.runId
-        )}`
-      );
-    } catch (e: any) {
-      setErr(e?.message || "Something went wrong");
-      setLoading(false);
-    }
+    router.push(`/app/generate?projectId=${encodeURIComponent(projectId)}`);
   }
 
   return (
@@ -63,17 +53,16 @@ export default function CreateClient() {
 
       <button
         onClick={onGenerate}
-        disabled={loading}
         style={{
           marginTop: 16,
           padding: "14px 18px",
           fontSize: 18,
           borderRadius: 12,
           border: "1px solid rgba(0,0,0,0.15)",
-          cursor: loading ? "not-allowed" : "pointer",
+          cursor: "pointer",
         }}
       >
-        {loading ? "Starting…" : "Generate Website"}
+        Generate Website
       </button>
 
       <p style={{ marginTop: 10, opacity: 0.7 }}>This usually takes less than 60 seconds.</p>
