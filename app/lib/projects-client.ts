@@ -15,4 +15,3 @@ export async function fetchProject(projectId: string): Promise<Project | null> {
   const json = await res.json();
   return json?.project ?? null;
 }
-
