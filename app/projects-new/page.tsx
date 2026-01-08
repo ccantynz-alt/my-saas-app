@@ -9,13 +9,20 @@ import { createProjectClient } from "@/app/lib/projects-client";
 export default function ProjectsNewPage() {
   const [name, setName] = useState("My Project");
   const [creating, setCreating] = useState(false);
+
+  const [banner, setBanner] = useState<string>("");
   const [lastResult, setLastResult] = useState<string>("");
+
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeMessage, setUpgradeMessage] = useState("");
 
-  const canCreate = useMemo(() => name.trim().length > 0 && !creating, [name, creating]);
+  const canCreate = useMemo(
+    () => name.trim().length > 0 && !creating,
+    [name, creating]
+  );
 
   async function onCreate() {
+    setBanner("");
     setLastResult("");
     setCreating(true);
 
@@ -28,21 +35,20 @@ export default function ProjectsNewPage() {
         return;
       }
 
-      // 401 = not signed in
       if (result.status === 401) {
-        setLastResult("❌ You must be signed in to create a project.");
+        setBanner("You must be signed in to create a project.");
         return;
       }
 
-      // 403 = plan limit
       if (result.status === 403) {
-        setUpgradeMessage(result.error || "Free plan limit reached. Upgrade to Pro.");
-        setUpgradeOpen(true);
+        const msg = result.error || "Free plan limit reached. Upgrade to Pro.";
+        setBanner(msg); // <- always visible
+        setUpgradeMessage(msg);
+        setUpgradeOpen(true); // <- modal
         return;
       }
 
-      // Everything else
-      setLastResult(`❌ Error (${result.status}): ${result.error}`);
+      setBanner(`Error (${result.status}): ${result.error}`);
     } finally {
       setCreating(false);
     }
@@ -50,18 +56,28 @@ export default function ProjectsNewPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-10">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
-        <p className="text-gray-600">
-          Create and manage your AI-generated websites. Free accounts can create 1 project.
-        </p>
-      </div>
+      <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
+      <p className="mt-2 text-gray-600">
+        Create and manage your AI-generated websites. Free accounts can create 1 project.
+      </p>
+
+      {banner ? (
+        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+          <div className="font-semibold">Action needed</div>
+          <div className="mt-1">{banner}</div>
+          <div className="mt-3">
+            <a
+              href="/billing"
+              className="inline-flex items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+            >
+              Upgrade to Pro
+            </a>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-gray-900">Create a new project</h2>
-        <p className="mt-1 text-sm text-gray-600">
-          If you hit the Free limit, you’ll see an upgrade prompt.
-        </p>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
@@ -85,16 +101,6 @@ export default function ProjectsNewPage() {
             {lastResult}
           </div>
         ) : null}
-
-        <div className="mt-6 rounded-xl border border-dashed border-gray-300 p-4">
-          <p className="text-sm text-gray-700">
-            Want to test the limit quickly?
-          </p>
-          <ol className="mt-2 list-decimal pl-5 text-sm text-gray-600">
-            <li>Force Free (admin-only): <code className="bg-gray-100 px-1 py-0.5 rounded">/api/debug/force-free</code></li>
-            <li>Then try creating a project again → you should get an upgrade prompt.</li>
-          </ol>
-        </div>
       </div>
 
       <UpgradeToProDialog
