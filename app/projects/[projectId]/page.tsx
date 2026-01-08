@@ -1,152 +1,151 @@
-// app/projects/[projectId]/page.tsx
+'use client';
 
-"use client";
-
-import React, { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React, { useEffect, useState } from 'react';
 
 type Project = {
   id: string;
   userId: string;
   name: string;
   createdAt: number;
+  updatedAt: number;
 };
 
-async function fetchProject(projectId: string): Promise<Project | null> {
-  const res = await fetch(`/api/projects/${projectId}`);
-  if (!res.ok) return null;
-  const json = await res.json();
-  return json?.project ?? null;
+function formatDate(ts: number) {
+  if (!ts) return '';
+  try {
+    return new Date(ts).toLocaleString();
+  } catch {
+    return '';
+  }
 }
 
-export default function ProjectDetailsPage() {
-  const params = useParams();
-  const router = useRouter();
+function Card(props: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-2xl border border-neutral-200 bg-white shadow-sm ${props.className ?? ''}`}>
+      {props.children}
+    </div>
+  );
+}
 
-  const projectId = params?.projectId as string;
+function Button(props: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' }) {
+  const variant = props.variant ?? 'primary';
+  const base =
+    'inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed';
+  const styles =
+    variant === 'primary'
+      ? 'bg-black text-white hover:bg-neutral-800'
+      : 'bg-white text-black border border-neutral-300 hover:bg-neutral-50';
+  return (
+    <button {...props} className={`${base} ${styles} ${props.className ?? ''}`}>
+      {props.children}
+    </button>
+  );
+}
 
-  const [project, setProject] = useState<Project | null>(null);
+export default function ProjectDetailsPage({ params }: { params: { projectId: string } }) {
+  const projectId = params?.projectId;
+
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [project, setProject] = useState<Project | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!projectId) return;
+  async function load() {
+    setLoading(true);
+    setError(null);
 
-    (async () => {
-      setLoading(true);
-      const p = await fetchProject(projectId);
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, { method: 'GET' });
+      const data = await res.json().catch(() => null);
 
-      if (!p) {
-        setError("Project not found or you do not have access.");
-        setLoading(false);
-        return;
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || `Project not found or you do not have access.`);
       }
 
-      setProject(p);
+      setProject(data.project as Project);
+    } catch (e: any) {
+      setProject(null);
+      setError(e?.message || 'Project not found or you do not have access.');
+    } finally {
       setLoading(false);
-    })();
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  if (loading) {
-    return (
-      <div className="mx-auto max-w-4xl px-6 py-10">
-        <p className="text-sm text-gray-500">Loading project…</p>
-      </div>
-    );
-  }
-
-  if (error || !project) {
-    return (
-      <div className="mx-auto max-w-4xl px-6 py-10">
-        <h1 className="text-xl font-semibold text-gray-900">Error</h1>
-        <p className="mt-2 text-gray-600">{error}</p>
-
-        <button
-          onClick={() => router.push("/projects")}
-          className="mt-6 rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white"
-        >
-          Back to Projects
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
-      {/* Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{project.name}</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Project ID: <span className="font-mono">{project.id}</span>
-          </p>
+    <div className="min-h-screen bg-neutral-50">
+      <div className="mx-auto max-w-4xl px-4 py-10">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-neutral-900">Project</h1>
+            <p className="mt-1 text-sm text-neutral-600">Project ID: {projectId}</p>
+          </div>
+
+          <a
+            href="/projects"
+            className="inline-flex items-center justify-center rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-black hover:bg-neutral-50"
+          >
+            Back to Projects
+          </a>
         </div>
 
-        <div className="mt-4 flex gap-3 sm:mt-0">
-          <button
-            onClick={() => router.push("/projects")}
-            className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-          >
-            ← Back
-          </button>
+        <div className="mt-6">
+          {loading ? (
+            <Card>
+              <div className="p-6">
+                <div className="h-6 w-56 animate-pulse rounded-lg bg-neutral-200" />
+                <div className="mt-3 h-4 w-80 animate-pulse rounded-lg bg-neutral-200" />
+                <div className="mt-2 h-4 w-72 animate-pulse rounded-lg bg-neutral-200" />
+              </div>
+            </Card>
+          ) : error ? (
+            <Card>
+              <div className="p-6">
+                <div className="text-lg font-semibold text-neutral-900">Error</div>
+                <div className="mt-2 whitespace-pre-wrap text-sm text-neutral-700">{error}</div>
 
-          <button
-            onClick={() => alert("Next step: Generate website UI")}
-            className="rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-          >
-            Generate website
-          </button>
-        </div>
-      </div>
+                <div className="mt-4 flex gap-2">
+                  <Button variant="secondary" onClick={load}>
+                    Try again
+                  </Button>
+                  <a
+                    href="/projects"
+                    className="inline-flex items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+                  >
+                    Back to Projects
+                  </a>
+                </div>
+              </div>
+            </Card>
+          ) : project ? (
+            <div className="grid grid-cols-1 gap-4">
+              <Card>
+                <div className="p-6">
+                  <div className="text-sm font-semibold text-neutral-700">Name</div>
+                  <div className="mt-1 text-xl font-semibold text-neutral-900">{project.name}</div>
 
-      {/* Project overview */}
-      <div className="mt-8 grid gap-6 sm:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:col-span-2">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Project overview
-          </h2>
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+                      <div className="text-xs font-semibold text-neutral-700">Created</div>
+                      <div className="mt-1 text-sm text-neutral-900">{formatDate(project.createdAt) || '—'}</div>
+                    </div>
+                    <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+                      <div className="text-xs font-semibold text-neutral-700">Updated</div>
+                      <div className="mt-1 text-sm text-neutral-900">{formatDate(project.updatedAt) || '—'}</div>
+                    </div>
+                  </div>
 
-          <dl className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <dt className="text-sm text-gray-500">Name</dt>
-              <dd className="text-sm font-medium text-gray-900">
-                {project.name}
-              </dd>
+                  <div className="mt-6 text-sm text-neutral-600">
+                    Next product step (later): show generated HTML, versions, and publish status here.
+                  </div>
+                </div>
+              </Card>
             </div>
-
-            <div>
-              <dt className="text-sm text-gray-500">Created</dt>
-              <dd className="text-sm font-medium text-gray-900">
-                {new Date(project.createdAt).toLocaleString()}
-              </dd>
-            </div>
-          </dl>
+          ) : null}
         </div>
-
-        {/* Next steps */}
-        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6">
-          <h3 className="text-sm font-semibold text-gray-900">Next steps</h3>
-
-          <ol className="mt-3 list-decimal pl-5 text-sm text-gray-700">
-            <li>Generate a website using AI</li>
-            <li>Review and edit the content</li>
-            <li>Publish and connect a domain</li>
-          </ol>
-
-          <button
-            onClick={() => alert("Next step: Generate website UI")}
-            className="mt-4 w-full rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-          >
-            Generate website
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-10 rounded-2xl border border-dashed border-gray-300 p-8 text-center">
-        <p className="text-sm text-gray-600">
-          Website versions, generation history, and publishing controls will
-          appear here.
-        </p>
       </div>
     </div>
   );
