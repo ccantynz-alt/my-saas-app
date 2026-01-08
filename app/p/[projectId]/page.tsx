@@ -22,3 +22,4 @@ export default async function PublicPage({ params }: { params: { projectId: stri
     </main>
   );
 }
+
