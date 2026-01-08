@@ -31,7 +31,9 @@ export async function POST(req: Request) {
     }
 
     const stripe = new Stripe(stripeSecret, {
-      apiVersion: '2024-06-20',
+      // IMPORTANT: this must match the Stripe package types installed in your repo
+      // Your build error showed it expects: "2025-02-24.acacia"
+      apiVersion: '2025-02-24.acacia',
     });
 
     const baseUrl = getBaseUrl(req);
@@ -40,7 +42,7 @@ export async function POST(req: Request) {
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
 
-      // IMPORTANT: tie Stripe activity to the Clerk user
+      // Tie Stripe activity to Clerk user
       client_reference_id: userId,
       metadata: {
         clerkUserId: userId,
@@ -56,9 +58,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, url: session.url });
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err?.message || 'Checkout error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: err?.message || 'Checkout error' }, { status: 500 });
   }
 }
