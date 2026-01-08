@@ -13,16 +13,28 @@ function json(data: any, status = 200) {
 
 export async function POST(req: Request) {
   try {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      return json({ ok: false, error: "Missing STRIPE_SECRET_KEY" }, 500);
+    const price = process.env.STRIPE_PRICE_PRO || "";
+    const key = process.env.STRIPE_SECRET_KEY || "";
+
+    if (!key) {
+      return json(
+        {
+          ok: false,
+          error: "Missing STRIPE_SECRET_KEY",
+          vercel_env: process.env.VERCEL_ENV || null,
+        },
+        500
+      );
     }
 
-    if (!process.env.STRIPE_PRICE_PRO) {
+    if (!price) {
       return json(
         {
           ok: false,
           error: "Missing STRIPE_PRICE_PRO",
-          fix: "Set STRIPE_PRICE_PRO to your Stripe Price ID (starts with price_) in Vercel env vars (Production + Preview) then redeploy.",
+          vercel_env: process.env.VERCEL_ENV || null,
+          hint:
+            "This means the running deployment does not have STRIPE_PRICE_PRO in its environment (Production vs Preview mismatch, wrong project, or not redeployed).",
         },
         500
       );
@@ -33,15 +45,12 @@ export async function POST(req: Request) {
       req.headers.get("origin") || (host ? `https://${host}` : null);
 
     if (!origin) {
-      return json(
-        { ok: false, error: "Could not determine origin/host headers" },
-        500
-      );
+      return json({ ok: false, error: "Could not determine origin" }, 500);
     }
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
-      line_items: [{ price: process.env.STRIPE_PRICE_PRO, quantity: 1 }],
+      line_items: [{ price, quantity: 1 }],
       success_url: `${origin}/billing?success=1`,
       cancel_url: `${origin}/billing?canceled=1`,
       metadata: {},
