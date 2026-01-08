@@ -13,12 +13,6 @@ function json(data: any, status = 200) {
 
 export async function POST(req: Request) {
   try {
-    // Basic health info (safe)
-    const host = req.headers.get("host");
-    const origin =
-      req.headers.get("origin") || (host ? `https://${host}` : null);
-
-    // Hard checks
     if (!process.env.STRIPE_SECRET_KEY) {
       return json({ ok: false, error: "Missing STRIPE_SECRET_KEY" }, 500);
     }
@@ -34,6 +28,10 @@ export async function POST(req: Request) {
       );
     }
 
+    const host = req.headers.get("host");
+    const origin =
+      req.headers.get("origin") || (host ? `https://${host}` : null);
+
     if (!origin) {
       return json(
         { ok: false, error: "Could not determine origin/host headers" },
@@ -41,7 +39,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Create subscription Checkout session
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       line_items: [{ price: process.env.STRIPE_PRICE_PRO, quantity: 1 }],
@@ -52,7 +49,6 @@ export async function POST(req: Request) {
 
     return json({ ok: true, url: session.url }, 200);
   } catch (err: any) {
-    // Return the actual Stripe error message
     return json(
       {
         ok: false,
@@ -60,15 +56,6 @@ export async function POST(req: Request) {
         type: err?.type,
         code: err?.code,
         statusCode: err?.statusCode,
-        raw: err?.raw
-          ? {
-              message: err.raw.message,
-              type: err.raw.type,
-              code: err.raw.code,
-              param: err.raw.param,
-              decline_code: err.raw.decline_code,
-            }
-          : undefined,
       },
       500
     );
