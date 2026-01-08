@@ -1,11 +1,11 @@
-import { getProject } from "@/lib/demoStore";
+import { getPublishedHtml } from "@/lib/publishedStore";
 
 export const dynamic = "force-dynamic";
 
 export default async function PublicPage({ params }: { params: { projectId: string } }) {
-  const project = getProject(params.projectId);
+  const record = getPublishedHtml(params.projectId);
 
-  if (!project?.latestHtml) {
+  if (!record?.html) {
     return (
       <main style={{ padding: 32, fontFamily: "system-ui" }}>
         <h1>Not published</h1>
@@ -18,7 +18,7 @@ export default async function PublicPage({ params }: { params: { projectId: stri
     <main style={{ margin: 0, padding: 0 }}>
       <iframe
         title="site"
-        srcDoc={project.latestHtml}
+        srcDoc={record.html}
         style={{ width: "100%", height: "100vh", border: 0 }}
       />
     </main>
