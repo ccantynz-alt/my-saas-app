@@ -14,8 +14,8 @@ const MESSAGES = [
 export default function GeneratingPage() {
   const router = useRouter();
   const sp = useSearchParams();
-  const projectId = useMemo(() => sp.get("projectId") || "", [sp]);
-  const runId = useMemo(() => sp.get("runId") || "", [sp]);
+  const projectId = sp?.get("projectId") ?? "";
+const runId = sp?.get("runId") ?? "";
 
   const [msgIndex, setMsgIndex] = useState(0);
   const [err, setErr] = useState<string | null>(null);
