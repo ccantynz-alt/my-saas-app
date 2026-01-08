@@ -21,6 +21,7 @@ export default function CreateClient() {
       setErr("Missing projectId. Go back to Dashboard and click Create Website again.");
       return;
     }
+
     setErr(null);
     setLoading(true);
 
