@@ -15,6 +15,10 @@ function parseCsvEnv(value: string | undefined): string[] {
  * - If userId is in ADMIN_USER_IDS => admin
  * - Else if user's email is in ADMIN_EMAILS => admin
  * - Else => not admin
+ *
+ * NOTE:
+ * In this project, `clerkClient` is typed as a function returning a Promise,
+ * so we must `await clerkClient()` before using `.users`.
  */
 export async function isAdminUser(userId: string): Promise<boolean> {
   const adminUserIds = parseCsvEnv(process.env.ADMIN_USER_IDS);
@@ -25,12 +29,13 @@ export async function isAdminUser(userId: string): Promise<boolean> {
   // Fast path: userId allowlist
   if (adminUserIds.includes(userId)) return true;
 
-  // If no email allowlist is configured, stop here.
+  // If no email allowlist configured, stop.
   if (adminEmails.length === 0) return false;
 
   // Otherwise, check Clerk user's emails
   try {
-    const user = await clerkClient.users.getUser(userId);
+    const client = await clerkClient();
+    const user = await client.users.getUser(userId);
 
     const emails =
       user.emailAddresses?.map((e) => (e.emailAddress || "").toLowerCase()) ??
