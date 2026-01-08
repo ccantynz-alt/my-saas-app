@@ -2,9 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* A tiny bit of polish */
-:root {
-  color-scheme: light;
+html, body {
+  height: 100%;
 }
 
 body {
