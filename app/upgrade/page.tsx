@@ -1,18 +1,41 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 
-export const metadata = {
-  title: "Upgrade",
-};
-
 export default function UpgradePage() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function startCheckout() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data?.url) {
+        throw new Error(data?.error || "Failed to create Stripe checkout.");
+      }
+
+      window.location.href = data.url;
+    } catch (err: any) {
+      setError(err.message || "Something went wrong.");
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen p-6">
       <div className="mx-auto max-w-xl space-y-6">
         <h1 className="text-3xl font-bold">Upgrade to Pro</h1>
 
         <p className="text-gray-700">
-          Next step: we will connect this button to Stripe Checkout so upgrades
-          actually charge and activate Pro automatically.
+          You’re one click away from upgrading. This will open Stripe Checkout.
         </p>
 
         <div className="rounded-2xl border p-5 space-y-3">
@@ -25,25 +48,25 @@ export default function UpgradePage() {
           </ul>
         </div>
 
-        <div className="flex flex-col gap-3">
-          <button
-            disabled
-            className="rounded-md bg-black px-4 py-2 text-white opacity-60 cursor-not-allowed"
-          >
-            Upgrade (Stripe checkout next)
-          </button>
+        {error && (
+          <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+            {error}
+          </div>
+        )}
 
-          <Link
-            href="/pricing"
-            className="rounded-md border px-4 py-2 text-center hover:bg-gray-50"
-          >
+        <button
+          onClick={startCheckout}
+          disabled={loading}
+          className="w-full rounded-md bg-black px-4 py-2 text-white hover:bg-gray-800 disabled:opacity-60"
+        >
+          {loading ? "Opening Stripe Checkout..." : "Upgrade to Pro"}
+        </button>
+
+        <div className="flex justify-between text-sm">
+          <Link href="/pricing" className="hover:underline">
             Back to Pricing
           </Link>
-
-          <Link
-            href="/dashboard"
-            className="text-center text-sm text-gray-600 hover:underline"
-          >
+          <Link href="/dashboard" className="hover:underline">
             Back to Dashboard
           </Link>
         </div>
