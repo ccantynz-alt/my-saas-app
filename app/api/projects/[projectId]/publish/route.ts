@@ -1,42 +1,53 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { kvJsonGet } from "../../../../lib/kv";
-import { getCurrentUserId } from "../../../../lib/demoAuth";
+import { kv } from "@vercel/kv";
 import { requirePro, toJsonError } from "@/app/lib/limits";
+
+type Project = {
+  id: string;
+  name: string;
+  ownerId: string;
+  createdAt: string;
+};
 
 export async function POST(
   _req: Request,
   { params }: { params: { projectId: string } }
 ) {
   try {
-    // Keep your existing demo auth for accessing the project KV path
-    const userId = getCurrentUserId();
+    const { userId } = await auth();
 
-    // ✅ Enforce Pro plan (backend)
-    // Use Clerk userId for plan lookup (matches your Stripe webhook plan keys)
-    const { userId: clerkUserId } = await auth();
-    if (!clerkUserId) {
+    if (!userId) {
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    // ✅ Pro only
     try {
-      await requirePro(clerkUserId);
+      await requirePro(userId);
     } catch (err) {
       const { status, body } = toJsonError(err);
       return NextResponse.json(body, { status });
     }
 
-    const { projectId } = params;
+    const projectId = (params?.projectId || "").toString().trim();
 
     if (!projectId) {
-      return NextResponse.json(
-        { ok: false, error: "Missing projectId" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "Missing projectId" }, { status: 400 });
     }
 
-    const project = await kvJsonGet(`projects:${userId}:${projectId}`);
+    // ✅ Validate project exists + ownership
+    const project = (await kv.get(`project:${projectId}`)) as Project | null;
 
+    if (!project) {
+      return NextResponse.json({ ok: false, error: "Project not found" }, { status: 404 });
+    }
+
+    if (project.ownerId !== userId) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    }
+
+    // TODO: real publish (Vercel deploy / Git commit / etc)
+    // For now, keep stub response
     return NextResponse.json({
       ok: true,
       commitUrl: "https://github.com/example/commit/demo",
