@@ -1,125 +1,145 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
-import {
-  ensureCanCreateProject,
-  toJsonError,
-  trackProjectForUser,
-} from "@/app/lib/limits";
+import { auth } from "@clerk/nextjs/server";
+import { nanoid } from "nanoid";
 
-type Project = {
-  id: string;
-  name: string;
-  ownerId: string;
-  createdAt: string;
-};
-
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function makeId(prefix: string) {
-  return `${prefix}_${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`;
-}
-
-function isProjectLike(value: any): value is Project {
-  return (
-    value &&
-    typeof value === "object" &&
-    typeof value.id === "string" &&
-    typeof value.name === "string" &&
-    typeof value.ownerId === "string" &&
-    typeof value.createdAt === "string"
-  );
-}
-
-export async function GET() {
+export async function POST(req: Request) {
   try {
-    const { userId } = await auth();
-
+    // ─────────────────────────────────────────────
+    // AUTH
+    // ─────────────────────────────────────────────
+    const { userId } = auth();
     if (!userId) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Store projects per-user so you only see your own
-    const listKey = `user:${userId}:projects`;
-
-    let idsRaw: unknown = null;
-    try {
-      idsRaw = await kv.lrange(listKey, 0, -1);
-    } catch (err: any) {
       return NextResponse.json(
-        { ok: false, error: err?.message || "KV error reading project list" },
-        { status: 500 }
+        { ok: false, error: "Unauthorized" },
+        { status: 401 }
       );
     }
 
-    const projectIds = Array.isArray(idsRaw) ? (idsRaw as unknown[]) : [];
-    const projects: Project[] = [];
-    const skipped: string[] = [];
+    const body = await req.json();
+    const name = body?.name || "New Website";
 
-    for (const rawId of projectIds) {
-      const id = typeof rawId === "string" ? rawId : String(rawId ?? "");
-      if (!id) continue;
+    // ─────────────────────────────────────────────
+    // CREATE PROJECT
+    // ─────────────────────────────────────────────
+    const projectId = `proj_${nanoid(24)}`;
 
-      try {
-        const p = await kv.get(`project:${id}`);
-        if (isProjectLike(p)) {
-          projects.push(p);
-        } else {
-          skipped.push(id);
-        }
-      } catch {
-        skipped.push(id);
-      }
+    const project = {
+      id: projectId,
+      name,
+      ownerId: userId,
+      createdAt: new Date().toISOString(),
+    };
+
+    await kv.set(`project:${projectId}`, project);
+
+    await kv.sadd("projects:index", projectId);
+    await kv.sadd(`user:${userId}:projects`, projectId);
+
+    // ─────────────────────────────────────────────
+    // AUTO-SCAFFOLD HTML (CRITICAL)
+    // ─────────────────────────────────────────────
+    const scaffoldHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>${name}</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f9fafb;
+      color: #111827;
     }
+    header {
+      background: #2563eb;
+      color: white;
+      padding: 3rem 1.5rem;
+      text-align: center;
+    }
+    section {
+      padding: 3rem 1.5rem;
+      max-width: 900px;
+      margin: auto;
+    }
+    h2 {
+      margin-top: 0;
+    }
+    .card {
+      background: white;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+      margin-bottom: 1.5rem;
+    }
+    footer {
+      background: #111827;
+      color: white;
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>${name}</h1>
+    <p>Your website is ready to be customised</p>
+  </header>
 
-    // Newest first
-    projects.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  <section>
+    <div class="card">
+      <h2>Next steps</h2>
+      <p>
+        This is a starter site. You can:
+      </p>
+      <ul>
+        <li>Generate a site with AI</li>
+        <li>Import an existing website</li>
+        <li>Replace this content at any time</li>
+      </ul>
+    </div>
 
-    return NextResponse.json({ ok: true, projects, skipped });
-  } catch (e: any) {
+    <div class="card">
+      <h2>About</h2>
+      <p>
+        Replace this section with your real content.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Contact</h2>
+      <p>
+        Email: you@example.com
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    <p>Powered by your AI Website Builder</p>
+  </footer>
+</body>
+</html>`;
+
+    const projectHtmlKey = `generated:project:${projectId}:latest`;
+
+    await kv.set(projectHtmlKey, scaffoldHtml);
+    await kv.set("generated:latest", scaffoldHtml);
+
+    // ─────────────────────────────────────────────
+    // RESPONSE
+    // ─────────────────────────────────────────────
+    return NextResponse.json({
+      ok: true,
+      project,
+      scaffolded: true,
+    });
+  } catch (err) {
+    console.error("CREATE PROJECT ERROR:", err);
     return NextResponse.json(
-      { ok: false, error: e?.message || "Failed to load projects" },
+      { ok: false, error: "Internal error" },
       { status: 500 }
     );
   }
-}
-
-export async function POST(req: Request) {
-  const { userId } = await auth();
-
-  if (!userId) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
-
-  // ✅ Enforce Free vs Pro project creation limit (backend)
-  try {
-    await ensureCanCreateProject(userId);
-  } catch (err) {
-    const { status, body } = toJsonError(err);
-    return NextResponse.json(body, { status });
-  }
-
-  const body = (await req.json().catch(() => ({}))) as { name?: string };
-  const name = (body?.name || "Untitled Project").toString().trim() || "Untitled Project";
-
-  const id = makeId("proj");
-  const project: Project = {
-    id,
-    name,
-    ownerId: userId,
-    createdAt: nowIso(),
-  };
-
-  await kv.set(`project:${id}`, project);
-
-  // Add to the user's project list (existing behavior)
-  const listKey = `user:${userId}:projects`;
-  await kv.lpush(listKey, id);
-
-  // ✅ Track the project in the limits set (for counting)
-  await trackProjectForUser(userId, id);
-
-  return NextResponse.json({ ok: true, project });
 }
