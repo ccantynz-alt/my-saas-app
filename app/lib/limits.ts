@@ -1,81 +1,89 @@
-import { kv } from "@vercel/kv";
 import { auth } from "@clerk/nextjs/server";
-import { getUserPlan } from "@/app/lib/plan";
+import { kv } from "@vercel/kv";
+import { getUserPlan } from "./plan";
 
+/**
+ * Plan limits (backend-enforced)
+ */
 export const LIMITS = {
   free: {
-    maxProjects: 1, // change to 2 if you want
+    maxProjects: 1,
     canPublish: false,
-    canUseCustomDomains: false,
-    priorityAi: false,
+    canCustomDomain: false,
   },
   pro: {
     maxProjects: Infinity,
     canPublish: true,
-    canUseCustomDomains: true,
-    priorityAi: true,
+    canCustomDomain: true,
   },
 } as const;
 
-export type Plan = "free" | "pro";
+export type PlanName = "free" | "pro";
 
-export function getLimits(plan: Plan) {
-  return plan === "pro" ? LIMITS.pro : LIMITS.free;
-}
-
-export async function requireSignedInUserId() {
+export function requireSignedInUserId(): string {
   const { userId } = auth();
-  if (!userId) return { ok: false as const, status: 401, error: "Not signed in." };
-  return { ok: true as const, userId };
+  if (!userId) {
+    // 401 Unauthorized
+    throw Object.assign(new Error("Unauthorized"), { status: 401 });
+  }
+  return userId;
 }
 
-export async function requirePro() {
-  const signedIn = await requireSignedInUserId();
-  if (!signedIn.ok) return signedIn;
+export async function getEffectivePlan(clerkUserId: string): Promise<PlanName> {
+  const plan = await getUserPlan(clerkUserId);
+  return plan === "pro" ? "pro" : "free";
+}
 
-  const plan = await getUserPlan(signedIn.userId);
+export async function requirePro(clerkUserId: string): Promise<void> {
+  const plan = await getEffectivePlan(clerkUserId);
   if (plan !== "pro") {
-    return {
-      ok: false as const,
-      status: 403,
-      error: "Pro required. Please upgrade to Pro.",
-    };
+    // 403 Forbidden
+    throw Object.assign(new Error("Pro plan required"), { status: 403 });
   }
-
-  return { ok: true as const, userId: signedIn.userId, plan };
 }
 
-// Counts projects per user using KV.
-// Uses key format you already had earlier: projects:count:clerk:<userId>
-export async function getProjectCount(userId: string) {
-  const key = `projects:count:clerk:${userId}`;
-  const val = (await kv.get(key)) as number | null;
-  return val ?? 0;
+/**
+ * We maintain a per-user set of projectIds.
+ * Key: projects:byUser:<clerkUserId>  (Redis Set)
+ */
+function userProjectsKey(clerkUserId: string) {
+  return `projects:byUser:${clerkUserId}`;
 }
 
-export async function incrementProjectCount(userId: string) {
-  const key = `projects:count:clerk:${userId}`;
-  const current = await getProjectCount(userId);
-  const next = current + 1;
-  await kv.set(key, next);
-  return next;
+export async function getProjectCount(clerkUserId: string): Promise<number> {
+  // SCARD returns cardinality of set
+  const count = await kv.scard(userProjectsKey(clerkUserId));
+  return typeof count === "number" ? count : 0;
 }
 
-export async function ensureCanCreateProject(userId: string) {
-  const plan = await getUserPlan(userId);
-  const limits = getLimits(plan);
-  const count = await getProjectCount(userId);
+export async function trackProjectForUser(clerkUserId: string, projectId: string): Promise<void> {
+  // SADD is idempotent (won’t duplicate)
+  await kv.sadd(userProjectsKey(clerkUserId), projectId);
+}
 
-  if (count >= limits.maxProjects) {
-    return {
-      ok: false as const,
+export async function ensureCanCreateProject(clerkUserId: string): Promise<void> {
+  const plan = await getEffectivePlan(clerkUserId);
+  const limit = LIMITS[plan].maxProjects;
+
+  if (limit === Infinity) return;
+
+  const count = await getProjectCount(clerkUserId);
+  if (count >= limit) {
+    // 403 Forbidden
+    throw Object.assign(new Error(`Free plan limit reached (max ${limit} project). Upgrade to Pro.`), {
       status: 403,
-      error: `Free plan limit reached (${limits.maxProjects} project). Upgrade to Pro to create more.`,
-      plan,
-      count,
-      maxProjects: limits.maxProjects,
-    };
+    });
   }
+}
 
-  return { ok: true as const, plan, count, maxProjects: limits.maxProjects };
+/**
+ * Helper to convert thrown errors above into consistent JSON responses.
+ * Use this in route handlers.
+ */
+export function toJsonError(err: any) {
+  const status = typeof err?.status === "number" ? err.status : 500;
+  const message =
+    typeof err?.message === "string" ? err.message : "Internal server error";
+
+  return { status, body: { ok: false, error: message } };
 }
