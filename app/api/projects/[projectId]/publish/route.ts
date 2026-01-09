@@ -5,6 +5,25 @@ import { kv } from "@vercel/kv";
 
 const publicIndexKey = "public:projects:index";
 
+async function getGeneratedHtml(projectId: string): Promise<{ html: string | null; keyUsed: string | null; keys: string[] }> {
+  const keys = [
+    `generated:project:${projectId}:latest`,
+    `generated:project:${projectId}`,
+    `generated:${projectId}:latest`,
+    `generated:${projectId}`,
+    `generated:latest`, // <-- common in your earlier logs
+  ];
+
+  for (const key of keys) {
+    const v = await kv.get<any>(key);
+    if (typeof v === "string" && v.trim().length > 0) {
+      return { html: v, keyUsed: key, keys };
+    }
+  }
+
+  return { html: null, keyUsed: null, keys };
+}
+
 export async function POST(
   _req: Request,
   { params }: { params: { projectId: string } }
@@ -35,18 +54,13 @@ export async function POST(
     }
 
     // Ensure there is generated HTML to serve
-    const htmlKey1 = `generated:project:${projectId}:latest`;
-    const htmlKey2 = `generated:${projectId}:latest`;
-
-    const html =
-      (await kv.get<string>(htmlKey1)) ?? (await kv.get<string>(htmlKey2)) ?? null;
-
-    if (!html || typeof html !== "string") {
+    const found = await getGeneratedHtml(projectId);
+    if (!found.html) {
       return NextResponse.json(
         {
           ok: false,
-          error:
-            "No generated HTML found for this project. Generate the site first, then publish.",
+          error: "No generated HTML found for this project. Generate the site first, then publish.",
+          keysTried: found.keys,
         },
         { status: 400 }
       );
@@ -66,7 +80,7 @@ export async function POST(
       projectId,
       publicUrl: `/p/${projectId}`,
       indexKey: publicIndexKey,
-      htmlKeyUsed: (await kv.get<string>(htmlKey1)) ? htmlKey1 : htmlKey2,
+      htmlKeyUsed: found.keyUsed,
     });
   } catch (e: any) {
     return NextResponse.json(
