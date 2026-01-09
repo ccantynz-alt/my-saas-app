@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 "use client";
 
 import { useState } from "react";
@@ -43,9 +45,7 @@ export default function UpgradePage() {
           </div>
         ) : !isSignedIn ? (
           <div className="rounded-2xl border p-5 space-y-4">
-            <p className="text-sm text-gray-700">
-              You’re currently signed out.
-            </p>
+            <p className="text-sm text-gray-700">You’re currently signed out.</p>
 
             <SignInButton mode="modal">
               <button className="w-full rounded-md bg-black px-4 py-2 text-white hover:bg-gray-800">
