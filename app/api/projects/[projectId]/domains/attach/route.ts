@@ -1,79 +1,58 @@
-// app/api/projects/[projectId]/domain/attach/route.ts
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
+import { requirePro, toJsonError } from "@/app/lib/limits";
 
-export const dynamic = "force-dynamic";
+export async function POST(
+  req: Request,
+  { params }: { params: { projectId: string } }
+) {
+  // ✅ FIX: auth() must be awaited in your current Clerk typings/build
+  const { userId } = await auth();
 
-async function requireProjectOwner(userId: string, projectId: string) {
-  const project = (await kv.hgetall(`project:${projectId}`)) as any;
-  if (!project?.id) return { ok: false as const, error: "PROJECT_NOT_FOUND" as const };
-  if (project.userId !== userId) return { ok: false as const, error: "FORBIDDEN" as const };
-  return { ok: true as const, project };
-}
+  if (!userId) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
 
-function normalizeDomain(input: string) {
-  const d = input.trim().toLowerCase();
-  return d.replace(/^https?:\/\//, "").split("/")[0];
-}
-
-function isValidDomain(domain: string) {
-  if (!domain.includes(".")) return false;
-  if (domain.length < 4 || domain.length > 253) return false;
-  if (!/^[a-z0-9.-]+$/.test(domain)) return false;
-  if (domain.startsWith(".") || domain.endsWith(".")) return false;
-  if (domain.includes("..")) return false;
-  return true;
-}
-
-// ✅ Browser test endpoint (GET)
-export async function GET(_req: Request, ctx: { params: { projectId: string } }) {
-  return NextResponse.json({
-    ok: true,
-    route: "domain/attach",
-    projectId: ctx.params.projectId,
-  });
-}
-
-// ✅ Real attach (POST)
-export async function POST(req: Request, ctx: { params: { projectId: string } }) {
+  // ✅ Enforce Pro plan (backend)
   try {
-    const { userId } = await auth();
-    if (!userId) return NextResponse.json({ ok: false, error: "UNAUTHORIZED" }, { status: 401 });
+    await requirePro(userId);
+  } catch (err) {
+    const { status, body } = toJsonError(err);
+    return NextResponse.json(body, { status });
+  }
 
-    const projectId = ctx.params.projectId;
+  const projectId = params.projectId;
 
-    const ownerCheck = await requireProjectOwner(userId, projectId);
-    if (!ownerCheck.ok) {
-      const status = ownerCheck.error === "PROJECT_NOT_FOUND" ? 404 : 403;
-      return NextResponse.json({ ok: false, error: ownerCheck.error }, { status });
-    }
+  // Expecting JSON like: { "domain": "example.com" }
+  let body: any = null;
+  try {
+    body = await req.json();
+  } catch {
+    body = null;
+  }
 
-    let body: any = null;
-    try {
-      body = await req.json();
-    } catch {
-      body = null;
-    }
+  const domain =
+    typeof body?.domain === "string" ? body.domain.trim().toLowerCase() : "";
 
-    const domain = normalizeDomain(String(body?.domain || ""));
-    if (!domain || !isValidDomain(domain)) {
-      return NextResponse.json({ ok: false, error: "INVALID_DOMAIN" }, { status: 400 });
-    }
+  if (!domain) {
+    return NextResponse.json(
+      { ok: false, error: "Missing domain" },
+      { status: 400 }
+    );
+  }
 
-    const now = new Date().toISOString();
+  // Stub-friendly storage:
+  // Store the requested domain on the project.
+  // Later we can add real DNS verification + Vercel Domains API integration.
+  const key = `project:${projectId}:domain`;
 
-    await kv.hset(`project:${projectId}`, {
-      domain,
-      domainStatus: "attached",
-      domainUpdatedAt: now,
-      updatedAt: now,
-    });
-
+  try {
+    await kv.set(key, { domain, attachedBy: userId, attachedAt: Date.now() });
     return NextResponse.json({ ok: true, projectId, domain });
   } catch (err: any) {
     return NextResponse.json(
-      { ok: false, error: "DOMAIN_ATTACH_FAILED", detail: String(err?.message || err) },
+      { ok: false, error: err?.message || "Failed to attach domain" },
       { status: 500 }
     );
   }
