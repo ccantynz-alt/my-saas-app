@@ -1,63 +1,37 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { stripe } from "../_lib/stripe";
+import { stripe } from "@/lib/stripe";
 
-function getBaseUrl(req: Request) {
-  const url = new URL(req.url);
-
-  // If you have a custom domain, Vercel may pass x-forwarded-host.
-  // Otherwise, fall back to the request URL host.
-  const forwardedHost = req.headers.get("x-forwarded-host");
-  const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
-
-  if (forwardedHost) {
-    return `${forwardedProto}://${forwardedHost}`;
-  }
-
-  return `${url.protocol}//${url.host}`;
-}
-
-export async function POST(req: Request) {
+export async function POST() {
   try {
-    const { userId } = auth();
-    if (!userId) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
+    const priceId = process.env.STRIPE_PRICE_PRO;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
-    // Optional body fields (safe defaults)
-    const body = await req.json().catch(() => ({} as any));
-    const priceId = body?.priceId as string | undefined;
-
-    // You should set STRIPE_PRICE_ID_PRO in Vercel env.
-    const envPriceId = process.env.STRIPE_PRICE_ID_PRO;
-
-    const finalPriceId = priceId || envPriceId;
-    if (!finalPriceId) {
+    if (!priceId) {
       return NextResponse.json(
-        { ok: false, error: "Missing Stripe price id. Set STRIPE_PRICE_ID_PRO in env or pass { priceId }." },
-        { status: 400 }
+        { ok: false, error: "Missing STRIPE_PRICE_PRO env var." },
+        { status: 500 }
       );
     }
 
-    const baseUrl = getBaseUrl(req);
+    if (!appUrl) {
+      return NextResponse.json(
+        { ok: false, error: "Missing NEXT_PUBLIC_APP_URL env var." },
+        { status: 500 }
+      );
+    }
 
-    // Create a Stripe Checkout Session for a subscription.
-    // Clerk userId is stored in metadata so the webhook can map Stripe -> Clerk.
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
-      line_items: [{ price: finalPriceId, quantity: 1 }],
-      success_url: `${baseUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/pricing?canceled=1`,
-      metadata: {
-        clerkUserId: userId,
-      },
+      line_items: [{ price: priceId, quantity: 1 }],
+      allow_promotion_codes: true,
+      success_url: `${appUrl}/upgrade/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/pricing`,
     });
 
-    return NextResponse.json({ ok: true, url: session.url }, { status: 200 });
+    return NextResponse.json({ ok: true, url: session.url });
   } catch (err: any) {
-    console.error("Stripe checkout error:", err);
     return NextResponse.json(
-      { ok: false, error: err?.message || "Stripe checkout failed" },
+      { ok: false, error: err?.message ?? "Stripe error" },
       { status: 500 }
     );
   }
