@@ -8,17 +8,15 @@
     "start": "next start",
     "lint": "next lint",
     "vercel-build": "next build"
-  },
+    
   "dependencies": {
-    "@clerk/nextjs": "^5.7.5",
-    "@vercel/kv": "^3.0.0",
-    "next": "14.2.5",
-    "openai": "^4.0.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "stripe": "^16.12.0",
-    "zod": "^3.23.8"
-  },
+  "@clerk/nextjs": "^6.36.5",
+  "@vercel/kv": "^1.0.1",
+  "next": "14.2.5",
+  "react": "^18.2.0",
+  "react-dom": "^18.2.0",
+  "adm-zip": "^0.5.16"
+}
   "devDependencies": {
     "@types/node": "^20.11.30",
     "@types/react": "^18.3.5",
