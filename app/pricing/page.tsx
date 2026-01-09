@@ -1,151 +1,121 @@
-'use client';
+import Link from "next/link";
 
-import React, { useEffect, useMemo, useState } from 'react';
-
-function Card(props: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-2xl border border-neutral-200 bg-white shadow-sm ${props.className ?? ''}`}>
-      {props.children}
-    </div>
-  );
-}
-
-function Button(
-  props: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' }
-) {
-  const variant = props.variant ?? 'primary';
-  const base =
-    'inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed';
-  const styles =
-    variant === 'primary'
-      ? 'bg-black text-white hover:bg-neutral-800'
-      : 'bg-white text-black border border-neutral-300 hover:bg-neutral-50';
-  return (
-    <button {...props} className={`${base} ${styles} ${props.className ?? ''}`}>
-      {props.children}
-    </button>
-  );
-}
+export const metadata = {
+  title: "Pricing",
+};
 
 export default function PricingPage() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const canceled = useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    const url = new URL(window.location.href);
-    return url.searchParams.get('canceled') === '1';
-  }, []);
-
-  useEffect(() => {
-    if (canceled) {
-      // Just a friendly message; no extra state needed
-    }
-  }, [canceled]);
-
-  async function startCheckout() {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const res = await fetch('/api/stripe/checkout', { method: 'POST' });
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok || !data?.ok || !data?.url) {
-        throw new Error(data?.error || `Checkout failed (HTTP ${res.status})`);
-      }
-
-      window.location.href = data.url;
-    } catch (e: any) {
-      setError(e?.message || 'Checkout failed');
-      setLoading(false);
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <div className="mx-auto max-w-5xl px-4 py-10">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-semibold text-neutral-900">Pricing</h1>
-            <p className="mt-2 text-sm text-neutral-600">
-              Upgrade to Pro to create unlimited projects.
-            </p>
-          </div>
+    <div className="min-h-screen p-6">
+      <div className="mx-auto max-w-5xl space-y-10">
+        {/* Header */}
+        <header className="space-y-3">
+          <p className="text-sm text-gray-600">Pricing</p>
+          <h1 className="text-3xl font-bold">
+            Simple pricing that grows with you
+          </h1>
+          <p className="text-gray-700 max-w-2xl">
+            Start free, then upgrade when you’re ready to publish more sites,
+            connect custom domains, and unlock priority generation.
+          </p>
+        </header>
 
-          <div className="flex gap-2">
-            <a
-              href="/projects"
-              className="inline-flex items-center justify-center rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-black hover:bg-neutral-50"
-            >
-              Back to Projects
-            </a>
-          </div>
-        </div>
-
-        {canceled ? (
-          <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            Checkout was canceled. No worries — you can upgrade anytime.
-          </div>
-        ) : null}
-
-        {error ? (
-          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 whitespace-pre-wrap">
-            {error}
-          </div>
-        ) : null}
-
-        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Card>
-            <div className="p-6">
-              <div className="text-sm font-semibold text-neutral-700">Free</div>
-              <div className="mt-2 text-3xl font-semibold text-neutral-900">$0</div>
-              <div className="mt-1 text-sm text-neutral-600">Great for trying it out</div>
-
-              <ul className="mt-5 space-y-2 text-sm text-neutral-700">
-                <li>• 1 project</li>
-                <li>• Basic access</li>
-              </ul>
-
-              <div className="mt-6">
-                <a
-                  href="/projects"
-                  className="inline-flex items-center justify-center rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-black hover:bg-neutral-50"
-                >
-                  Use Free
-                </a>
+        {/* Cards */}
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Free */}
+          <div className="rounded-2xl border p-6 space-y-5 bg-white">
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold">Free</h2>
+              <p className="text-gray-600">Try it out and build your first site.</p>
+              <div className="text-3xl font-bold">
+                $0 <span className="text-base font-normal text-gray-600">/ month</span>
               </div>
             </div>
-          </Card>
 
-          <Card className="border-neutral-900">
-            <div className="p-6">
-              <div className="text-sm font-semibold text-neutral-900">Pro</div>
-              <div className="mt-2 text-3xl font-semibold text-neutral-900">Monthly</div>
-              <div className="mt-1 text-sm text-neutral-600">Unlimited projects + future features</div>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li>✅ 1 project</li>
+              <li>✅ 1 published website</li>
+              <li>✅ Basic AI generation</li>
+              <li>❌ Custom domains</li>
+              <li>❌ Priority generation</li>
+            </ul>
 
-              <ul className="mt-5 space-y-2 text-sm text-neutral-800">
-                <li>• Unlimited projects</li>
-                <li>• Better workflow for builders</li>
-                <li>• Designed for real businesses</li>
-              </ul>
+            <div className="pt-2">
+              <Link
+                href="/dashboard"
+                className="inline-flex w-full justify-center rounded-md border px-4 py-2 text-sm hover:bg-gray-50"
+              >
+                Continue on Free
+              </Link>
+            </div>
+          </div>
 
-              <div className="mt-6 flex flex-col gap-2">
-                <Button onClick={startCheckout} disabled={loading} variant="primary">
-                  {loading ? 'Redirecting to Stripe…' : 'Upgrade to Pro'}
-                </Button>
-
-                <div className="text-xs text-neutral-500">
-                  You’ll be redirected to Stripe Checkout securely.
-                </div>
+          {/* Pro */}
+          <div className="rounded-2xl border p-6 space-y-5 bg-black text-white">
+            <div className="space-y-2">
+              <div className="inline-flex w-fit rounded-full bg-white/10 px-3 py-1 text-xs">
+                Most Popular
+              </div>
+              <h2 className="text-xl font-semibold">Pro</h2>
+              <p className="text-white/80">
+                For creators and small businesses who want to publish without limits.
+              </p>
+              <div className="text-3xl font-bold">
+                $29 <span className="text-base font-normal text-white/70">/ month</span>
               </div>
             </div>
-          </Card>
+
+            <ul className="space-y-2 text-sm text-white/90">
+              <li>✅ Unlimited projects</li>
+              <li>✅ Unlimited published sites</li>
+              <li>✅ Custom domains</li>
+              <li>✅ Priority AI generation</li>
+              <li>✅ Future automation features included</li>
+            </ul>
+
+            <div className="pt-2 space-y-2">
+              {/* Stripe / checkout is wired in the NEXT step.
+                  For now, this button routes to /upgrade so you can test the flow. */}
+              <Link
+                href="/upgrade"
+                className="inline-flex w-full justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-gray-100"
+              >
+                Upgrade to Pro
+              </Link>
+
+              <p className="text-xs text-white/70 text-center">
+                Cancel anytime. Secure payments.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="mt-10 text-xs text-neutral-500">
-          Note: Your plan updates via Stripe webhook → KV key <code>plan:clerk:&lt;userId&gt;</code>.
-        </div>
+        {/* FAQ */}
+        <section className="rounded-2xl border p-6 space-y-4">
+          <h3 className="text-lg font-semibold">FAQ</h3>
+
+          <div className="space-y-3 text-sm text-gray-700">
+            <div>
+              <p className="font-medium text-gray-900">Can I cancel anytime?</p>
+              <p>Yes — you can cancel whenever you want. You’ll keep access until the end of your billing period.</p>
+            </div>
+
+            <div>
+              <p className="font-medium text-gray-900">Do I own my website?</p>
+              <p>Yes — your generated content is yours. You can publish and use it for your business.</p>
+            </div>
+
+            <div>
+              <p className="font-medium text-gray-900">Do I need a credit card to try it?</p>
+              <p>No — the Free plan lets you try it without a credit card.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="text-xs text-gray-500">
+          Tip: For now we’re keeping everything on the Vercel URL until monetisation is fully working.
+        </footer>
       </div>
     </div>
   );
