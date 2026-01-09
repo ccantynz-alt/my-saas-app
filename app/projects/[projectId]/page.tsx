@@ -3,13 +3,21 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
+type Status = "loading" | "empty" | "draft" | "published";
+
 export default function ProjectBuilderPage() {
   const params = useParams();
   const projectId = params.projectId as string;
 
-  const [status, setStatus] = useState<"loading" | "empty" | "draft" | "published">("loading");
+  const [status, setStatus] = useState<Status>("loading");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<
+    "generate" | "import" | null
+  >(null);
+  const [pendingHtml, setPendingHtml] = useState<string | null>(null);
 
   // ─────────────────────────────────────────────
   // LOAD PROJECT STATUS
@@ -32,29 +40,9 @@ export default function ProjectBuilderPage() {
   }, [projectId]);
 
   // ─────────────────────────────────────────────
-  // ACTIONS
+  // CORE ACTIONS
   // ─────────────────────────────────────────────
-  async function publish() {
-    setBusy(true);
-    setMessage(null);
-
-    const res = await fetch(`/api/projects/${projectId}/publish`, {
-      method: "POST",
-    });
-
-    const text = await res.text();
-
-    if (res.ok) {
-      setStatus("published");
-      setMessage("✅ Site published");
-    } else {
-      setMessage(text);
-    }
-
-    setBusy(false);
-  }
-
-  async function generate() {
+  async function doGenerate() {
     setBusy(true);
     setMessage(null);
 
@@ -67,21 +55,17 @@ export default function ProjectBuilderPage() {
       }),
     });
 
-    if (!res.ok) {
+    if (res.ok) {
+      setStatus("draft");
+      setMessage("⏳ Generating site… refresh shortly");
+    } else {
       setMessage("❌ Failed to start generation");
-      setBusy(false);
-      return;
     }
 
-    setMessage("⏳ Generating site… refresh in a moment");
-    setStatus("draft");
     setBusy(false);
   }
 
-  async function importHtml() {
-    const html = prompt("Paste full HTML here");
-    if (!html) return;
-
+  async function doImport(html: string) {
     setBusy(true);
     setMessage(null);
 
@@ -94,16 +78,73 @@ export default function ProjectBuilderPage() {
       }
     );
 
-    const text = await res.text();
-
     if (res.ok) {
       setStatus("draft");
       setMessage("✅ HTML imported");
     } else {
-      setMessage(text);
+      setMessage("❌ Import failed");
     }
 
     setBusy(false);
+  }
+
+  async function publish() {
+    setBusy(true);
+    setMessage(null);
+
+    const res = await fetch(
+      `/api/projects/${projectId}/publish`,
+      { method: "POST" }
+    );
+
+    if (res.ok) {
+      setStatus("published");
+      setMessage("✅ Site published");
+    } else {
+      setMessage("❌ Publish failed");
+    }
+
+    setBusy(false);
+  }
+
+  // ─────────────────────────────────────────────
+  // CONFIRM FLOW
+  // ─────────────────────────────────────────────
+  function requestGenerate() {
+    if (status === "empty") {
+      doGenerate();
+    } else {
+      setPendingAction("generate");
+      setConfirmOpen(true);
+    }
+  }
+
+  function requestImport() {
+    const html = prompt("Paste full HTML here");
+    if (!html) return;
+
+    if (status === "empty") {
+      doImport(html);
+    } else {
+      setPendingHtml(html);
+      setPendingAction("import");
+      setConfirmOpen(true);
+    }
+  }
+
+  function confirmOverwrite() {
+    setConfirmOpen(false);
+
+    if (pendingAction === "generate") {
+      doGenerate();
+    }
+
+    if (pendingAction === "import" && pendingHtml) {
+      doImport(pendingHtml);
+    }
+
+    setPendingAction(null);
+    setPendingHtml(null);
   }
 
   // ─────────────────────────────────────────────
@@ -125,9 +166,17 @@ export default function ProjectBuilderPage() {
           <h2 className="text-lg font-medium">Status</h2>
 
           {status === "loading" && <p>Loading…</p>}
-          {status === "empty" && <p className="text-red-600">❌ No content yet</p>}
-          {status === "draft" && <p className="text-yellow-600">⚠️ Draft (not published)</p>}
-          {status === "published" && <p className="text-green-600">✅ Published</p>}
+          {status === "empty" && (
+            <p className="text-red-600">❌ No content yet</p>
+          )}
+          {status === "draft" && (
+            <p className="text-yellow-600">
+              ⚠️ Draft (not published)
+            </p>
+          )}
+          {status === "published" && (
+            <p className="text-green-600">✅ Published</p>
+          )}
         </div>
 
         <div className="rounded border bg-white p-6 space-y-3">
@@ -135,7 +184,7 @@ export default function ProjectBuilderPage() {
 
           <div className="flex flex-wrap gap-3">
             <button
-              onClick={generate}
+              onClick={requestGenerate}
               disabled={busy}
               className="rounded bg-purple-600 px-4 py-2 text-white disabled:opacity-50"
             >
@@ -143,7 +192,7 @@ export default function ProjectBuilderPage() {
             </button>
 
             <button
-              onClick={importHtml}
+              onClick={requestImport}
               disabled={busy}
               className="rounded bg-gray-800 px-4 py-2 text-white disabled:opacity-50"
             >
@@ -184,6 +233,38 @@ export default function ProjectBuilderPage() {
           </div>
         )}
       </div>
+
+      {/* CONFIRM MODAL */}
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded bg-white p-6 space-y-4">
+            <h3 className="text-lg font-semibold text-red-600">
+              Overwrite existing site?
+            </h3>
+
+            <p className="text-sm text-gray-700">
+              This will permanently replace the current site
+              content for this project.
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmOpen(false)}
+                className="rounded border px-4 py-2"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={confirmOverwrite}
+                className="rounded bg-red-600 px-4 py-2 text-white"
+              >
+                Yes, overwrite
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
