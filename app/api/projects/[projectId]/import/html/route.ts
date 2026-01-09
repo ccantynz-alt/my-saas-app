@@ -21,7 +21,7 @@ export async function POST(
     const { projectId } = params;
 
     // ─────────────────────────────────────────────
-    // VERIFY PROJECT OWNERSHIP
+    // LOAD PROJECT
     // ─────────────────────────────────────────────
     const projectKey = `project:${projectId}`;
     const project = await kv.get<any>(projectKey);
@@ -33,7 +33,8 @@ export async function POST(
       );
     }
 
-    if (project.userId !== userId) {
+    // ✅ FIX: projects use ownerId (NOT userId)
+    if (project.ownerId !== userId) {
       return NextResponse.json(
         { ok: false, error: "Forbidden" },
         { status: 403 }
@@ -54,7 +55,7 @@ export async function POST(
     }
 
     // ─────────────────────────────────────────────
-    // SAVE HTML (PROJECT + GLOBAL FALLBACK)
+    // SAVE HTML (PROJECT + FALLBACK)
     // ─────────────────────────────────────────────
     const projectHtmlKey = `generated:project:${projectId}:latest`;
 
