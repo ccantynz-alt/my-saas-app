@@ -30,16 +30,21 @@ export async function POST() {
       );
     }
 
+    // Create a Stripe Customer with clerkUserId attached
+    const customer = await stripe.customers.create({
+      metadata: { clerkUserId: userId },
+    });
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
+      customer: customer.id,
+
       line_items: [{ price: priceId, quantity: 1 }],
       allow_promotion_codes: true,
 
-      // This is the key part: we attach the Clerk userId to the Checkout Session
+      // also attach for good measure
       client_reference_id: userId,
-      metadata: {
-        clerkUserId: userId,
-      },
+      metadata: { clerkUserId: userId },
 
       success_url: `${appUrl}/upgrade/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/pricing`,
