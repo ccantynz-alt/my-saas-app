@@ -1,16 +1,25 @@
-import UpgradeBanner from "@/app/components/UpgradeBanner";
+"use client";
 
-export default function DashboardPage() {
+import Link from "next/link";
+
+export default function UpgradeBanner({ isPro }: { isPro: boolean }) {
+  if (isPro) return null;
+
   return (
-    <div className="p-6 space-y-6">
-      <UpgradeBanner isPro={false} />
+    <div className="rounded-xl border border-yellow-300 bg-yellow-50 p-4 flex flex-col gap-3">
+      <h3 className="text-lg font-semibold">You’re on the Free plan</h3>
 
-      <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-gray-600">
-          Manage your projects and generate websites using AI.
-        </p>
-      </div>
+      <p className="text-sm text-gray-700">
+        Upgrade to Pro to unlock unlimited websites, custom domains, and priority
+        AI generation.
+      </p>
+
+      <Link
+        href="/pricing"
+        className="inline-flex w-fit rounded-md bg-black px-4 py-2 text-white text-sm hover:bg-gray-800"
+      >
+        Upgrade to Pro
+      </Link>
     </div>
   );
 }
