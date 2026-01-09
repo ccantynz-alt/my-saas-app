@@ -7,6 +7,15 @@ import { setUserPlan } from "@/app/lib/plan";
 
 export const runtime = "nodejs";
 
+// ✅ Health check (so you can confirm the correct deployed URL in your browser)
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    message: "Stripe webhook route is deployed. POST is used for Stripe events.",
+    hasWebhookSecret: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
+  });
+}
+
 export async function POST(req: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -33,7 +42,10 @@ export async function POST(req: Request) {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
   } catch (err: any) {
     return NextResponse.json(
-      { ok: false, error: `Webhook signature verification failed: ${err?.message}` },
+      {
+        ok: false,
+        error: `Webhook signature verification failed: ${err?.message}`,
+      },
       { status: 400 }
     );
   }
@@ -71,6 +83,7 @@ export async function POST(req: Request) {
       }
 
       if (!clerkUserId) {
+        // Return 200 so Stripe doesn't keep retrying, but we can see the issue in debug
         return NextResponse.json(
           { ok: false, error: "No clerkUserId found on session." },
           { status: 200 }
@@ -79,7 +92,10 @@ export async function POST(req: Request) {
 
       await setUserPlan(clerkUserId, "pro");
 
-      return NextResponse.json({ ok: true, event: event.type, clerkUserId }, { status: 200 });
+      return NextResponse.json(
+        { ok: true, event: event.type, clerkUserId },
+        { status: 200 }
+      );
     }
 
     return NextResponse.json({ ok: true, event: event.type }, { status: 200 });
