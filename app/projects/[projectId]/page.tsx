@@ -46,21 +46,24 @@ export default function ProjectPage({
   const [lastAuditRaw, setLastAuditRaw] = useState<string>("");
   const [lastPublishRaw, setLastPublishRaw] = useState<string>("");
 
+  // Conversion Agent (always-clickable section)
+  const [agentBusy, setAgentBusy] = useState(false);
+  const [agentInstructions, setAgentInstructions] = useState(
+    "Improve conversion ethically (clear CTA, trust strip, pricing teaser). Remove calls/meetings language. Keep it automation-first and website-only."
+  );
+  const [lastAgentRaw, setLastAgentRaw] = useState<string>("");
+
   const canFinish = useMemo(() => {
     return bizName.trim().length > 0 && bizNiche.trim().length > 0;
   }, [bizName, bizNiche]);
 
   async function loadPreview() {
-    // Best-effort preview load.
-    // If your project has a dedicated preview endpoint, you can swap this later.
-    // For now, we try to read generated HTML from a common endpoint if it exists.
     try {
       const res = await fetch(`/api/projects/${projectId}/preview`, {
         method: "GET",
       });
 
       if (!res.ok) {
-        // Not fatal. Keep current preview.
         return;
       }
 
@@ -97,7 +100,6 @@ export default function ProjectPage({
       const text = await res.text();
       setLastPublishRaw(text);
 
-      // 402: Free user needs upgrade
       if (res.status === 402) {
         let upgradeUrl = "";
         try {
@@ -110,10 +112,9 @@ export default function ProjectPage({
         setToast({
           tone: "danger",
           title: "Upgrade required",
-          message:
-            upgradeUrl
-              ? `Publishing is a Pro feature. Open this upgrade link:\n${upgradeUrl}`
-              : `Publishing is a Pro feature. (${res.status}) ${text}`,
+          message: upgradeUrl
+            ? `Publishing is a Pro feature.\n\nOpen this upgrade link:\n${upgradeUrl}`
+            : `Publishing is a Pro feature. (${res.status}) ${text}`,
         });
         return;
       }
@@ -149,6 +150,50 @@ export default function ProjectPage({
       });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function runConversionAgent() {
+    if (!projectId) return;
+
+    setAgentBusy(true);
+    setToast(null);
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/agents/conversion`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          instructions: agentInstructions,
+        }),
+      });
+
+      const text = await res.text();
+      setLastAgentRaw(text);
+
+      if (!res.ok) {
+        setToast({
+          tone: "danger",
+          title: "Conversion agent failed",
+          message: `(${res.status}) ${text}`,
+        });
+        return;
+      }
+
+      setToast({
+        tone: "success",
+        title: "Conversion agent ran",
+        message:
+          "Agent request completed. If this agent updates HTML, reload preview to see changes.",
+      });
+    } catch (err: any) {
+      setToast({
+        tone: "danger",
+        title: "Conversion agent error",
+        message: err?.message ? String(err.message) : "Unknown agent error.",
+      });
+    } finally {
+      setAgentBusy(false);
     }
   }
 
@@ -221,7 +266,10 @@ export default function ProjectPage({
       setLastAuditRaw(auditText);
 
       if (!auditRes.ok) {
-        setAudit({ state: "error", message: `(${auditRes.status}) ${auditText}` });
+        setAudit({
+          state: "error",
+          message: `(${auditRes.status}) ${auditText}`,
+        });
         setToast({
           tone: "danger",
           title: "Quality check failed",
@@ -297,7 +345,14 @@ export default function ProjectPage({
 
   return (
     <main style={{ maxWidth: 980, margin: "0 auto", padding: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
           <h1 style={{ fontSize: 24, margin: 0 }}>Project</h1>
           <div style={{ opacity: 0.7, marginTop: 6 }}>ID: {projectId}</div>
@@ -306,7 +361,12 @@ export default function ProjectPage({
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
           <a
             href={`/p/${projectId}`}
-            style={{ textDecoration: "none", padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd" }}
+            style={{
+              textDecoration: "none",
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid #ddd",
+            }}
           >
             Open public page
           </a>
@@ -339,74 +399,127 @@ export default function ProjectPage({
           }}
         >
           <div style={{ fontWeight: 700 }}>
-            {toast.tone === "danger" ? "⚠ " : toast.tone === "success" ? "✅ " : "ℹ "}
+            {toast.tone === "danger"
+              ? "⚠ "
+              : toast.tone === "success"
+              ? "✅ "
+              : "ℹ "}
             {toast.title}
           </div>
           <div style={{ marginTop: 6, opacity: 0.85 }}>{toast.message}</div>
         </div>
       ) : null}
 
-      <section style={{ marginTop: 18, padding: 16, borderRadius: 16, border: "1px solid #eee" }}>
+      <section
+        style={{
+          marginTop: 18,
+          padding: 16,
+          borderRadius: 16,
+          border: "1px solid #eee",
+        }}
+      >
         <h2 style={{ marginTop: 0 }}>Finish-for-me (Level 2)</h2>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <label>
-            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>Business name *</div>
+            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>
+              Business name *
+            </div>
             <input
               value={bizName}
               onChange={(e) => setBizName(e.target.value)}
               placeholder="e.g., Book A Ride"
-              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+              style={{
+                width: "100%",
+                padding: 10,
+                borderRadius: 10,
+                border: "1px solid #ddd",
+              }}
             />
           </label>
 
           <label>
-            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>Niche *</div>
+            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>
+              Niche *
+            </div>
             <input
               value={bizNiche}
               onChange={(e) => setBizNiche(e.target.value)}
               placeholder="e.g., Airport shuttle"
-              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+              style={{
+                width: "100%",
+                padding: 10,
+                borderRadius: 10,
+                border: "1px solid #ddd",
+              }}
             />
           </label>
 
           <label>
-            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>Location</div>
+            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>
+              Location
+            </div>
             <input
               value={bizLocation}
               onChange={(e) => setBizLocation(e.target.value)}
               placeholder="e.g., Auckland, NZ"
-              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+              style={{
+                width: "100%",
+                padding: 10,
+                borderRadius: 10,
+                border: "1px solid #ddd",
+              }}
             />
           </label>
 
           <label>
-            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>Tagline</div>
+            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>
+              Tagline
+            </div>
             <input
               value={bizTagline}
               onChange={(e) => setBizTagline(e.target.value)}
               placeholder="e.g., Reliable rides. Simple booking."
-              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+              style={{
+                width: "100%",
+                padding: 10,
+                borderRadius: 10,
+                border: "1px solid #ddd",
+              }}
             />
           </label>
 
           <label>
-            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>Phone</div>
+            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>
+              Phone
+            </div>
             <input
               value={bizPhone}
               onChange={(e) => setBizPhone(e.target.value)}
               placeholder="Optional"
-              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+              style={{
+                width: "100%",
+                padding: 10,
+                borderRadius: 10,
+                border: "1px solid #ddd",
+              }}
             />
           </label>
 
           <label>
-            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>Email</div>
+            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>
+              Email
+            </div>
             <input
               value={bizEmail}
               onChange={(e) => setBizEmail(e.target.value)}
               placeholder="Optional"
-              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+              style={{
+                width: "100%",
+                padding: 10,
+                borderRadius: 10,
+                border: "1px solid #ddd",
+              }}
             />
           </label>
         </div>
@@ -455,7 +568,14 @@ export default function ProjectPage({
           ) : null}
 
           {audit.state === "error" ? (
-            <div style={{ whiteSpace: "pre-wrap", border: "1px solid #f0caca", padding: 12, borderRadius: 12 }}>
+            <div
+              style={{
+                whiteSpace: "pre-wrap",
+                border: "1px solid #f0caca",
+                padding: 12,
+                borderRadius: 12,
+              }}
+            >
               ⚠ {audit.message}
             </div>
           ) : null}
@@ -503,18 +623,89 @@ export default function ProjectPage({
         </div>
       </section>
 
+      <section
+        style={{
+          marginTop: 18,
+          padding: 16,
+          borderRadius: 16,
+          border: "1px solid #eee",
+        }}
+      >
+        <h2 style={{ marginTop: 0 }}>Conversion Agent (website-only)</h2>
+
+        <div style={{ opacity: 0.75, marginBottom: 10 }}>
+          This button is server-driven (no chat UI needed). It should always be clickable unless it’s actively running.
+        </div>
+
+        <label style={{ display: "block" }}>
+          <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>
+            Instructions
+          </div>
+          <textarea
+            value={agentInstructions}
+            onChange={(e) => setAgentInstructions(e.target.value)}
+            rows={4}
+            style={{
+              width: "100%",
+              padding: 10,
+              borderRadius: 10,
+              border: "1px solid #ddd",
+              resize: "vertical",
+            }}
+          />
+        </label>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+          <button
+            onClick={runConversionAgent}
+            disabled={agentBusy || !projectId}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 12,
+              border: "1px solid #111",
+              background: agentBusy ? "#eee" : "#111",
+              color: agentBusy ? "#333" : "#fff",
+              cursor: agentBusy ? "not-allowed" : "pointer",
+              fontWeight: 700,
+            }}
+          >
+            {agentBusy ? "Running…" : "Run Conversion Agent"}
+          </button>
+
+          <button
+            onClick={loadPreview}
+            disabled={busy || agentBusy || !projectId}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 12,
+              border: "1px solid #ddd",
+              background: "#fff",
+              cursor: busy || agentBusy ? "not-allowed" : "pointer",
+            }}
+          >
+            Reload preview
+          </button>
+        </div>
+      </section>
+
       <section style={{ marginTop: 18 }}>
         <h2>Preview</h2>
 
         {previewHtml ? (
           <iframe
             title="preview"
-            style={{ width: "100%", height: 720, border: "1px solid #ddd", borderRadius: 14 }}
+            style={{
+              width: "100%",
+              height: 720,
+              border: "1px solid #ddd",
+              borderRadius: 14,
+            }}
             srcDoc={previewHtml}
           />
         ) : (
           <div style={{ opacity: 0.7 }}>
-            No preview HTML loaded yet. Click <b>Finish → Quality Check</b> or <b>Reload preview</b>.
+            No preview HTML loaded yet. Click <b>Finish → Quality Check</b> or{" "}
+            <b>Reload preview</b>.
           </div>
         )}
       </section>
@@ -524,22 +715,57 @@ export default function ProjectPage({
 
         <details style={{ marginTop: 10 }}>
           <summary>Finish response</summary>
-          <pre style={{ whiteSpace: "pre-wrap", border: "1px solid #eee", padding: 12, borderRadius: 12 }}>
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              border: "1px solid #eee",
+              padding: 12,
+              borderRadius: 12,
+            }}
+          >
             {lastFinishRaw || "(empty)"}
           </pre>
         </details>
 
         <details style={{ marginTop: 10 }}>
           <summary>Audit response</summary>
-          <pre style={{ whiteSpace: "pre-wrap", border: "1px solid #eee", padding: 12, borderRadius: 12 }}>
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              border: "1px solid #eee",
+              padding: 12,
+              borderRadius: 12,
+            }}
+          >
             {lastAuditRaw || "(empty)"}
           </pre>
         </details>
 
         <details style={{ marginTop: 10 }}>
           <summary>Publish response</summary>
-          <pre style={{ whiteSpace: "pre-wrap", border: "1px solid #eee", padding: 12, borderRadius: 12 }}>
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              border: "1px solid #eee",
+              padding: 12,
+              borderRadius: 12,
+            }}
+          >
             {lastPublishRaw || "(empty)"}
+          </pre>
+        </details>
+
+        <details style={{ marginTop: 10 }}>
+          <summary>Conversion agent response</summary>
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              border: "1px solid #eee",
+              padding: 12,
+              borderRadius: 12,
+            }}
+          >
+            {lastAgentRaw || "(empty)"}
           </pre>
         </details>
       </section>
