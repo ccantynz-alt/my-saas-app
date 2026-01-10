@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getProjectById } from "@/lib/projects";
+import { getProjectById } from "../../../../../lib/projects";
 
 export async function GET(
   _req: Request,
