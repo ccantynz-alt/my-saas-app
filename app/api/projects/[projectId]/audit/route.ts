@@ -1,81 +1,146 @@
 import { NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
 import { auth } from "@clerk/nextjs/server";
+import { kv } from "@vercel/kv";
 
 export const runtime = "nodejs";
 
-function generatedProjectLatestKey(projectId: string) {
-  return `generated:project:${projectId}:latest`;
+type RouteContext = {
+  params: { projectId: string };
+};
+
+function asText(v: unknown): string {
+  return typeof v === "string" ? v : "";
 }
 
-function includesAny(html: string, patterns: string[]) {
-  const h = html.toLowerCase();
-  return patterns.some((p) => h.includes(p.toLowerCase()));
+function normalize(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-export async function POST(
-  _req: Request,
-  ctx: { params: { projectId: string } }
-) {
-  const session = await auth();
-  const userId = session.userId;
+function includesAny(haystack: string, needles: string[]) {
+  const h = normalize(haystack);
+  return needles.some((n) => h.includes(normalize(n)));
+}
 
+function hasTag(html: string, tag: string) {
+  const re = new RegExp(`<${tag}\\b[^>]*>`, "i");
+  return re.test(html);
+}
+
+function getTitle(html: string) {
+  const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return m ? m[1].trim() : "";
+}
+
+function hasMetaDescription(html: string) {
+  // <meta name="description" content="...">
+  const re = /<meta\s+[^>]*name=["']description["'][^>]*content=["'][^"']+["'][^>]*>/i;
+  return re.test(html);
+}
+
+function hasH1WithText(html: string) {
+  const m = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  if (!m) return false;
+  const text = m[1].replace(/<[^>]+>/g, "").trim();
+  return text.length >= 4;
+}
+
+function hasCta(html: string) {
+  // Flexible: allow common CTA wording used in your product direction
+  const ctas = [
+    "start free",
+    "generate",
+    "publish",
+    "upgrade",
+    "get started",
+    "get a quote",
+    "create site",
+  ];
+  return includesAny(html, ctas);
+}
+
+function scoreAudit(html: string) {
+  const missing: string[] = [];
+  const warnings: string[] = [];
+  const notes: string[] = [];
+
+  const title = getTitle(html);
+  if (!title) missing.push("Add a <title> tag for SEO.");
+  if (!hasMetaDescription(html)) missing.push('Add <meta name="description" ...> for SEO.');
+  if (!hasH1WithText(html)) missing.push("Add a clear H1 headline (human-readable).");
+
+  // CTA should exist somewhere in the page for conversion
+  if (!hasCta(html)) missing.push('Add at least one clear CTA (e.g., "Start free", "Generate", "Publish", "Upgrade").');
+
+  // Good-to-have notes that match your current defaults (do NOT fail audit)
+  if (includesAny(html, ["trust", "trusted by", "reviews", "rating", "secure"])) {
+    notes.push("Trust elements detected (good).");
+  } else {
+    notes.push("Consider adding a trust strip (reviews, guarantees, privacy/security note).");
+  }
+
+  if (includesAny(html, ["pricing", "plans", "free", "pro"])) {
+    notes.push("Pricing teaser detected (good).");
+  } else {
+    notes.push("Consider adding a simple pricing teaser (Free vs Pro).");
+  }
+
+  // Ensure automation-first / website-only language (warn only)
+  if (includesAny(html, ["book a call", "schedule a call", "book a meeting", "free consultation", "calendar"])) {
+    warnings.push("Found call/meeting language. Product direction is website-only automation-first—consider removing calls/meetings wording.");
+  }
+
+  // If HTML is suspiciously tiny, warn
+  if (html.trim().length < 500) warnings.push("HTML looks very small—preview may be incomplete.");
+
+  // Your generation already applies ethical conversion defaults.
+  notes.push("Audit is tuned for automation-first conversion-ready sites (trust strip/pricing/no-calls handled as notes/warnings, not hard fails).");
+
+  const readyToPublish = missing.length === 0;
+
+  return { missing, warnings, notes, readyToPublish };
+}
+
+export async function POST(_req: Request, ctx: RouteContext) {
+  const { userId } = auth();
   if (!userId) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   const projectId = ctx.params.projectId;
 
-  if (!projectId || typeof projectId !== "string") {
-    return NextResponse.json({ ok: false, error: "Missing projectId" }, { status: 400 });
-  }
-
-  const html = (await kv.get<string>(generatedProjectLatestKey(projectId))) || "";
-
-  if (!html) {
+  // Read generated HTML stored by Finish:
+  // generated:project:<id>:latest
+  let html = "";
+  try {
+    const key = `generated:project:${projectId}:latest`;
+    const v = await kv.get(key);
+    html = asText(v);
+  } catch (e: any) {
     return NextResponse.json(
-      { ok: false, error: "No generated HTML found for this project yet." },
-      { status: 404 }
+      { ok: false, error: "Audit storage unavailable", details: e?.message ? String(e.message) : "KV error" },
+      { status: 500 }
     );
   }
 
-  const missing: string[] = [];
-  const warnings: string[] = [];
-  const notes: string[] = [];
-
-  // Required sections (look for common anchors/ids/words)
-  const checks: { key: string; patterns: string[] }[] = [
-    { key: "Hero section", patterns: ["<h1", "hero", "get started", "contact"] },
-    { key: "Services section", patterns: ["#services", 'id="services"', "services"] },
-    { key: "Work/Portfolio section", patterns: ["#work", 'id="work"', "portfolio", "case study"] },
-    { key: "About section", patterns: ["#about", 'id="about"', "about"] },
-    { key: "Testimonials section", patterns: ["#testimonials", 'id="testimonials"', "testimonial"] },
-    { key: "FAQ section", patterns: ["#faq", 'id="faq"', "faq"] },
-    { key: "Contact section", patterns: ["#contact", 'id="contact"', "<form", "contact"] },
-  ];
-
-  for (const c of checks) {
-    if (!includesAny(html, c.patterns)) {
-      missing.push(c.key);
-    }
+  if (!html) {
+    return NextResponse.json(
+      {
+        ok: true,
+        readyToPublish: false,
+        missing: ["No generated HTML found yet. Click Finish → Quality Check first."],
+        warnings: [],
+        notes: [],
+      },
+      { status: 200 }
+    );
   }
 
-  // Basic SEO checks
-  if (!includesAny(html, ["<title>"])) warnings.push("Missing <title> tag");
-  if (!includesAny(html, ['name="description"', "name='description'"]))
-    warnings.push("Missing meta description");
-  if (!includesAny(html, ['property="og:title"', "property='og:title'"]))
-    notes.push("Optional: add Open Graph tags for nicer link previews");
-
-  // Links sanity
-  if (!includesAny(html, ['href="#contact"', "href='#contact'"]))
-    notes.push("Optional: add a primary CTA that links to #contact");
-
-  const readyToPublish = missing.length === 0 && warnings.length === 0;
+  const { missing, warnings, notes, readyToPublish } = scoreAudit(html);
 
   return NextResponse.json(
     {
       ok: true,
+      projectId,
       readyToPublish,
       missing,
       warnings,
