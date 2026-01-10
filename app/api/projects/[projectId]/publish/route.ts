@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { kv } from "@vercel/kv";
+import { stripe } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
@@ -27,7 +28,8 @@ function getTitle(html: string) {
 }
 
 function hasMetaDescription(html: string) {
-  const re = /<meta\s+[^>]*name=["']description["'][^>]*content=["'][^"']+["'][^>]*>/i;
+  const re =
+    /<meta\s+[^>]*name=["']description["'][^>]*content=["'][^"']+["'][^>]*>/i;
   return re.test(html);
 }
 
@@ -58,16 +60,31 @@ function runAudit(html: string) {
 
   const title = getTitle(html);
   if (!title) missing.push("Add a <title> tag for SEO.");
-  if (!hasMetaDescription(html)) missing.push('Add <meta name="description" ...> for SEO.');
-  if (!hasH1WithText(html)) missing.push("Add a clear H1 headline (human-readable).");
-  if (!hasCta(html)) missing.push('Add at least one clear CTA (e.g., "Start free", "Generate", "Publish", "Upgrade").');
+  if (!hasMetaDescription(html))
+    missing.push('Add <meta name="description" ...> for SEO.');
+  if (!hasH1WithText(html))
+    missing.push("Add a clear H1 headline (human-readable).");
+  if (!hasCta(html))
+    missing.push(
+      'Add at least one clear CTA (e.g., "Start free", "Generate", "Publish", "Upgrade").'
+    );
 
   // Website-only direction (warn only)
-  if (includesAny(html, ["book a call", "schedule a call", "book a meeting", "free consultation", "calendar"])) {
-    warnings.push("Found call/meeting language. Product direction is website-only automation-first—consider removing calls/meetings wording.");
+  if (
+    includesAny(html, [
+      "book a call",
+      "schedule a call",
+      "book a meeting",
+      "free consultation",
+      "calendar",
+    ])
+  ) {
+    warnings.push(
+      "Found call/meeting language. Product direction is website-only automation-first—consider removing calls/meetings wording."
+    );
   }
 
-  // Notes: trust/pricing are nice but not blockers
+  // Notes: trust/pricing are good but not blockers
   if (includesAny(html, ["trusted by", "reviews", "rating", "secure", "guarantee"])) {
     notes.push("Trust elements detected (good).");
   } else {
@@ -84,7 +101,45 @@ function runAudit(html: string) {
   return { readyToPublish, missing, warnings, notes };
 }
 
-export async function POST(_req: Request, ctx: RouteContext) {
+async function isProUser(userId: string): Promise<boolean> {
+  // Your app previously stored plan as: plan:clerk:<userId> => "pro" / "free"
+  try {
+    const v = await kv.get(`plan:clerk:${userId}`);
+    return String(v || "").toLowerCase() === "pro";
+  } catch {
+    return false;
+  }
+}
+
+async function createUpgradeUrl(origin: string, userId: string, projectId: string) {
+  const priceId = process.env.STRIPE_PRICE_ID || "";
+  if (!priceId) return "";
+
+  // Where to send the user after checkout
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    origin ||
+    "https://my-saas-app-5eyw.vercel.app";
+
+  const successUrl = `${appUrl}/projects/${projectId}?upgraded=1`;
+  const cancelUrl = `${appUrl}/projects/${projectId}?upgrade=cancelled`;
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    metadata: {
+      clerkUserId: userId,
+      projectId,
+      source: "publish_gate",
+    },
+  });
+
+  return session.url || "";
+}
+
+export async function POST(req: Request, ctx: RouteContext) {
   const { userId } = auth();
   if (!userId) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -92,16 +147,33 @@ export async function POST(_req: Request, ctx: RouteContext) {
 
   const projectId = ctx.params.projectId;
 
+  // Optional owner check (only enforced if a project record exists)
+  // This avoids breaking older data layouts while still protecting when present.
+  try {
+    const proj: any = await kv.get(`project:${projectId}`);
+    const ownerId =
+      proj?.ownerId || proj?.userId || proj?.clerkUserId || proj?.owner;
+    if (ownerId && String(ownerId) !== String(userId)) {
+      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+    }
+  } catch {
+    // ignore (do not block publish if record layout differs)
+  }
+
   // Load generated HTML from KV (Finish stores here)
-  const key = `generated:project:${projectId}:latest`;
+  const generatedKey = `generated:project:${projectId}:latest`;
 
   let html = "";
   try {
-    const v = await kv.get(key);
+    const v = await kv.get(generatedKey);
     html = asText(v);
   } catch (e: any) {
     return NextResponse.json(
-      { ok: false, error: "Publish storage unavailable", details: e?.message ? String(e.message) : "KV error" },
+      {
+        ok: false,
+        error: "Publish storage unavailable",
+        details: e?.message ? String(e.message) : "KV error",
+      },
       { status: 500 }
     );
   }
@@ -113,7 +185,7 @@ export async function POST(_req: Request, ctx: RouteContext) {
     );
   }
 
-  // Server-side quality gate
+  // Server-side audit gate
   const audit = runAudit(html);
   if (!audit.readyToPublish) {
     return NextResponse.json(
@@ -129,18 +201,40 @@ export async function POST(_req: Request, ctx: RouteContext) {
     );
   }
 
-  // NOTE: Pro gate is expected to exist in your app.
-  // If your repo already enforces Pro via Stripe/Clerk, keep using it.
-  // This server-side audit gate is additive and safe.
+  // Pro gate (restore correct behavior)
+  const pro = await isProUser(userId);
+  if (!pro) {
+    const origin = req.headers.get("origin") || "";
+    let upgradeUrl = "";
+    try {
+      upgradeUrl = await createUpgradeUrl(origin, userId, projectId);
+    } catch (e: any) {
+      // If Stripe fails, still return 402 (UI can guide user)
+      upgradeUrl = "";
+    }
 
-  // Write "published" HTML key (used by /p/<projectId>)
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Upgrade required",
+        upgradeUrl,
+      },
+      { status: 402 }
+    );
+  }
+
+  // Write published HTML key (used by /p/<projectId>)
   const publishedKey = `published:project:${projectId}:latest`;
 
   try {
     await kv.set(publishedKey, html);
   } catch (e: any) {
     return NextResponse.json(
-      { ok: false, error: "Publish write failed", details: e?.message ? String(e.message) : "KV error" },
+      {
+        ok: false,
+        error: "Publish write failed",
+        details: e?.message ? String(e.message) : "KV error",
+      },
       { status: 500 }
     );
   }
