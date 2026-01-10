@@ -12,6 +12,7 @@
   "dependencies": {
     "@clerk/nextjs": "^6.36.5",
     "@vercel/kv": "^0.2.4",
+    "adm-zip": "^0.5.16",
     "nanoid": "^5.0.7",
     "next": "14.2.5",
     "openai": "^4.0.0",
@@ -27,4 +28,3 @@
     "typescript": "^5.4.5"
   }
 }
-
