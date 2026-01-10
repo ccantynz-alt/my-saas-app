@@ -1,57 +1,110 @@
 import { kv } from "@vercel/kv";
-import { notFound } from "next/navigation";
+import Link from "next/link";
 
 export const runtime = "nodejs";
 
-type PublishedMeta = {
-  projectId: string;
-  publishedAt: string;
-  published: boolean;
-};
-
-function generatedProjectLatestKey(projectId: string) {
-  return `generated:project:${projectId}:latest`;
+function asText(v: unknown): string {
+  return typeof v === "string" ? v : "";
 }
 
-function publishedKey(projectId: string) {
-  return `published:project:${projectId}`;
-}
-
-export default async function PublishedProjectPage({
+export default async function PublicProjectPage({
   params,
 }: {
   params: { projectId: string };
 }) {
-  const projectId = params.projectId;
+  const projectId = params?.projectId || "";
 
-  // Only show public page if published
-  const meta = await kv.get<PublishedMeta>(publishedKey(projectId));
-  if (!meta?.published) {
-    notFound();
+  // This MUST match what the publish route writes.
+  const publishedKey = `published:project:${projectId}:latest`;
+
+  let html = "";
+  try {
+    const v = await kv.get(publishedKey);
+    html = asText(v);
+  } catch {
+    html = "";
   }
 
-  // Load last generated HTML
-  const html = await kv.get<string>(generatedProjectLatestKey(projectId));
   if (!html) {
-    notFound();
+    return (
+      <main style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
+        <h1 style={{ margin: 0, fontSize: 26 }}>This site isn’t published yet</h1>
+        <p style={{ marginTop: 12, opacity: 0.8 }}>
+          The project exists, but it hasn’t been published. Go back to the builder
+          and click Publish.
+        </p>
+
+        <div style={{ marginTop: 16 }}>
+          <Link
+            href="/projects"
+            style={{
+              display: "inline-block",
+              padding: "10px 14px",
+              borderRadius: 12,
+              border: "1px solid #111",
+              background: "#111",
+              color: "#fff",
+              textDecoration: "none",
+              fontWeight: 700,
+            }}
+          >
+            Back to Projects
+          </Link>
+        </div>
+
+        <div style={{ marginTop: 18, opacity: 0.6, fontSize: 12 }}>
+          Debug: no HTML found at key <code>{publishedKey}</code>
+        </div>
+      </main>
+    );
   }
 
   return (
-    <html lang="en">
-      <head />
-      <body style={{ margin: 0 }}>
-        <iframe
-          title="Published site"
+    <main style={{ maxWidth: 1100, margin: "0 auto", padding: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          marginBottom: 12,
+        }}
+      >
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 18 }}>Published site</div>
+          <div style={{ opacity: 0.7, marginTop: 4 }}>
+            Project: <code>{projectId}</code>
+          </div>
+        </div>
+
+        <Link
+          href={`/projects/${projectId}`}
           style={{
-            width: "100%",
-            height: "100vh",
-            border: "none",
-            display: "block",
+            display: "inline-block",
+            padding: "10px 14px",
+            borderRadius: 12,
+            border: "1px solid #ddd",
+            background: "#fff",
+            color: "#111",
+            textDecoration: "none",
           }}
-          sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin"
-          srcDoc={html}
-        />
-      </body>
-    </html>
+        >
+          Back to builder
+        </Link>
+      </div>
+
+      <iframe
+        title="published"
+        style={{
+          width: "100%",
+          height: "82vh",
+          border: "1px solid #ddd",
+          borderRadius: 14,
+          background: "#fff",
+        }}
+        srcDoc={html}
+      />
+    </main>
   );
 }
