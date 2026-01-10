@@ -86,8 +86,9 @@ export default function ProjectPage({
     }
   }
 
-  async function runAuditOnly() {
-    if (!projectId) return;
+  // IMPORTANT: returns boolean so Finish can decide publish immediately (no race with React state updates)
+  async function runAuditOnly(): Promise<boolean> {
+    if (!projectId) return false;
 
     setAudit({ state: "checking" });
 
@@ -105,7 +106,7 @@ export default function ProjectPage({
           title: "Quality check failed",
           message: `(${auditRes.status}) ${auditText}`,
         });
-        return;
+        return false;
       }
 
       let auditData: any = null;
@@ -118,7 +119,7 @@ export default function ProjectPage({
           title: "Quality check error",
           message: `Unexpected response: ${auditText}`,
         });
-        return;
+        return false;
       }
 
       if (!auditData?.ok) {
@@ -128,7 +129,7 @@ export default function ProjectPage({
           title: "Quality check error",
           message: `Audit error: ${auditText}`,
         });
-        return;
+        return false;
       }
 
       const readyToPublish = Boolean(auditData.readyToPublish);
@@ -151,6 +152,8 @@ export default function ProjectPage({
           ? "Your site meets the minimum publish requirements."
           : "Quality check found issues. Fix missing items, then click Publish.",
       });
+
+      return readyToPublish;
     } catch (err: any) {
       setAudit({
         state: "error",
@@ -161,6 +164,7 @@ export default function ProjectPage({
         title: "Quality check error",
         message: err?.message ? String(err.message) : "Unknown audit error.",
       });
+      return false;
     }
   }
 
@@ -337,11 +341,11 @@ export default function ProjectPage({
 
       await loadPreview();
 
-      // 3) Run audit
-      await runAuditOnly();
+      // 3) Run audit (returns boolean)
+      const ready = await runAuditOnly();
 
       // 4) Publish only if audit passes
-      if (audit.state === "ready" && audit.ok) {
+      if (ready) {
         setToast({
           tone: "success",
           title: "Quality check passed",
