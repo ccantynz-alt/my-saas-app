@@ -24,7 +24,8 @@ type Modal =
   | { open: false }
   | { open: true; kind: "finish" }
   | { open: true; kind: "importHtml" }
-  | { open: true; kind: "importZip" };
+  | { open: true; kind: "importZip" }
+  | { open: true; kind: "conversion" };
 
 type PublishState =
   | { state: "idle" }
@@ -80,6 +81,11 @@ export default function ProjectBuilderPage() {
   const [bizEmail, setBizEmail] = useState("");
   const [bizTagline, setBizTagline] = useState("");
 
+  // Conversion Agent typed instruction
+  const [conversionInstruction, setConversionInstruction] = useState(
+    "Make the hero more aggressive for sales, strengthen the main CTA, and add urgency (ethical)."
+  );
+
   useEffect(() => {
     if (!projectId) {
       setStatus("error");
@@ -116,6 +122,18 @@ export default function ProjectBuilderPage() {
     if (tone === "danger") return { ...base, borderColor: "#ffd1d1", background: "#fff5f5" };
     return base;
   };
+
+  function closeModal() {
+    setModal({ open: false });
+  }
+
+  function normalizePublishedUrl(url: string) {
+    const trimmed = url.trim();
+    if (!trimmed) return "";
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+    if (trimmed.startsWith("/")) return `${window.location.origin}${trimmed}`;
+    return `${window.location.origin}/${trimmed}`;
+  }
 
   async function loadPreview() {
     if (!projectId) return;
@@ -336,25 +354,17 @@ export default function ProjectBuilderPage() {
         return;
       }
 
-      let data: any = null;
+      let urlFromApi = "";
       try {
-        data = JSON.parse(text);
+        const data = JSON.parse(text);
+        urlFromApi =
+          (typeof data?.url === "string" && data.url) ||
+          (typeof data?.path === "string" && data.path) ||
+          (typeof data?.publicUrl === "string" && data.publicUrl) ||
+          "";
       } catch {
-        const maybeUrl = text.trim();
-        if (maybeUrl) {
-          setPublish({ state: "published", url: maybeUrl });
-          setToast({ tone: "success", title: "Published", message: maybeUrl });
-          return;
-        }
-        setPublish({ state: "error", message: `Unexpected publish response: ${text}` });
-        return;
+        urlFromApi = text.trim();
       }
-
-      const urlFromApi =
-        (typeof data?.url === "string" && data.url) ||
-        (typeof data?.path === "string" && data.path) ||
-        (typeof data?.publicUrl === "string" && data.publicUrl) ||
-        "";
 
       if (!urlFromApi) {
         setPublish({ state: "error", message: `Unexpected publish response: ${text}` });
@@ -367,7 +377,7 @@ export default function ProjectBuilderPage() {
       }
 
       setPublish({ state: "published", url: urlFromApi });
-      setToast({ tone: "success", title: "Published", message: urlFromApi });
+      setToast({ tone: "success", title: "Published", message: normalizePublishedUrl(urlFromApi) });
     } catch (err: any) {
       setPublish({
         state: "error",
@@ -383,21 +393,7 @@ export default function ProjectBuilderPage() {
     }
   }
 
-  function closeModal() {
-    setModal({ open: false });
-  }
-
-  function normalizePublishedUrl(url: string) {
-    const trimmed = url.trim();
-    if (!trimmed) return "";
-    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
-    if (trimmed.startsWith("/")) return `${window.location.origin}${trimmed}`;
-    return `${window.location.origin}/${trimmed}`;
-  }
-
-  /* =========================
-     LEVEL 2: Finish → Preview → Audit → Publish
-     ========================= */
+  // LEVEL 2 finish → preview → audit → publish
   async function finishForMeLevel2() {
     if (!projectId) return;
 
@@ -422,7 +418,6 @@ export default function ProjectBuilderPage() {
     setPublish({ state: "idle" });
 
     try {
-      // 1) Level 2 finish endpoint
       const res = await fetch(`/api/projects/${projectId}/finish`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -451,65 +446,15 @@ export default function ProjectBuilderPage() {
       setToast({
         tone: "success",
         title: "Finished",
-        message: "Generated. Loading preview and preparing to publish…",
+        message: "Generated. Loading preview and publishing…",
       });
 
       setModal({ open: false });
 
-      // 2) Preview
       await loadPreview();
-
-      // 3) Audit (optional but nice UI feedback)
       setAudit({ state: "idle" });
       await runAudit();
-
-      // 4) Publish
-      setPublish({ state: "publishing" });
-
-      const pubRes = await fetch(`/api/projects/${projectId}/publish`, {
-        method: "POST",
-      });
-
-      const pubText = await pubRes.text();
-
-      if (!pubRes.ok) {
-        setPublish({ state: "error", message: `(${pubRes.status}) ${pubText}` });
-        setToast({
-          tone: "danger",
-          title: "Publish failed",
-          message: `(${pubRes.status}) ${pubText}`,
-        });
-        return;
-      }
-
-      let url = "";
-      try {
-        const data = JSON.parse(pubText);
-        url =
-          (typeof data?.url === "string" && data.url) ||
-          (typeof data?.path === "string" && data.path) ||
-          (typeof data?.publicUrl === "string" && data.publicUrl) ||
-          "";
-      } catch {
-        url = pubText.trim();
-      }
-
-      if (!url) {
-        setPublish({ state: "error", message: `Unexpected publish response: ${pubText}` });
-        setToast({
-          tone: "danger",
-          title: "Publish error",
-          message: `Unexpected publish response: ${pubText}`,
-        });
-        return;
-      }
-
-      setPublish({ state: "published", url });
-      setToast({
-        tone: "success",
-        title: "Published",
-        message: normalizePublishedUrl(url),
-      });
+      await publishNow();
     } catch (err: any) {
       setToast({
         tone: "danger",
@@ -521,10 +466,8 @@ export default function ProjectBuilderPage() {
     }
   }
 
-  /* =========================
-     Conversion Agent Button
-     ========================= */
-  async function conversionAgentNow() {
+  // Conversion Agent (typed instruction) + preview reload + audit
+  async function runConversionAgent() {
     if (!projectId) return;
 
     setBusy(true);
@@ -533,6 +476,8 @@ export default function ProjectBuilderPage() {
     try {
       const res = await fetch(`/api/projects/${projectId}/agents/conversion`, {
         method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ instruction: conversionInstruction }),
       });
 
       const text = await res.text();
@@ -549,8 +494,10 @@ export default function ProjectBuilderPage() {
       setToast({
         tone: "success",
         title: "Conversion Agent applied",
-        message: "Made the site more sales-focused. Loading preview…",
+        message: "Changes applied. Loading preview… (Undo is available)",
       });
+
+      setModal({ open: false });
 
       await loadPreview();
       setAudit({ state: "idle" });
@@ -566,40 +513,60 @@ export default function ProjectBuilderPage() {
     }
   }
 
+  // Undo last change
+  async function undoLastChange() {
+    if (!projectId) return;
+
+    setBusy(true);
+    setToast(null);
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/undo`, { method: "POST" });
+      const text = await res.text();
+
+      if (!res.ok) {
+        setToast({
+          tone: "danger",
+          title: "Undo failed",
+          message: `(${res.status}) ${text}`,
+        });
+        return;
+      }
+
+      let label = "Undo complete";
+      try {
+        const data = JSON.parse(text);
+        if (data?.ok && data?.undone) label = `Undone: ${data.undone}`;
+      } catch {}
+
+      setToast({
+        tone: "success",
+        title: "Undo",
+        message: `${label}. Loading preview…`,
+      });
+
+      await loadPreview();
+      setAudit({ state: "idle" });
+      await runAudit();
+    } catch (err: any) {
+      setToast({
+        tone: "danger",
+        title: "Undo error",
+        message: err?.message ? String(err.message) : "Unknown error during undo.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (status === "loading") {
     return (
       <div style={{ minHeight: "100vh", background: "#fafafa" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: 24 }}>
-          <div
-            style={{
-              border: "1px solid #eee",
-              borderRadius: 16,
-              background: "white",
-              padding: 20,
-              fontFamily: "system-ui",
-            }}
-          >
+          <div style={{ border: "1px solid #eee", borderRadius: 16, background: "white", padding: 20 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div
-                style={{
-                  width: 10,
-                  height: 10,
-                  borderRadius: 999,
-                  background: "#999",
-                }}
-              />
+              <div style={{ width: 10, height: 10, borderRadius: 999, background: "#999" }} />
               <div style={{ fontSize: 14, color: "#333" }}>Loading project…</div>
-            </div>
-            <div
-              style={{
-                marginTop: 16,
-                height: 10,
-                borderRadius: 999,
-                background: "#f1f1f1",
-                overflow: "hidden",
-              }}
-            >
-              <div style={{ width: "60%", height: "100%", background: "#e7e7e7" }} />
             </div>
           </div>
         </div>
@@ -611,19 +578,11 @@ export default function ProjectBuilderPage() {
     return (
       <div style={{ minHeight: "100vh", background: "#fafafa", fontFamily: "system-ui" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto", padding: 24 }}>
-          <div
-            style={{
-              border: "1px solid #eee",
-              borderRadius: 16,
-              background: "white",
-              padding: 20,
-            }}
-          >
+          <div style={{ border: "1px solid #eee", borderRadius: 16, background: "white", padding: 20 }}>
             <h1 style={{ margin: 0, fontSize: 20 }}>Invalid project</h1>
             <p style={{ marginTop: 10, marginBottom: 0, color: "#444" }}>
               We couldn’t read the project id from the URL.
             </p>
-
             <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
               <button
                 onClick={() => router.push("/projects")}
@@ -648,13 +607,7 @@ export default function ProjectBuilderPage() {
   const publishedUrl = publish.state === "published" ? normalizePublishedUrl(publish.url) : "";
 
   const auditTone: ToastTone =
-    audit.state === "ready"
-      ? audit.ok
-        ? "success"
-        : "danger"
-      : audit.state === "error"
-      ? "danger"
-      : "neutral";
+    audit.state === "ready" ? (audit.ok ? "success" : "danger") : audit.state === "error" ? "danger" : "neutral";
 
   const auditTitle =
     audit.state === "ready"
@@ -666,6 +619,8 @@ export default function ProjectBuilderPage() {
       : audit.state === "error"
       ? "Audit error"
       : "Quality checklist";
+
+  const hasPreview = preview.state === "ready";
 
   return (
     <div style={{ minHeight: "100vh", background: "#fafafa", fontFamily: "system-ui" }}>
@@ -680,16 +635,13 @@ export default function ProjectBuilderPage() {
             width: 380,
             borderRadius: 16,
             border: "1px solid #eee",
-            background:
-              toast.tone === "success" ? "#f0fff4" : toast.tone === "danger" ? "#fff5f5" : "white",
+            background: toast.tone === "success" ? "#f0fff4" : toast.tone === "danger" ? "#fff5f5" : "white",
             padding: 14,
             boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
           }}
         >
           <div style={{ fontWeight: 800, color: "#111" }}>{toast.title}</div>
-          <div style={{ marginTop: 6, fontSize: 13, color: "#333", whiteSpace: "pre-wrap" }}>
-            {toast.message}
-          </div>
+          <div style={{ marginTop: 6, fontSize: 13, color: "#333", whiteSpace: "pre-wrap" }}>{toast.message}</div>
         </div>
       ) : null}
 
@@ -734,7 +686,9 @@ export default function ProjectBuilderPage() {
                   ? "Finish for me (AI)"
                   : modal.kind === "importHtml"
                   ? "Import HTML"
-                  : "Import ZIP"}
+                  : modal.kind === "importZip"
+                  ? "Import ZIP"
+                  : "Conversion Agent (Sales)"}
               </div>
               <button
                 onClick={() => closeModal()}
@@ -755,47 +709,27 @@ export default function ProjectBuilderPage() {
               {modal.kind === "finish" ? (
                 <>
                   <div style={{ fontSize: 13, color: "#555", lineHeight: 1.4 }}>
-                    Fill the details and click <b>Finish for me</b>. This will run <b>Level 2</b>{" "}
-                    (generate + QA/SEO) and then auto-publish.
+                    Fill the details and click <b>Finish for me</b>. This runs <b>Level 2</b> and auto-publishes.
                   </div>
 
-                  <div
-                    style={{
-                      marginTop: 12,
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 10,
-                    }}
-                  >
+                  <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <label style={{ display: "grid", gap: 6 }}>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: "#333" }}>
-                        Business name (required)
-                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#333" }}>Business name (required)</span>
                       <input
                         value={bizName}
                         onChange={(e) => setBizName(e.target.value)}
                         placeholder="e.g. Book A Ride"
-                        style={{
-                          border: "1px solid #ddd",
-                          borderRadius: 12,
-                          padding: 10,
-                        }}
+                        style={{ border: "1px solid #ddd", borderRadius: 12, padding: 10 }}
                       />
                     </label>
 
                     <label style={{ display: "grid", gap: 6 }}>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: "#333" }}>
-                        Niche (required)
-                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#333" }}>Niche (required)</span>
                       <input
                         value={bizNiche}
                         onChange={(e) => setBizNiche(e.target.value)}
                         placeholder="e.g. Airport shuttle service"
-                        style={{
-                          border: "1px solid #ddd",
-                          borderRadius: 12,
-                          padding: 10,
-                        }}
+                        style={{ border: "1px solid #ddd", borderRadius: 12, padding: 10 }}
                       />
                     </label>
 
@@ -805,11 +739,7 @@ export default function ProjectBuilderPage() {
                         value={bizLocation}
                         onChange={(e) => setBizLocation(e.target.value)}
                         placeholder="e.g. Auckland, NZ"
-                        style={{
-                          border: "1px solid #ddd",
-                          borderRadius: 12,
-                          padding: 10,
-                        }}
+                        style={{ border: "1px solid #ddd", borderRadius: 12, padding: 10 }}
                       />
                     </label>
 
@@ -819,11 +749,7 @@ export default function ProjectBuilderPage() {
                         value={bizTagline}
                         onChange={(e) => setBizTagline(e.target.value)}
                         placeholder="e.g. Reliable rides, on time"
-                        style={{
-                          border: "1px solid #ddd",
-                          borderRadius: 12,
-                          padding: 10,
-                        }}
+                        style={{ border: "1px solid #ddd", borderRadius: 12, padding: 10 }}
                       />
                     </label>
 
@@ -833,11 +759,7 @@ export default function ProjectBuilderPage() {
                         value={bizPhone}
                         onChange={(e) => setBizPhone(e.target.value)}
                         placeholder="e.g. +64 ..."
-                        style={{
-                          border: "1px solid #ddd",
-                          borderRadius: 12,
-                          padding: 10,
-                        }}
+                        style={{ border: "1px solid #ddd", borderRadius: 12, padding: 10 }}
                       />
                     </label>
 
@@ -847,11 +769,7 @@ export default function ProjectBuilderPage() {
                         value={bizEmail}
                         onChange={(e) => setBizEmail(e.target.value)}
                         placeholder="e.g. hello@company.com"
-                        style={{
-                          border: "1px solid #ddd",
-                          borderRadius: 12,
-                          padding: 10,
-                        }}
+                        style={{ border: "1px solid #ddd", borderRadius: 12, padding: 10 }}
                       />
                     </label>
                   </div>
@@ -914,29 +832,16 @@ export default function ProjectBuilderPage() {
                     </button>
                   </div>
                 </>
-              ) : (
+              ) : modal.kind === "importZip" ? (
                 <>
                   <div style={{ fontSize: 13, color: "#555", lineHeight: 1.4 }}>
                     Choose a <b>.zip</b> file, then click <b>Import ZIP</b>.
                   </div>
 
-                  <div
-                    style={{
-                      marginTop: 12,
-                      border: "1px solid #eee",
-                      borderRadius: 14,
-                      background: "#fafafa",
-                      padding: 12,
-                    }}
-                  >
-                    <input
-                      type="file"
-                      accept=".zip,application/zip"
-                      onChange={(e) => setZipFile(e.target.files?.[0] ?? null)}
-                    />
+                  <div style={{ marginTop: 12, border: "1px solid #eee", borderRadius: 14, background: "#fafafa", padding: 12 }}>
+                    <input type="file" accept=".zip,application/zip" onChange={(e) => setZipFile(e.target.files?.[0] ?? null)} />
                     <div style={{ marginTop: 10, fontSize: 12, color: "#444" }}>
-                      Selected:{" "}
-                      <b>{zipFile ? `${zipFile.name} (${Math.round(zipFile.size / 1024)} KB)` : "none"}</b>
+                      Selected: <b>{zipFile ? `${zipFile.name} (${Math.round(zipFile.size / 1024)} KB)` : "none"}</b>
                     </div>
                   </div>
 
@@ -958,6 +863,67 @@ export default function ProjectBuilderPage() {
                     </button>
                   </div>
                 </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 13, color: "#555", lineHeight: 1.4 }}>
+                    Tell the <b>Conversion Agent</b> what to change. This is guarded and safe. You can always <b>Undo</b>.
+                  </div>
+
+                  <textarea
+                    value={conversionInstruction}
+                    onChange={(e) => setConversionInstruction(e.target.value)}
+                    placeholder="e.g. Make the hero more urgent and push phone bookings."
+                    style={{
+                      marginTop: 12,
+                      width: "100%",
+                      height: 220,
+                      resize: "vertical",
+                      borderRadius: 14,
+                      border: "1px solid #ddd",
+                      padding: 12,
+                      fontFamily: "system-ui",
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                    }}
+                  />
+
+                  <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                    <button
+                      disabled={busy}
+                      onClick={() => {
+                        setConversionInstruction(
+                          "Make the hero more aggressive for sales, strengthen the main CTA, and add urgency (ethical)."
+                        );
+                      }}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 12,
+                        border: "1px solid #ddd",
+                        background: "white",
+                        cursor: busy ? "not-allowed" : "pointer",
+                        fontWeight: 800,
+                      }}
+                    >
+                      Reset example
+                    </button>
+
+                    <button
+                      disabled={busy}
+                      onClick={() => runConversionAgent()}
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: 14,
+                        border: "1px solid #ddd",
+                        background: busy ? "#f3f4f6" : "#111",
+                        color: busy ? "#777" : "white",
+                        cursor: busy ? "not-allowed" : "pointer",
+                        fontWeight: 900,
+                      }}
+                    >
+                      {busy ? "Working…" : "Apply Conversion Agent"}
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -966,15 +932,7 @@ export default function ProjectBuilderPage() {
 
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: 24 }}>
         {/* Top bar */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            marginBottom: 16,
-          }}
-        >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <h1 style={{ margin: 0, fontSize: 22, letterSpacing: -0.2 }}>Project Builder</h1>
 
@@ -984,8 +942,7 @@ export default function ProjectBuilderPage() {
                   width: 8,
                   height: 8,
                   borderRadius: 999,
-                  background:
-                    headerBadge.tone === "success" ? "#22c55e" : headerBadge.tone === "danger" ? "#ef4444" : "#6b7280",
+                  background: headerBadge.tone === "success" ? "#22c55e" : headerBadge.tone === "danger" ? "#ef4444" : "#6b7280",
                 }}
               />
               <span style={{ color: "#111" }}>{headerBadge.label}</span>
@@ -1047,22 +1004,36 @@ export default function ProjectBuilderPage() {
                 Finish for me (AI) — Level 2
               </button>
 
-              {/* NEW: Conversion Agent */}
               <button
-                disabled={busy || preview.state !== "ready"}
-                onClick={() => conversionAgentNow()}
-                title={preview.state !== "ready" ? "Load or generate a preview first." : "Apply conversion optimization."}
+                disabled={busy || !hasPreview}
+                onClick={() => setModal({ open: true, kind: "conversion" })}
+                title={!hasPreview ? "Load or generate a preview first." : "Tell the Conversion Agent what to do."}
                 style={{
                   padding: "12px 14px",
                   borderRadius: 14,
                   border: "1px solid #ddd",
                   background: busy ? "#f3f4f6" : "#111",
                   color: busy ? "#777" : "white",
-                  cursor: busy || preview.state !== "ready" ? "not-allowed" : "pointer",
+                  cursor: busy || !hasPreview ? "not-allowed" : "pointer",
                   fontWeight: 900,
                 }}
               >
-                Make this more aggressive (sales)
+                Talk to Conversion Agent (Sales)
+              </button>
+
+              <button
+                disabled={busy}
+                onClick={() => undoLastChange()}
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: 14,
+                  border: "1px solid #ddd",
+                  background: "white",
+                  cursor: busy ? "not-allowed" : "pointer",
+                  fontWeight: 900,
+                }}
+              >
+                Undo last change
               </button>
 
               <button
@@ -1152,8 +1123,7 @@ export default function ProjectBuilderPage() {
                   border: "1px solid #eee",
                   borderRadius: 14,
                   padding: 12,
-                  background:
-                    auditTone === "success" ? "#f0fff4" : auditTone === "danger" ? "#fff5f5" : "#fafafa",
+                  background: auditTone === "success" ? "#f0fff4" : auditTone === "danger" ? "#fff5f5" : "#fafafa",
                   fontSize: 13,
                   color: "#111",
                   whiteSpace: "pre-wrap",
@@ -1169,9 +1139,7 @@ export default function ProjectBuilderPage() {
                   <div style={{ color: "#111" }}>{audit.message}</div>
                 ) : (
                   <div>
-                    <div style={{ fontWeight: 900, marginBottom: 8 }}>
-                      {audit.ok ? "✅ Ready to publish" : "⚠️ Not ready yet"}
-                    </div>
+                    <div style={{ fontWeight: 900, marginBottom: 8 }}>{audit.ok ? "✅ Ready to publish" : "⚠️ Not ready yet"}</div>
 
                     {audit.missing.length > 0 ? (
                       <>
@@ -1215,17 +1183,7 @@ export default function ProjectBuilderPage() {
             </div>
 
             {publish.state === "published" ? (
-              <div
-                style={{
-                  marginTop: 14,
-                  border: "1px solid #b7ebc6",
-                  background: "#f0fff4",
-                  borderRadius: 14,
-                  padding: 12,
-                  fontSize: 13,
-                  color: "#111",
-                }}
-              >
+              <div style={{ marginTop: 14, border: "1px solid #b7ebc6", background: "#f0fff4", borderRadius: 14, padding: 12, fontSize: 13, color: "#111" }}>
                 <div style={{ fontWeight: 900 }}>Published</div>
                 <div style={{ marginTop: 8, wordBreak: "break-all" }}>
                   <a href={publishedUrl} target="_blank" rel="noreferrer">
@@ -1234,18 +1192,7 @@ export default function ProjectBuilderPage() {
                 </div>
               </div>
             ) : publish.state === "error" ? (
-              <div
-                style={{
-                  marginTop: 14,
-                  border: "1px solid #ffd1d1",
-                  background: "#fff5f5",
-                  borderRadius: 14,
-                  padding: 12,
-                  fontSize: 13,
-                  color: "#111",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
+              <div style={{ marginTop: 14, border: "1px solid #ffd1d1", background: "#fff5f5", borderRadius: 14, padding: 12, fontSize: 13, color: "#111", whiteSpace: "pre-wrap" }}>
                 <div style={{ fontWeight: 900 }}>Publish error</div>
                 <div style={{ marginTop: 8 }}>{publish.message}</div>
               </div>
@@ -1265,13 +1212,7 @@ export default function ProjectBuilderPage() {
               {preview.state === "ready" ? (
                 <iframe
                   title="Preview"
-                  style={{
-                    width: "100%",
-                    height: 560,
-                    border: "1px solid #eee",
-                    borderRadius: 14,
-                    background: "white",
-                  }}
+                  style={{ width: "100%", height: 560, border: "1px solid #eee", borderRadius: 14, background: "white" }}
                   sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin"
                   srcDoc={preview.html}
                 />
@@ -1292,11 +1233,7 @@ export default function ProjectBuilderPage() {
                     whiteSpace: "pre-wrap",
                   }}
                 >
-                  {preview.state === "loading"
-                    ? preview.message
-                    : preview.state === "error"
-                    ? preview.message
-                    : preview.message}
+                  {preview.message}
                 </div>
               )}
             </div>
@@ -1304,7 +1241,7 @@ export default function ProjectBuilderPage() {
         </div>
 
         <div style={{ marginTop: 14, fontSize: 12, color: "#666" }}>
-          Level 2: Finish for me → QA/SEO → Publish. Agents: Conversion (sales) runs after preview exists.
+          Safety: Conversion Agent writes an undo snapshot first. If it looks wrong, click <b>Undo last change</b>.
         </div>
       </div>
     </div>
