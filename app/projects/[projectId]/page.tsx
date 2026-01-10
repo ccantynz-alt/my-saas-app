@@ -11,6 +11,14 @@ type PreviewState =
   | { state: "ready"; html: string }
   | { state: "error"; message: string };
 
+type ToastTone = "neutral" | "success" | "danger";
+
+type Toast = {
+  tone: ToastTone;
+  title: string;
+  message: string;
+};
+
 export default function ProjectBuilderPage() {
   const router = useRouter();
   const params = useParams();
@@ -30,6 +38,8 @@ export default function ProjectBuilderPage() {
     message: "Preview not loaded yet.",
   });
 
+  const [toast, setToast] = useState<Toast | null>(null);
+
   useEffect(() => {
     if (!projectId) {
       setStatus("error");
@@ -37,6 +47,12 @@ export default function ProjectBuilderPage() {
     }
     setStatus("ready");
   }, [projectId]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const headerBadge = (() => {
     if (status === "loading") return { label: "Loading", tone: "neutral" as const };
@@ -67,10 +83,6 @@ export default function ProjectBuilderPage() {
     setPreview({ state: "loading", message: "Loading preview from server…" });
 
     try {
-      // We intentionally use an API route so the browser never touches KV directly.
-      // This route should read KV:
-      // - generated:project:<projectId>:latest (primary)
-      // - generated:latest (fallback)
       const res = await fetch(`/api/projects/${projectId}/preview`, { method: "GET" });
       const text = await res.text();
 
@@ -86,7 +98,6 @@ export default function ProjectBuilderPage() {
       try {
         data = JSON.parse(text);
       } catch {
-        // If the API ever returns raw HTML, handle it too.
         setPreview({ state: "ready", html: text });
         return;
       }
@@ -105,6 +116,56 @@ export default function ProjectBuilderPage() {
         state: "error",
         message: err?.message ? String(err.message) : "Unknown error while loading preview.",
       });
+    }
+  }
+
+  async function generateNow() {
+    if (!projectId) return;
+
+    setBusy(true);
+    setToast(null);
+
+    try {
+      // This should already exist in your app (used earlier in your build flow):
+      // POST /api/projects/:projectId/generate
+      // It should write HTML into KV keys:
+      // - generated:project:<projectId>:latest (primary)
+      // - generated:latest (fallback)
+      const res = await fetch(`/api/projects/${projectId}/generate`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          prompt:
+            "Create a professional business website with hero, services, testimonials, about, and contact. Clean modern styling.",
+        }),
+      });
+
+      const text = await res.text();
+
+      if (!res.ok) {
+        setToast({
+          tone: "danger",
+          title: "Generate failed",
+          message: `(${res.status}) ${text}`,
+        });
+        return;
+      }
+
+      setToast({
+        tone: "success",
+        title: "Generated",
+        message: "Generation completed. Loading preview…",
+      });
+
+      await loadPreview();
+    } catch (err: any) {
+      setToast({
+        tone: "danger",
+        title: "Generate error",
+        message: err?.message ? String(err.message) : "Unknown error during generate.",
+      });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -190,6 +251,34 @@ export default function ProjectBuilderPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#fafafa", fontFamily: "system-ui" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", padding: 24 }}>
+        {/* Toast */}
+        {toast ? (
+          <div
+            style={{
+              position: "fixed",
+              top: 18,
+              right: 18,
+              zIndex: 50,
+              width: 360,
+              borderRadius: 16,
+              border: "1px solid #eee",
+              background:
+                toast.tone === "success"
+                  ? "#f0fff4"
+                  : toast.tone === "danger"
+                    ? "#fff5f5"
+                    : "white",
+              padding: 14,
+              boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+            }}
+          >
+            <div style={{ fontWeight: 800, color: "#111" }}>{toast.title}</div>
+            <div style={{ marginTop: 6, fontSize: 13, color: "#333", whiteSpace: "pre-wrap" }}>
+              {toast.message}
+            </div>
+          </div>
+        ) : null}
+
         {/* Top bar */}
         <div
           style={{
@@ -272,15 +361,14 @@ export default function ProjectBuilderPage() {
           >
             <div style={{ fontSize: 13, fontWeight: 700, color: "#111" }}>Actions</div>
             <div style={{ marginTop: 10, fontSize: 13, color: "#555", lineHeight: 1.4 }}>
-              Preview wiring: this page calls <b>/api/projects/&lt;projectId&gt;/preview</b>.
-              If that route does not exist yet, the preview will show an error — that’s expected and
-              we’ll add it next.
+              Generate now calls <b>POST /api/projects/&lt;projectId&gt;/generate</b>, then loads
+              preview from <b>GET /api/projects/&lt;projectId&gt;/preview</b>.
             </div>
 
             <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
               <button
                 disabled={busy}
-                onClick={() => setBusy(true)}
+                onClick={() => generateNow()}
                 style={{
                   padding: "12px 14px",
                   borderRadius: 14,
@@ -291,7 +379,7 @@ export default function ProjectBuilderPage() {
                   fontWeight: 700,
                 }}
               >
-                {busy ? "Working…" : "Generate (UI Only)"}
+                {busy ? "Working…" : "Generate"}
               </button>
 
               <button
@@ -311,7 +399,9 @@ export default function ProjectBuilderPage() {
 
               <button
                 disabled={busy}
-                onClick={() => setBusy(false)}
+                onClick={() =>
+                  setPreview({ state: "idle", message: "Preview cleared. Click Load Preview." })
+                }
                 style={{
                   padding: "12px 14px",
                   borderRadius: 14,
@@ -321,7 +411,7 @@ export default function ProjectBuilderPage() {
                   fontWeight: 700,
                 }}
               >
-                Reset Busy
+                Clear Preview
               </button>
             </div>
 
@@ -379,26 +469,9 @@ export default function ProjectBuilderPage() {
               <div>
                 <div style={{ fontSize: 13, fontWeight: 800, color: "#111" }}>Preview</div>
                 <div style={{ marginTop: 4, fontSize: 13, color: "#555" }}>
-                  Loads from KV via a server API route.
+                  srcDoc iframe from KV-backed API route.
                 </div>
               </div>
-
-              <button
-                onClick={() =>
-                  setPreview({ state: "idle", message: "Preview cleared. Click Load Preview." })
-                }
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: 12,
-                  border: "1px solid #ddd",
-                  background: "white",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Clear Preview
-              </button>
             </div>
 
             <div style={{ padding: 14 }}>
@@ -443,10 +516,8 @@ export default function ProjectBuilderPage() {
           </div>
         </div>
 
-        {/* Footer hint */}
         <div style={{ marginTop: 14, fontSize: 12, color: "#666" }}>
-          Next: we will create the API route <b>/api/projects/[projectId]/preview</b> to read KV and
-          return the HTML.
+          Next: wire Import HTML and Import ZIP buttons to their API routes.
         </div>
       </div>
     </div>
