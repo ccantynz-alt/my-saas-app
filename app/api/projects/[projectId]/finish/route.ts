@@ -84,7 +84,6 @@ function ensureHeadBasics(html: string, opts: { title: string; description: stri
 
   // Ensure <head> exists
   if (!/<head[\s>]/i.test(out)) {
-    // If there's an <html>, inject head after it; otherwise wrap minimally.
     if (/<html[\s>]/i.test(out)) {
       out = out.replace(/<html([^>]*)>/i, `<html$1><head></head>`);
     } else {
@@ -112,7 +111,7 @@ function ensureHeadBasics(html: string, opts: { title: string; description: stri
     );
   }
 
-  // Ensure viewport (nice-to-have)
+  // Ensure viewport
   if (!/name=["']viewport["']/i.test(out)) {
     out = out.replace(
       /<head([^>]*)>/i,
@@ -126,7 +125,6 @@ function ensureHeadBasics(html: string, opts: { title: string; description: stri
 function ensureSingleH1(html: string, h1Text: string) {
   let out = html;
 
-  // If no H1, add one near top of body
   if (!/<h1[\s>]/i.test(out)) {
     if (/<body[\s>]/i.test(out)) {
       out = out.replace(/<body([^>]*)>/i, `<body$1><h1>${h1Text}</h1>`);
@@ -136,7 +134,6 @@ function ensureSingleH1(html: string, h1Text: string) {
     return out;
   }
 
-  // If multiple H1s, keep the first and downgrade the rest to H2
   const h1Matches = out.match(/<h1[\s>][\s\S]*?<\/h1>/gi) || [];
   if (h1Matches.length > 1) {
     let firstDone = false;
@@ -145,18 +142,19 @@ function ensureSingleH1(html: string, h1Text: string) {
         firstDone = true;
         return `<h1>${h1Text}</h1>`;
       }
-      // downgrade remaining h1 to h2
       return m.replace(/^<h1/i, "<h2").replace(/<\/h1>$/i, "</h2>");
     });
     return out;
   }
 
-  // Exactly one H1: replace its content with our chosen text (keeps layout stable enough)
   out = out.replace(/<h1[\s>][\s\S]*?<\/h1>/i, `<h1>${h1Text}</h1>`);
   return out;
 }
 
-function qualityAndSeoPass(html: string, input: { businessName: string; niche: string; location: string }) {
+function qualityAndSeoPass(
+  html: string,
+  input: { businessName: string; niche: string; location: string }
+) {
   const businessName = (input.businessName || "A professional business").trim();
   const niche = (input.niche || "services").trim();
   const location = (input.location || "").trim();
@@ -165,65 +163,34 @@ function qualityAndSeoPass(html: string, input: { businessName: string; niche: s
     ? `${businessName} | ${niche} in ${location}`
     : `${businessName} | ${niche}`;
 
-  // Keep description short-ish
   const descriptionBase = location
     ? `${businessName} provides ${niche} in ${location}.`
     : `${businessName} provides ${niche}.`;
 
   const description = `${descriptionBase} Get a fast quote, learn about our services, and contact us today.`;
 
-  // 1) Head basics
   let out = ensureHeadBasics(html, { title, description });
 
-  // 2) H1 rules
-  const h1Text = location ? `${businessName} — ${niche} in ${location}` : `${businessName} — ${niche}`;
+  const h1Text = location
+    ? `${businessName} — ${niche} in ${location}`
+    : `${businessName} — ${niche}`;
+
   out = ensureSingleH1(out, h1Text);
 
-  // 3) Remove obvious lorem ipsum
   out = out.replace(/lorem ipsum/gi, "");
 
-  // 4) Ensure there's some contact cue (very light touch)
   if (!/contact/i.test(out)) {
     out = out + `\n<!-- Contact: Please add a contact section if missing -->\n`;
   }
 
-  // 5) Make sure description isn't empty or nonsense
   const textCheck = stripTags(out);
   if (textCheck.length < 200) {
-    // If it's too short, append a safe filler section (still deterministic)
     out =
       out +
       `\n<section><h2>Why choose ${businessName}?</h2><p>We focus on clear communication, reliable delivery, and quality results. Reach out today to discuss your needs and get a quick quote.</p></section>\n`;
   }
 
   return { html: out, seo: { title, description, h1: h1Text } };
-}
-
-async function tryAutoPublish(req: Request, projectId: string) {
-  // Best-effort: if a publish route exists, call it.
-  // If it doesn't exist or fails, we still return ok with published=false.
-  const url = new URL(req.url);
-  const origin = url.origin;
-
-  try {
-    const res = await fetch(`${origin}/api/projects/${projectId}/publish`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ source: "finish-level-2" }),
-    });
-
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      return { published: false, status: res.status, body: txt };
-    }
-
-    const data: any = await res.json().catch(() => ({}));
-    return { published: true, status: res.status, body: data };
-  } catch (e: any) {
-    return { published: false, status: 0, body: String(e?.message || e) };
-  }
 }
 
 export async function POST(req: Request, ctx: { params: { projectId: string } }) {
@@ -244,7 +211,6 @@ export async function POST(req: Request, ctx: { params: { projectId: string } })
     return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   }
 
-  // Parse input
   let body: any = {};
   try {
     body = await req.json();
@@ -268,9 +234,7 @@ export async function POST(req: Request, ctx: { params: { projectId: string } })
   const refined = qualityAndSeoPass(html, { businessName, niche, location });
   html = refined.html;
 
-  // Store HTML in BOTH places:
-  // - demoStore (your current UI uses this)
-  // - KV generated key (your import route uses this pattern)
+  // Store HTML in BOTH places
   setProjectHtml(projectId, html);
   await kv.set(generatedProjectLatestKey(projectId), html);
   await kv.set("generated:latest", html);
@@ -280,15 +244,17 @@ export async function POST(req: Request, ctx: { params: { projectId: string } })
 
   setRunStatus(run.id, "complete");
 
-  // STEP 5: Auto-publish (best effort)
-  const pub = await tryAutoPublish(req, projectId);
+  // NOTE:
+  // We do NOT auto-call /publish from here because server-to-server fetch won't
+  // include the user's Clerk session automatically, causing 401 Unauthorized.
+  // Instead, the UI should call the publish endpoint separately after this finishes.
 
   return NextResponse.json({
     ok: true,
     projectId,
     runId: run.id,
     seo: refined.seo,
-    published: pub.published,
-    publishResult: pub,
+    readyToPublish: true,
+    nextAction: "Call POST /api/projects/:projectId/publish from the UI after finish completes.",
   });
 }
