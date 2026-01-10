@@ -1,74 +1,65 @@
-/**
- * billingKV.ts
- *
- * Minimal billing subscription helpers.
- * These functions exist to satisfy imports across the app and unblock builds.
- *
- * Replace with real Stripe + KV/DB logic later.
- */
+import { kv } from "@vercel/kv";
+
+export type BillingPlan = "free" | "pro";
 
 export type BillingSubscription = {
   status: "active" | "trialing" | "canceled" | "incomplete" | string;
-  currentPeriodEnd?: string | number | null;
-  plan?: string | null;
+  plan?: BillingPlan;
+  current_period_end?: number;
+  customerId?: string;
+  subscriptionId?: string;
+  priceId?: string;
+  updatedAt?: string;
 };
 
-export type UserSubscriptionRecord = BillingSubscription & {
-  userId?: string | null;
-  clerkUserId?: string | null;
-  customerId?: string | null;
-  subscriptionId?: string | null;
-};
+export function planKey(userId: string) {
+  return `plan:clerk:${userId}`;
+}
 
-export type ActivateArgs =
-  | string
-  | {
-      clerkUserId?: any;
-      customerId?: any;
-      subscriptionId?: any;
-    };
-
-/**
- * Return the current user's subscription info.
- * Stub implementation: defaults to "active" so protected flows work.
- */
-export async function getSubscription(_userId: string): Promise<BillingSubscription> {
-  return { status: "active" };
+export function subscriptionKey(userId: string) {
+  return `billing:subscription:${userId}`;
 }
 
 /**
- * Mark a user's subscription as active.
- * Accepts either:
- *  - userId string
- *  - object: { clerkUserId, customerId, subscriptionId }
- *
- * Stub implementation: no-op.
+ * Returns the user's plan: "free" | "pro"
+ * Default is "free" if not present.
  */
-export async function setUserSubscriptionActive(
-  _arg: ActivateArgs,
-  _data?: Partial<UserSubscriptionRecord>
-): Promise<void> {
-  // no-op (stub)
+export async function getPlan(userId: string): Promise<BillingPlan> {
+  const plan = await kv.get<BillingPlan>(planKey(userId));
+  return plan === "pro" ? "pro" : "free";
 }
 
 /**
- * Mark a user's subscription as canceled.
- * Stub implementation: no-op.
+ * Sets plan explicitly.
  */
-export async function setUserSubscriptionCanceled(
-  _userId: string,
-  _data?: Partial<UserSubscriptionRecord>
-): Promise<void> {
-  // no-op (stub)
+export async function setPlan(userId: string, plan: BillingPlan) {
+  await kv.set(planKey(userId), plan);
 }
 
 /**
- * Generic setter if other code paths use a different name.
- * Stub implementation: no-op.
+ * ✅ COMPAT EXPORT: requirePlan.ts expects this name.
+ * Returns the saved subscription object (or null).
+ */
+export async function getSubscription(
+  userId: string
+): Promise<BillingSubscription | null> {
+  const sub = await kv.get<BillingSubscription>(subscriptionKey(userId));
+  return sub ?? null;
+}
+
+/**
+ * Saves the subscription object.
  */
 export async function setSubscription(
-  _userId: string,
-  _subscription: BillingSubscription
-): Promise<void> {
-  // no-op (stub)
+  userId: string,
+  sub: BillingSubscription | null
+) {
+  if (!sub) {
+    await kv.del(subscriptionKey(userId));
+    return;
+  }
+  await kv.set(subscriptionKey(userId), {
+    ...sub,
+    updatedAt: new Date().toISOString(),
+  });
 }
