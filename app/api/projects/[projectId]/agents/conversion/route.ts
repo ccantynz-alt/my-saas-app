@@ -18,49 +18,107 @@ function generatedProjectLatestKey(projectId: string) {
 }
 
 /**
- * VERY IMPORTANT:
- * This agent is NOT freeform chat.
- * It applies controlled, conversion-focused transformations only.
+ * Undo snapshots are stored as a short history list in KV.
+ * We store the HTML BEFORE agent changes so the user can "Undo last change".
  */
-function applyConversionPass(html: string) {
+function historyKey(projectId: string) {
+  return `history:project:${projectId}`;
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+type HistoryItem = {
+  ts: string;
+  label: string;
+  html: string;
+};
+
+function clampInstruction(s: string) {
+  const cleaned = String(s || "").trim();
+  if (!cleaned) return "";
+  // Keep it short and safe (novice UX)
+  return cleaned.slice(0, 400);
+}
+
+/**
+ * Conversion Agent: controlled transformation.
+ * It is NOT freeform rewriting. It applies safe edits.
+ *
+ * We use the instruction only to pick among a few safe behaviors.
+ */
+function applyConversionPass(html: string, instruction: string) {
   let out = html;
 
-  // 1) Strengthen primary CTA wording
-  out = out.replace(
-    /(Get Started|Contact Us|Learn More)/gi,
-    "Get Started Today"
-  );
+  const instr = instruction.toLowerCase();
 
-  // 2) Improve vague hero headlines
-  out = out.replace(
-    /<h1[^>]*>([^<]{0,120})<\/h1>/i,
-    (_m, text) =>
-      `<h1>${text} — Book Now & Get Results Faster</h1>`
-  );
+  // Always: strengthen common CTA wording a bit
+  out = out.replace(/(Get Started|Contact Us|Learn More|Request a Quote)/gi, "Get Started Today");
 
-  // 3) Add urgency cue if none exists
-  if (!/today|now|limited|book/i.test(out)) {
+  // If user wants "more urgent" / "more aggressive"
+  const wantsUrgency =
+    instr.includes("urgent") ||
+    instr.includes("aggressive") ||
+    instr.includes("sales") ||
+    instr.includes("hard") ||
+    instr.includes("stronger") ||
+    instr.includes("pushy") ||
+    instr.includes("book now") ||
+    instr.includes("call now");
+
+  // If user wants "more premium" / "more professional"
+  const wantsPremium =
+    instr.includes("premium") ||
+    instr.includes("luxury") ||
+    instr.includes("upmarket") ||
+    instr.includes("professional") ||
+    instr.includes("corporate");
+
+  // 1) Improve hero headline slightly (safe)
+  out = out.replace(/<h1[^>]*>([^<]{0,140})<\/h1>/i, (_m, text) => {
+    const base = String(text || "").trim() || "Get the results you want";
+    if (wantsPremium) return `<h1>${base} — premium, reliable, and on time</h1>`;
+    if (wantsUrgency) return `<h1>${base} — book now and secure your spot</h1>`;
+    return `<h1>${base} — start today</h1>`;
+  });
+
+  // 2) Add a short urgency/trust line near top if missing
+  if (wantsUrgency && !/limited availability|secure your spot|book today/i.test(out)) {
     out = out.replace(
       /<\/header>|<\/section>/i,
-      `<p style="font-weight:700;color:#111">Limited availability — book today.</p>$&`
+      `<p style="font-weight:800;color:#111;margin:10px 0 0">Limited availability — secure your spot today.</p>$&`
     );
   }
 
-  // 4) Ensure at least one strong CTA button exists
-  if (!/<button|<a[^>]+href="#contact"/i.test(out)) {
+  if (wantsPremium && !/trusted|reliable|professional/i.test(out)) {
+    out = out.replace(
+      /<\/header>|<\/section>/i,
+      `<p style="font-weight:700;color:#111;margin:10px 0 0">Trusted, professional service — no surprises.</p>$&`
+    );
+  }
+
+  // 3) Ensure there is at least one strong CTA to #contact
+  if (!/<a[^>]+href="#contact"[^>]*>/i.test(out)) {
     out = out.replace(
       /<\/body>/i,
-      `<a href="#contact" style="display:inline-block;padding:14px 18px;border-radius:12px;background:#0b5fff;color:#fff;font-weight:800;text-decoration:none">Book Now</a></body>`
+      `<a href="#contact" style="display:inline-block;padding:14px 18px;border-radius:12px;background:#0b5fff;color:#fff;font-weight:900;text-decoration:none">Book Now</a></body>`
+    );
+  }
+
+  // 4) If user explicitly mentions "phone" or "call", try to add a "Call now" CTA (safe append)
+  const wantsPhone = instr.includes("phone") || instr.includes("call") || instr.includes("ring");
+  if (wantsPhone && !/Call now/i.test(out)) {
+    out = out.replace(
+      /<\/body>/i,
+      `<div style="margin:16px 0;text-align:center"><a href="#contact" style="display:inline-block;padding:12px 16px;border-radius:12px;border:1px solid #111;color:#111;font-weight:900;text-decoration:none">Call now</a></div></body>`
     );
   }
 
   return out;
 }
 
-export async function POST(
-  _req: Request,
-  ctx: { params: { projectId: string } }
-) {
+export async function POST(req: Request, ctx: { params: { projectId: string } }) {
   const session = await auth();
   const userId = session.userId;
 
@@ -82,21 +140,40 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   }
 
-  const html = await kv.get<string>(generatedProjectLatestKey(projectId));
-  if (!html) {
-    return NextResponse.json(
-      { ok: false, error: "No generated HTML to optimize yet" },
-      { status: 400 }
-    );
+  const currentHtml = await kv.get<string>(generatedProjectLatestKey(projectId));
+  if (!currentHtml) {
+    return NextResponse.json({ ok: false, error: "No generated HTML to optimize yet" }, { status: 400 });
   }
 
-  const updatedHtml = applyConversionPass(html);
+  // Read optional instruction
+  let instruction = "";
+  try {
+    const body: any = await req.json();
+    instruction = clampInstruction(body?.instruction || "");
+  } catch {
+    instruction = "";
+  }
+
+  // Save undo snapshot BEFORE changes
+  const snapshot: HistoryItem = {
+    ts: nowIso(),
+    label: instruction ? `Conversion Agent: ${instruction}` : "Conversion Agent",
+    html: currentHtml,
+  };
+
+  await kv.lpush(historyKey(projectId), snapshot);
+  // Keep only last 10 snapshots
+  await kv.ltrim(historyKey(projectId), 0, 9);
+
+  // Apply controlled pass
+  const updatedHtml = applyConversionPass(currentHtml, instruction);
 
   await kv.set(generatedProjectLatestKey(projectId), updatedHtml);
 
   return NextResponse.json({
     ok: true,
     agent: "conversion",
-    message: "Site optimized for higher conversions",
+    instruction,
+    message: "Conversion Agent applied (you can Undo if needed).",
   });
 }
