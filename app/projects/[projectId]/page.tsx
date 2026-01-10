@@ -5,6 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 
 type Status = "loading" | "ready" | "error";
 
+type PreviewState =
+  | { state: "idle"; message: string }
+  | { state: "loading"; message: string }
+  | { state: "ready"; html: string }
+  | { state: "error"; message: string };
+
 export default function ProjectBuilderPage() {
   const router = useRouter();
   const params = useParams();
@@ -18,6 +24,11 @@ export default function ProjectBuilderPage() {
 
   const [status, setStatus] = useState<Status>("loading");
   const [busy, setBusy] = useState(false);
+
+  const [preview, setPreview] = useState<PreviewState>({
+    state: "idle",
+    message: "Preview not loaded yet.",
+  });
 
   useEffect(() => {
     if (!projectId) {
@@ -49,6 +60,53 @@ export default function ProjectBuilderPage() {
     if (tone === "danger") return { ...base, borderColor: "#ffd1d1", background: "#fff5f5" };
     return base;
   };
+
+  async function loadPreview() {
+    if (!projectId) return;
+
+    setPreview({ state: "loading", message: "Loading preview from server…" });
+
+    try {
+      // We intentionally use an API route so the browser never touches KV directly.
+      // This route should read KV:
+      // - generated:project:<projectId>:latest (primary)
+      // - generated:latest (fallback)
+      const res = await fetch(`/api/projects/${projectId}/preview`, { method: "GET" });
+      const text = await res.text();
+
+      if (!res.ok) {
+        setPreview({
+          state: "error",
+          message: `Preview API error (${res.status}): ${text}`,
+        });
+        return;
+      }
+
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // If the API ever returns raw HTML, handle it too.
+        setPreview({ state: "ready", html: text });
+        return;
+      }
+
+      if (data?.ok && typeof data?.html === "string") {
+        setPreview({ state: "ready", html: data.html });
+        return;
+      }
+
+      setPreview({
+        state: "error",
+        message: `Unexpected preview response: ${text}`,
+      });
+    } catch (err: any) {
+      setPreview({
+        state: "error",
+        message: err?.message ? String(err.message) : "Unknown error while loading preview.",
+      });
+    }
+  }
 
   if (status === "loading") {
     return (
@@ -214,8 +272,9 @@ export default function ProjectBuilderPage() {
           >
             <div style={{ fontSize: 13, fontWeight: 700, color: "#111" }}>Actions</div>
             <div style={{ marginTop: 10, fontSize: 13, color: "#555", lineHeight: 1.4 }}>
-              This is UI polish only. Buttons don’t call APIs yet — we’ll wire them up after the
-              UI looks good.
+              Preview wiring: this page calls <b>/api/projects/&lt;projectId&gt;/preview</b>.
+              If that route does not exist yet, the preview will show an error — that’s expected and
+              we’ll add it next.
             </div>
 
             <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
@@ -237,7 +296,7 @@ export default function ProjectBuilderPage() {
 
               <button
                 disabled={busy}
-                onClick={() => alert("Next step: we will connect HTML import endpoint.")}
+                onClick={() => loadPreview()}
                 style={{
                   padding: "12px 14px",
                   borderRadius: 14,
@@ -247,37 +306,22 @@ export default function ProjectBuilderPage() {
                   fontWeight: 700,
                 }}
               >
-                Import HTML (UI Only)
+                Load Preview
               </button>
 
               <button
                 disabled={busy}
-                onClick={() => alert("Next step: we will connect ZIP import endpoint.")}
+                onClick={() => setBusy(false)}
                 style={{
                   padding: "12px 14px",
                   borderRadius: 14,
                   border: "1px solid #ddd",
                   background: "white",
-                  cursor: busy ? "not-allowed" : "pointer",
+                  cursor: "pointer",
                   fontWeight: 700,
                 }}
               >
-                Import ZIP (UI Only)
-              </button>
-
-              <button
-                disabled={busy}
-                onClick={() => alert("Next step: we will connect Publish endpoint.")}
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: 14,
-                  border: "1px solid #ddd",
-                  background: "white",
-                  cursor: busy ? "not-allowed" : "pointer",
-                  fontWeight: 700,
-                }}
-              >
-                Publish (UI Only)
+                Reset Busy
               </button>
             </div>
 
@@ -298,9 +342,16 @@ export default function ProjectBuilderPage() {
                   <span>Builder</span>
                   <span style={{ fontWeight: 700 }}>{status}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 6 }}>
-                  <span>Busy</span>
-                  <span style={{ fontWeight: 700 }}>{busy ? "yes" : "no"}</span>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    marginTop: 6,
+                  }}
+                >
+                  <span>Preview</span>
+                  <span style={{ fontWeight: 700 }}>{preview.state}</span>
                 </div>
               </div>
             </div>
@@ -328,12 +379,14 @@ export default function ProjectBuilderPage() {
               <div>
                 <div style={{ fontSize: 13, fontWeight: 800, color: "#111" }}>Preview</div>
                 <div style={{ marginTop: 4, fontSize: 13, color: "#555" }}>
-                  Next step: show the generated HTML here.
+                  Loads from KV via a server API route.
                 </div>
               </div>
 
               <button
-                onClick={() => setBusy(false)}
+                onClick={() =>
+                  setPreview({ state: "idle", message: "Preview cleared. Click Load Preview." })
+                }
                 style={{
                   padding: "10px 14px",
                   borderRadius: 12,
@@ -344,37 +397,56 @@ export default function ProjectBuilderPage() {
                   whiteSpace: "nowrap",
                 }}
               >
-                Reset Busy
+                Clear Preview
               </button>
             </div>
 
             <div style={{ padding: 14 }}>
-              <div
-                style={{
-                  height: 520,
-                  border: "1px dashed #ddd",
-                  borderRadius: 14,
-                  background: "#fafafa",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#666",
-                  fontSize: 13,
-                  textAlign: "center",
-                  padding: 20,
-                }}
-              >
-                Preview area placeholder.
-                <br />
-                We will wire this to KV: <b>generated:project:&lt;projectId&gt;:latest</b> next.
-              </div>
+              {preview.state === "ready" ? (
+                <iframe
+                  title="Preview"
+                  style={{
+                    width: "100%",
+                    height: 560,
+                    border: "1px solid #eee",
+                    borderRadius: 14,
+                    background: "white",
+                  }}
+                  sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+                  srcDoc={preview.html}
+                />
+              ) : (
+                <div
+                  style={{
+                    height: 560,
+                    border: "1px dashed #ddd",
+                    borderRadius: 14,
+                    background: "#fafafa",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#666",
+                    fontSize: 13,
+                    textAlign: "center",
+                    padding: 20,
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {preview.state === "loading"
+                    ? preview.message
+                    : preview.state === "error"
+                      ? preview.message
+                      : preview.message}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Footer hint */}
         <div style={{ marginTop: 14, fontSize: 12, color: "#666" }}>
-          Tip: Keep changes small and commit per fix. You are green — we’re polishing safely now.
+          Next: we will create the API route <b>/api/projects/[projectId]/preview</b> to read KV and
+          return the HTML.
         </div>
       </div>
     </div>
