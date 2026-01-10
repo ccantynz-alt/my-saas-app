@@ -95,7 +95,10 @@ export async function POST(
   try {
     form = await req.formData();
   } catch {
-    return NextResponse.json({ ok: false, error: "Expected multipart/form-data" }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "Expected multipart/form-data" },
+      { status: 400 }
+    );
   }
 
   const file = form.get("file");
