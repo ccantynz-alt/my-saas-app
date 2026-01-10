@@ -81,9 +81,9 @@ export default function ProjectBuilderPage() {
   const [bizEmail, setBizEmail] = useState("");
   const [bizTagline, setBizTagline] = useState("");
 
-  // Conversion Agent typed instruction
+  // Conversion Agent typed instruction (SaaS automation-first)
   const [conversionInstruction, setConversionInstruction] = useState(
-    "Make the hero more aggressive for sales, strengthen the main CTA, and add urgency (ethical)."
+    "Make it premium and conversion-focused for an automated AI website builder SaaS. No quotes, no calls, no meetings. Push actions: Start free, Create project, Generate, Publish, Upgrade to Pro. Add trust: secure, reliable, simple pricing. Add ethical urgency: launch in minutes."
   );
 
   useEffect(() => {
@@ -620,8 +620,6 @@ export default function ProjectBuilderPage() {
       ? "Audit error"
       : "Quality checklist";
 
-  const hasPreview = preview.state === "ready";
-
   return (
     <div style={{ minHeight: "100vh", background: "#fafafa", fontFamily: "system-ui" }}>
       {/* Toast */}
@@ -688,7 +686,7 @@ export default function ProjectBuilderPage() {
                   ? "Import HTML"
                   : modal.kind === "importZip"
                   ? "Import ZIP"
-                  : "Conversion Agent (Sales)"}
+                  : "Conversion Agent (SaaS)"}
               </div>
               <button
                 onClick={() => closeModal()}
@@ -754,21 +752,21 @@ export default function ProjectBuilderPage() {
                     </label>
 
                     <label style={{ display: "grid", gap: 6 }}>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: "#333" }}>Phone</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#333" }}>Phone (optional)</span>
                       <input
                         value={bizPhone}
                         onChange={(e) => setBizPhone(e.target.value)}
-                        placeholder="e.g. +64 ..."
+                        placeholder="(optional)"
                         style={{ border: "1px solid #ddd", borderRadius: 12, padding: 10 }}
                       />
                     </label>
 
                     <label style={{ display: "grid", gap: 6 }}>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: "#333" }}>Email</span>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#333" }}>Email (optional)</span>
                       <input
                         value={bizEmail}
                         onChange={(e) => setBizEmail(e.target.value)}
-                        placeholder="e.g. hello@company.com"
+                        placeholder="(optional)"
                         style={{ border: "1px solid #ddd", borderRadius: 12, padding: 10 }}
                       />
                     </label>
@@ -866,13 +864,13 @@ export default function ProjectBuilderPage() {
               ) : (
                 <>
                   <div style={{ fontSize: 13, color: "#555", lineHeight: 1.4 }}>
-                    Tell the <b>Conversion Agent</b> what to change. This is guarded and safe. You can always <b>Undo</b>.
+                    Tell the <b>Conversion Agent</b> what to improve. This is automation-first. You can always <b>Undo</b>.
                   </div>
 
                   <textarea
                     value={conversionInstruction}
                     onChange={(e) => setConversionInstruction(e.target.value)}
-                    placeholder="e.g. Make the hero more urgent and push phone bookings."
+                    placeholder="Type instructions here…"
                     style={{
                       marginTop: 12,
                       width: "100%",
@@ -887,26 +885,7 @@ export default function ProjectBuilderPage() {
                     }}
                   />
 
-                  <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                    <button
-                      disabled={busy}
-                      onClick={() => {
-                        setConversionInstruction(
-                          "Make the hero more aggressive for sales, strengthen the main CTA, and add urgency (ethical)."
-                        );
-                      }}
-                      style={{
-                        padding: "10px 12px",
-                        borderRadius: 12,
-                        border: "1px solid #ddd",
-                        background: "white",
-                        cursor: busy ? "not-allowed" : "pointer",
-                        fontWeight: 800,
-                      }}
-                    >
-                      Reset example
-                    </button>
-
+                  <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end", gap: 10 }}>
                     <button
                       disabled={busy}
                       onClick={() => runConversionAgent()}
@@ -1004,21 +983,21 @@ export default function ProjectBuilderPage() {
                 Finish for me (AI) — Level 2
               </button>
 
+              {/* IMPORTANT: Always enabled. No preview required. */}
               <button
-                disabled={busy || !hasPreview}
+                disabled={busy}
                 onClick={() => setModal({ open: true, kind: "conversion" })}
-                title={!hasPreview ? "Load or generate a preview first." : "Tell the Conversion Agent what to do."}
                 style={{
                   padding: "12px 14px",
                   borderRadius: 14,
                   border: "1px solid #ddd",
                   background: busy ? "#f3f4f6" : "#111",
                   color: busy ? "#777" : "white",
-                  cursor: busy || !hasPreview ? "not-allowed" : "pointer",
+                  cursor: busy ? "not-allowed" : "pointer",
                   fontWeight: 900,
                 }}
               >
-                Talk to Conversion Agent (Sales)
+                Talk to Conversion Agent (SaaS)
               </button>
 
               <button
@@ -1140,7 +1119,6 @@ export default function ProjectBuilderPage() {
                 ) : (
                   <div>
                     <div style={{ fontWeight: 900, marginBottom: 8 }}>{audit.ok ? "✅ Ready to publish" : "⚠️ Not ready yet"}</div>
-
                     {audit.missing.length > 0 ? (
                       <>
                         <div style={{ fontWeight: 900 }}>Missing</div>
@@ -1151,7 +1129,6 @@ export default function ProjectBuilderPage() {
                         </ul>
                       </>
                     ) : null}
-
                     {audit.warnings.length > 0 ? (
                       <>
                         <div style={{ fontWeight: 900 }}>Warnings</div>
@@ -1162,7 +1139,6 @@ export default function ProjectBuilderPage() {
                         </ul>
                       </>
                     ) : null}
-
                     {audit.notes.length > 0 ? (
                       <>
                         <div style={{ fontWeight: 900 }}>Notes</div>
@@ -1173,7 +1149,6 @@ export default function ProjectBuilderPage() {
                         </ul>
                       </>
                     ) : null}
-
                     {audit.missing.length === 0 && audit.warnings.length === 0 && audit.notes.length === 0 ? (
                       <div style={{ color: "#444" }}>No issues found.</div>
                     ) : null}
