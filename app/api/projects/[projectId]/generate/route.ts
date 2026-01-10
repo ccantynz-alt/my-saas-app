@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { buildDemoHtml, createRun, getProject, setProjectHtml, setRunStatus } from "@/lib/demoStore";
+import {
+  buildDemoHtml,
+  createRun,
+  setProjectHtml,
+  setRunStatus,
+} from "@/lib/demoStore";
 
 export const runtime = "nodejs";
 
@@ -8,10 +13,11 @@ export async function POST(
   { params }: { params: { projectId: string } }
 ) {
   const projectId = params.projectId;
-  const project = getProject(projectId);
-  if (!project) {
-    return NextResponse.json({ ok: false, error: "Project not found" }, { status: 404 });
-  }
+
+  // IMPORTANT:
+  // Do NOT hard-fail if the project record doesn't exist yet.
+  // The demo store can still create/run generation and store HTML for this projectId.
+  // This prevents 404 "Project not found" from killing the flow.
 
   let prompt = "";
   try {
@@ -28,6 +34,7 @@ export async function POST(
 
   const html = buildDemoHtml(prompt || "A professional business website");
   setProjectHtml(projectId, html);
+
   setRunStatus(run.id, "complete");
 
   return NextResponse.json({ ok: true, runId: run.id });
