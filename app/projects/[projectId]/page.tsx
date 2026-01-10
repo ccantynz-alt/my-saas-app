@@ -21,6 +21,7 @@ type Toast = {
 
 type Modal =
   | { open: false }
+  | { open: true; kind: "finish" }
   | { open: true; kind: "importHtml" }
   | { open: true; kind: "importZip" };
 
@@ -28,6 +29,18 @@ type PublishState =
   | { state: "idle" }
   | { state: "publishing" }
   | { state: "published"; url: string }
+  | { state: "error"; message: string };
+
+type AuditResult =
+  | { state: "idle" }
+  | { state: "checking" }
+  | {
+      state: "ready";
+      ok: boolean;
+      missing: string[];
+      warnings: string[];
+      notes: string[];
+    }
   | { state: "error"; message: string };
 
 export default function ProjectBuilderPage() {
@@ -50,13 +63,21 @@ export default function ProjectBuilderPage() {
   });
 
   const [toast, setToast] = useState<Toast | null>(null);
-
   const [modal, setModal] = useState<Modal>({ open: false });
 
   const [htmlToImport, setHtmlToImport] = useState<string>("");
   const [zipFile, setZipFile] = useState<File | null>(null);
 
   const [publish, setPublish] = useState<PublishState>({ state: "idle" });
+  const [audit, setAudit] = useState<AuditResult>({ state: "idle" });
+
+  // Finish-for-me fields
+  const [bizName, setBizName] = useState("");
+  const [bizNiche, setBizNiche] = useState("");
+  const [bizLocation, setBizLocation] = useState("");
+  const [bizPhone, setBizPhone] = useState("");
+  const [bizEmail, setBizEmail] = useState("");
+  const [bizTagline, setBizTagline] = useState("");
 
   useEffect(() => {
     if (!projectId) {
@@ -137,7 +158,49 @@ export default function ProjectBuilderPage() {
     }
   }
 
-  async function generateNow() {
+  async function runAudit() {
+    if (!projectId) return;
+
+    setAudit({ state: "checking" });
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/audit`, { method: "POST" });
+      const text = await res.text();
+
+      if (!res.ok) {
+        setAudit({ state: "error", message: `(${res.status}) ${text}` });
+        return;
+      }
+
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        setAudit({ state: "error", message: `Unexpected response: ${text}` });
+        return;
+      }
+
+      if (!data?.ok) {
+        setAudit({ state: "error", message: `Audit error: ${text}` });
+        return;
+      }
+
+      setAudit({
+        state: "ready",
+        ok: Boolean(data.readyToPublish),
+        missing: Array.isArray(data.missing) ? data.missing : [],
+        warnings: Array.isArray(data.warnings) ? data.warnings : [],
+        notes: Array.isArray(data.notes) ? data.notes : [],
+      });
+    } catch (err: any) {
+      setAudit({
+        state: "error",
+        message: err?.message ? String(err.message) : "Unknown audit error.",
+      });
+    }
+  }
+
+  async function generateWithPrompt(prompt: string) {
     if (!projectId) return;
 
     setBusy(true);
@@ -147,10 +210,7 @@ export default function ProjectBuilderPage() {
       const res = await fetch(`/api/projects/${projectId}/generate`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          prompt:
-            "Create a professional business website with hero, services, testimonials, about, and contact. Clean modern styling.",
-        }),
+        body: JSON.stringify({ prompt }),
       });
 
       const text = await res.text();
@@ -161,7 +221,7 @@ export default function ProjectBuilderPage() {
           title: "Generate failed",
           message: `(${res.status}) ${text}`,
         });
-        return;
+        return false;
       }
 
       setToast({
@@ -171,14 +231,73 @@ export default function ProjectBuilderPage() {
       });
 
       await loadPreview();
+      return true;
     } catch (err: any) {
       setToast({
         tone: "danger",
         title: "Generate error",
         message: err?.message ? String(err.message) : "Unknown error during generate.",
       });
+      return false;
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function finishForMe() {
+    if (!projectId) return;
+
+    const name = bizName.trim();
+    const niche = bizNiche.trim();
+    const location = bizLocation.trim();
+    const phone = bizPhone.trim();
+    const email = bizEmail.trim();
+    const tagline = bizTagline.trim();
+
+    if (!name || !niche) {
+      setToast({
+        tone: "danger",
+        title: "Finish for me",
+        message: "Please fill Business name and Niche (required).",
+      });
+      return;
+    }
+
+    const prompt = [
+      `Create a professional business website as a SINGLE HTML document (include <style> and <script> inline).`,
+      `Design: clean, modern, premium, mobile-first. Use accessible contrast. No external assets.`,
+      `Business name: ${name}`,
+      `Niche: ${niche}`,
+      `Location: ${location || "Not specified"}`,
+      `Phone: ${phone || "Not specified"}`,
+      `Email: ${email || "Not specified"}`,
+      `Tagline: ${tagline || "Not specified"}`,
+      ``,
+      `REQUIREMENTS:`,
+      `- Sticky header with nav links to sections (anchors).`,
+      `- Sections in this order: Hero, Services, Work/Portfolio, About, Testimonials, FAQ, Contact.`,
+      `- Hero must include: headline, short paragraph, primary CTA button (scroll to Contact), secondary CTA (scroll to Services).`,
+      `- Services: 3-6 service cards with short descriptions.`,
+      `- Work: 3 cards showing example projects (generic).`,
+      `- Testimonials: 3 quotes.`,
+      `- FAQ: 4 questions.`,
+      `- Contact section: show phone/email/location and a contact form (front-end only).`,
+      `- Footer with copyright and quick links.`,
+      ``,
+      `FORM BEHAVIOR (front-end only):`,
+      `- Validate required fields, show success message without reloading.`,
+      ``,
+      `SEO:`,
+      `- Set <title>, meta description, and Open Graph basics.`,
+      ``,
+      `OUTPUT: return ONLY the final HTML document.`,
+    ].join("\n");
+
+    const ok = await generateWithPrompt(prompt);
+    if (ok) {
+      setModal({ open: false });
+      setAudit({ state: "idle" });
+      await runAudit();
     }
   }
 
@@ -224,6 +343,8 @@ export default function ProjectBuilderPage() {
 
       setModal({ open: false });
       await loadPreview();
+      setAudit({ state: "idle" });
+      await runAudit();
     } catch (err: any) {
       setToast({
         tone: "danger",
@@ -278,6 +399,8 @@ export default function ProjectBuilderPage() {
 
       setModal({ open: false });
       await loadPreview();
+      setAudit({ state: "idle" });
+      await runAudit();
     } catch (err: any) {
       setToast({
         tone: "danger",
@@ -297,11 +420,6 @@ export default function ProjectBuilderPage() {
     setPublish({ state: "publishing" });
 
     try {
-      // Expected route (already in your repo):
-      // POST /api/projects/:projectId/publish
-      // This should return JSON with either:
-      // - { ok: true, url: "/p/<projectId>" }  (or full URL)
-      // or it may return { ok: true, path: "/p/<projectId>" }
       const res = await fetch(`/api/projects/${projectId}/publish`, {
         method: "POST",
       });
@@ -322,7 +440,6 @@ export default function ProjectBuilderPage() {
       try {
         data = JSON.parse(text);
       } catch {
-        // If the endpoint ever returns plain text, handle it.
         const maybeUrl = text.trim();
         if (maybeUrl) {
           setPublish({ state: "published", url: maybeUrl });
@@ -374,7 +491,6 @@ export default function ProjectBuilderPage() {
     const trimmed = url.trim();
     if (!trimmed) return "";
     if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
-    // If API returns a path like /p/<projectId>, turn it into a full URL using current origin.
     if (trimmed.startsWith("/")) return `${window.location.origin}${trimmed}`;
     return `${window.location.origin}/${trimmed}`;
   }
@@ -461,6 +577,26 @@ export default function ProjectBuilderPage() {
   const publishedUrl =
     publish.state === "published" ? normalizePublishedUrl(publish.url) : "";
 
+  const auditTone: ToastTone =
+    audit.state === "ready"
+      ? audit.ok
+        ? "success"
+        : "danger"
+      : audit.state === "error"
+        ? "danger"
+        : "neutral";
+
+  const auditTitle =
+    audit.state === "ready"
+      ? audit.ok
+        ? "Ready to publish"
+        : "Needs fixes"
+      : audit.state === "checking"
+        ? "Checking…"
+        : audit.state === "error"
+          ? "Audit error"
+          : "Quality checklist";
+
   return (
     <div style={{ minHeight: "100vh", background: "#fafafa", fontFamily: "system-ui" }}>
       {/* Toast */}
@@ -528,7 +664,11 @@ export default function ProjectBuilderPage() {
               }}
             >
               <div style={{ fontWeight: 900, color: "#111" }}>
-                {modal.kind === "importHtml" ? "Import HTML" : "Import ZIP"}
+                {modal.kind === "finish"
+                  ? "Finish for me (AI)"
+                  : modal.kind === "importHtml"
+                    ? "Import HTML"
+                    : "Import ZIP"}
               </div>
               <button
                 onClick={() => closeModal()}
@@ -546,7 +686,129 @@ export default function ProjectBuilderPage() {
             </div>
 
             <div style={{ padding: 14 }}>
-              {modal.kind === "importHtml" ? (
+              {modal.kind === "finish" ? (
+                <>
+                  <div style={{ fontSize: 13, color: "#555", lineHeight: 1.4 }}>
+                    Fill the details and click <b>Finish for me</b>. This will generate a complete
+                    website and run a quality checklist.
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 12,
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 10,
+                    }}
+                  >
+                    <label style={{ display: "grid", gap: 6 }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#333" }}>
+                        Business name (required)
+                      </span>
+                      <input
+                        value={bizName}
+                        onChange={(e) => setBizName(e.target.value)}
+                        placeholder="e.g. Book A Ride"
+                        style={{
+                          border: "1px solid #ddd",
+                          borderRadius: 12,
+                          padding: 10,
+                        }}
+                      />
+                    </label>
+
+                    <label style={{ display: "grid", gap: 6 }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#333" }}>
+                        Niche (required)
+                      </span>
+                      <input
+                        value={bizNiche}
+                        onChange={(e) => setBizNiche(e.target.value)}
+                        placeholder="e.g. Airport shuttle service"
+                        style={{
+                          border: "1px solid #ddd",
+                          borderRadius: 12,
+                          padding: 10,
+                        }}
+                      />
+                    </label>
+
+                    <label style={{ display: "grid", gap: 6 }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#333" }}>Location</span>
+                      <input
+                        value={bizLocation}
+                        onChange={(e) => setBizLocation(e.target.value)}
+                        placeholder="e.g. Auckland, NZ"
+                        style={{
+                          border: "1px solid #ddd",
+                          borderRadius: 12,
+                          padding: 10,
+                        }}
+                      />
+                    </label>
+
+                    <label style={{ display: "grid", gap: 6 }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#333" }}>Tagline</span>
+                      <input
+                        value={bizTagline}
+                        onChange={(e) => setBizTagline(e.target.value)}
+                        placeholder="e.g. Reliable rides, on time"
+                        style={{
+                          border: "1px solid #ddd",
+                          borderRadius: 12,
+                          padding: 10,
+                        }}
+                      />
+                    </label>
+
+                    <label style={{ display: "grid", gap: 6 }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#333" }}>Phone</span>
+                      <input
+                        value={bizPhone}
+                        onChange={(e) => setBizPhone(e.target.value)}
+                        placeholder="e.g. +64 ..."
+                        style={{
+                          border: "1px solid #ddd",
+                          borderRadius: 12,
+                          padding: 10,
+                        }}
+                      />
+                    </label>
+
+                    <label style={{ display: "grid", gap: 6 }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#333" }}>Email</span>
+                      <input
+                        value={bizEmail}
+                        onChange={(e) => setBizEmail(e.target.value)}
+                        placeholder="e.g. hello@company.com"
+                        style={{
+                          border: "1px solid #ddd",
+                          borderRadius: 12,
+                          padding: 10,
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                    <button
+                      disabled={busy}
+                      onClick={() => finishForMe()}
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: 14,
+                        border: "1px solid #ddd",
+                        background: busy ? "#f3f4f6" : "#111",
+                        color: busy ? "#777" : "white",
+                        cursor: busy ? "not-allowed" : "pointer",
+                        fontWeight: 900,
+                      }}
+                    >
+                      {busy ? "Working…" : "Finish for me"}
+                    </button>
+                  </div>
+                </>
+              ) : modal.kind === "importHtml" ? (
                 <>
                   <div style={{ fontSize: 13, color: "#555", lineHeight: 1.4 }}>
                     Paste a full HTML document. Then click <b>Import HTML</b>.
@@ -718,27 +980,22 @@ export default function ProjectBuilderPage() {
             }}
           >
             <div style={{ fontSize: 13, fontWeight: 700, color: "#111" }}>Actions</div>
-            <div style={{ marginTop: 10, fontSize: 13, color: "#555", lineHeight: 1.4 }}>
-              Generate → writes HTML → Preview reads KV via <b>/api/projects/&lt;projectId&gt;/preview</b>.
-              <br />
-              Publish calls <b>POST /api/projects/&lt;projectId&gt;/publish</b>.
-            </div>
 
             <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
               <button
                 disabled={busy}
-                onClick={() => generateNow()}
+                onClick={() => setModal({ open: true, kind: "finish" })}
                 style={{
                   padding: "12px 14px",
                   borderRadius: 14,
                   border: "1px solid #ddd",
-                  background: busy ? "#f3f4f6" : "#111",
+                  background: busy ? "#f3f4f6" : "#0b5fff",
                   color: busy ? "#777" : "white",
                   cursor: busy ? "not-allowed" : "pointer",
-                  fontWeight: 700,
+                  fontWeight: 900,
                 }}
               >
-                {busy ? "Working…" : "Generate"}
+                Finish for me (AI)
               </button>
 
               <button
@@ -788,12 +1045,27 @@ export default function ProjectBuilderPage() {
 
               <button
                 disabled={busy}
+                onClick={() => runAudit()}
+                style={{
+                  padding: "12px 14px",
+                  borderRadius: 14,
+                  border: "1px solid #ddd",
+                  background: "white",
+                  cursor: busy ? "not-allowed" : "pointer",
+                  fontWeight: 800,
+                }}
+              >
+                Run quality check
+              </button>
+
+              <button
+                disabled={busy}
                 onClick={() => publishNow()}
                 style={{
                   padding: "12px 14px",
                   borderRadius: 14,
                   border: "1px solid #ddd",
-                  background: busy ? "#f3f4f6" : "#0b5fff",
+                  background: busy ? "#f3f4f6" : "#111",
                   color: busy ? "#777" : "white",
                   cursor: busy ? "not-allowed" : "pointer",
                   fontWeight: 900,
@@ -801,6 +1073,82 @@ export default function ProjectBuilderPage() {
               >
                 {publish.state === "publishing" ? "Publishing…" : "Publish"}
               </button>
+            </div>
+
+            {/* Audit panel */}
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: "#111" }}>{auditTitle}</div>
+
+              <div
+                style={{
+                  marginTop: 10,
+                  border: "1px solid #eee",
+                  borderRadius: 14,
+                  padding: 12,
+                  background:
+                    auditTone === "success"
+                      ? "#f0fff4"
+                      : auditTone === "danger"
+                        ? "#fff5f5"
+                        : "#fafafa",
+                  fontSize: 13,
+                  color: "#111",
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {audit.state === "idle" ? (
+                  <div style={{ color: "#444" }}>
+                    Click <b>Run quality check</b> after Generate/Import. This checks for required sections and basic SEO.
+                  </div>
+                ) : audit.state === "checking" ? (
+                  <div style={{ color: "#444" }}>Checking your HTML…</div>
+                ) : audit.state === "error" ? (
+                  <div style={{ color: "#111" }}>{audit.message}</div>
+                ) : (
+                  <div>
+                    <div style={{ fontWeight: 900, marginBottom: 8 }}>
+                      {audit.ok ? "✅ Ready to publish" : "⚠️ Not ready yet"}
+                    </div>
+
+                    {audit.missing.length > 0 ? (
+                      <>
+                        <div style={{ fontWeight: 900 }}>Missing</div>
+                        <ul style={{ marginTop: 6, marginBottom: 10 }}>
+                          {audit.missing.map((m) => (
+                            <li key={m}>{m}</li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : null}
+
+                    {audit.warnings.length > 0 ? (
+                      <>
+                        <div style={{ fontWeight: 900 }}>Warnings</div>
+                        <ul style={{ marginTop: 6, marginBottom: 10 }}>
+                          {audit.warnings.map((w) => (
+                            <li key={w}>{w}</li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : null}
+
+                    {audit.notes.length > 0 ? (
+                      <>
+                        <div style={{ fontWeight: 900 }}>Notes</div>
+                        <ul style={{ marginTop: 6, marginBottom: 0 }}>
+                          {audit.notes.map((n) => (
+                            <li key={n}>{n}</li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : null}
+
+                    {audit.missing.length === 0 && audit.warnings.length === 0 && audit.notes.length === 0 ? (
+                      <div style={{ color: "#444" }}>No issues found.</div>
+                    ) : null}
+                  </div>
+                )}
+              </div>
             </div>
 
             {publish.state === "published" ? (
@@ -839,48 +1187,6 @@ export default function ProjectBuilderPage() {
                 <div style={{ marginTop: 8 }}>{publish.message}</div>
               </div>
             ) : null}
-
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#111" }}>Status</div>
-              <div
-                style={{
-                  marginTop: 10,
-                  border: "1px solid #eee",
-                  borderRadius: 14,
-                  padding: 12,
-                  background: "#fafafa",
-                  fontSize: 13,
-                  color: "#333",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                  <span>Builder</span>
-                  <span style={{ fontWeight: 700 }}>{status}</span>
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    marginTop: 6,
-                  }}
-                >
-                  <span>Preview</span>
-                  <span style={{ fontWeight: 700 }}>{preview.state}</span>
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    marginTop: 6,
-                  }}
-                >
-                  <span>Publish</span>
-                  <span style={{ fontWeight: 700 }}>{publish.state}</span>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Right panel */}
@@ -896,17 +1202,11 @@ export default function ProjectBuilderPage() {
               style={{
                 padding: 14,
                 borderBottom: "1px solid #eee",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
               }}
             >
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: "#111" }}>Preview</div>
-                <div style={{ marginTop: 4, fontSize: 13, color: "#555" }}>
-                  srcDoc iframe from KV-backed API route.
-                </div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#111" }}>Preview</div>
+              <div style={{ marginTop: 4, fontSize: 13, color: "#555" }}>
+                Loads from <b>/api/projects/&lt;projectId&gt;/preview</b>
               </div>
             </div>
 
@@ -953,7 +1253,7 @@ export default function ProjectBuilderPage() {
         </div>
 
         <div style={{ marginTop: 14, fontSize: 12, color: "#666" }}>
-          Next: show the published page inline and add a “Copy link” button.
+          Level 2: Finish for me → Quality check → Publish.
         </div>
       </div>
     </div>
