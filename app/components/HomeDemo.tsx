@@ -7,7 +7,6 @@ export default function HomeDemo() {
     <section id="demo" className="bg-white py-16 md:py-24">
       <div className="mx-auto w-full max-w-6xl px-6">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-2 md:items-center">
-          {/* LEFT */}
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-semibold text-zinc-700 shadow-sm">
               <span className="h-2 w-2 rounded-full bg-zinc-900" />
@@ -41,11 +40,11 @@ export default function HomeDemo() {
             </div>
 
             <div className="mt-6 text-xs text-zinc-500">
-              No signup required to explore. Real publishing happens inside the app.
+              No signup required to explore. Real publishing happens inside the
+              app.
             </div>
           </div>
 
-          {/* RIGHT — VISUAL MOCK */}
           <div className="rounded-3xl border border-zinc-200 bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-3">
               <div className="flex items-center gap-2">
@@ -60,9 +59,7 @@ export default function HomeDemo() {
 
             <div className="p-6">
               <div className="rounded-2xl bg-zinc-50 p-5">
-                <div className="text-xs font-semibold text-zinc-500">
-                  Prompt
-                </div>
+                <div className="text-xs font-semibold text-zinc-500">Prompt</div>
                 <div className="mt-2 text-sm font-semibold text-zinc-800">
                   “Create a premium SaaS website with a hero, features, pricing,
                   FAQ, and a strong CTA. Clean, modern design.”
@@ -89,9 +86,7 @@ export default function HomeDemo() {
                   <div className="mt-2 text-sm font-extrabold text-zinc-900">
                     One click
                   </div>
-                  <div className="mt-1 text-xs text-zinc-600">
-                    Public URL
-                  </div>
+                  <div className="mt-1 text-xs text-zinc-600">Public URL</div>
                 </div>
               </div>
 
@@ -110,4 +105,3 @@ export default function HomeDemo() {
     </section>
   );
 }
-
