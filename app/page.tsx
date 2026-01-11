@@ -13,7 +13,8 @@ import {
   Code2,
   Rocket,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import HomeDemo from "./components/HomeDemo";
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -152,6 +153,12 @@ function Nav() {
               Pricing
             </Link>
             <Link
+              href="#demo"
+              className="text-sm font-semibold text-zinc-700 hover:text-zinc-900"
+            >
+              Demo
+            </Link>
+            <Link
               href="/projects"
               className="text-sm font-semibold text-zinc-700 hover:text-zinc-900"
             >
@@ -239,9 +246,7 @@ function PricingCard({
     <div
       className={cn(
         "relative rounded-3xl border bg-white p-7 shadow-sm",
-        highlight
-          ? "border-black shadow-md"
-          : "border-zinc-200 hover:shadow-md"
+        highlight ? "border-black shadow-md" : "border-zinc-200 hover:shadow-md"
       )}
     >
       {highlight ? (
@@ -255,9 +260,7 @@ function PricingCard({
         <div className="text-4xl font-extrabold tracking-tight text-zinc-900">
           {price}
         </div>
-        <div className="pb-1 text-sm font-semibold text-zinc-500">
-          / month
-        </div>
+        <div className="pb-1 text-sm font-semibold text-zinc-500">/ month</div>
       </div>
 
       <div className="mt-5">
@@ -280,13 +283,7 @@ function PricingCard({
   );
 }
 
-function FAQ({
-  q,
-  a,
-}: {
-  q: string;
-  a: string;
-}) {
+function FAQ({ q, a }: { q: string; a: string }) {
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
       <div className="text-sm font-extrabold text-zinc-900">{q}</div>
@@ -312,6 +309,9 @@ function Footer() {
             </Link>
             <Link href="#features" className="hover:text-zinc-900">
               Features
+            </Link>
+            <Link href="#demo" className="hover:text-zinc-900">
+              Demo
             </Link>
           </div>
         </div>
@@ -360,7 +360,7 @@ export default function HomePage() {
 
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                   <PrimaryButton href="/projects">Start building now</PrimaryButton>
-                  <SecondaryButton href="#how">See how it works</SecondaryButton>
+                  <SecondaryButton href="#demo">Try live demo</SecondaryButton>
                 </div>
 
                 <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -452,33 +452,6 @@ export default function HomePage() {
         </Container>
       </section>
 
-      {/* LOGO STRIP */}
-      <section className="border-y border-zinc-200 bg-white">
-        <Container>
-          <div className="py-10">
-            <div className="text-center text-xs font-semibold text-zinc-500">
-              Built for speed, reliability, and a clean handoff to real code
-            </div>
-            <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-              {[
-                { icon: <Rocket className="h-5 w-5" />, label: "Ship faster" },
-                { icon: <Shield className="h-5 w-5" />, label: "Production-minded" },
-                { icon: <Code2 className="h-5 w-5" />, label: "Developer-friendly" },
-                { icon: <Globe className="h-5 w-5" />, label: "Global-ready" },
-              ].map((x) => (
-                <div
-                  key={x.label}
-                  className="flex items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-white p-4 text-sm font-semibold text-zinc-700 shadow-sm"
-                >
-                  <span className="text-zinc-900">{x.icon}</span>
-                  {x.label}
-                </div>
-              ))}
-            </div>
-          </div>
-        </Container>
-      </section>
-
       {/* FEATURES */}
       <section id="features" className="bg-zinc-50 py-16 md:py-24">
         <Container>
@@ -524,7 +497,7 @@ export default function HomePage() {
             <Feature
               icon={<Rocket className="h-5 w-5" />}
               title="Momentum-first"
-              text="Make shipping the default. “Perfect later” is a roadmap item, not a blocker."
+              text="Make shipping the default."
             />
           </div>
         </Container>
@@ -541,8 +514,7 @@ export default function HomePage() {
               Three steps. No drama.
             </div>
             <p className="mt-4 text-sm leading-6 text-zinc-600 md:text-base">
-              This is designed for solo founders and lean teams: minimal steps,
-              maximum output.
+              Minimal steps, maximum output.
             </p>
           </div>
 
@@ -550,17 +522,17 @@ export default function HomePage() {
             <Step
               number="1"
               title="Describe the site"
-              text="Tell us what you’re building and who it’s for. We generate a structured, modern layout."
+              text="Tell us what you’re building and who it’s for."
             />
             <Step
               number="2"
               title="Generate & preview"
-              text="Review the site output immediately. Iterate prompts until it matches the vibe."
+              text="Review output instantly. Iterate until it matches your vibe."
             />
             <Step
               number="3"
               title="Publish and share"
-              text="One click → public URL. Perfect for validation, sales, or a fast MVP."
+              text="One click → public URL. Perfect for validation and MVPs."
             />
           </div>
         </Container>
@@ -574,10 +546,6 @@ export default function HomePage() {
             <div className="mt-3 text-3xl font-extrabold tracking-tight text-zinc-900 md:text-4xl">
               Start free. Upgrade when it pays for itself.
             </div>
-            <p className="mt-4 text-sm leading-6 text-zinc-600 md:text-base">
-              Keep this aligned with your actual enforcement logic. These are
-              safe defaults for a clean marketing page today.
-            </p>
           </div>
 
           <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -585,11 +553,7 @@ export default function HomePage() {
               name="Free"
               price="$0"
               cta={{ label: "Try the builder", href: "/projects" }}
-              features={[
-                "Generate & preview",
-                "Publish via MVP pipeline",
-                "Basic templates (coming soon)",
-              ]}
+              features={["Generate & preview", "Publish via MVP pipeline", "Templates (coming soon)"]}
             />
             <PricingCard
               name="Pro"
@@ -600,7 +564,6 @@ export default function HomePage() {
                 "More generations / limits lifted",
                 "Faster iteration workflow",
                 "Branding controls (coming soon)",
-                "Priority reliability improvements",
               ]}
             />
             <PricingCard
@@ -611,26 +574,8 @@ export default function HomePage() {
                 "Team workflows (coming soon)",
                 "Shared templates / components",
                 "Publishing governance",
-                "Support & onboarding",
               ]}
             />
-          </div>
-
-          <div className="mt-10 rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
-            <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
-              <div>
-                <div className="text-lg font-extrabold text-zinc-900">
-                  Ready to ship your next site?
-                </div>
-                <div className="mt-1 text-sm text-zinc-600">
-                  Build, publish, and share a link today.
-                </div>
-              </div>
-              <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-                <PrimaryButton href="/projects">Start building</PrimaryButton>
-                <SecondaryButton href="#features">See features</SecondaryButton>
-              </div>
-            </div>
           </div>
         </Container>
       </section>
@@ -648,23 +593,26 @@ export default function HomePage() {
           <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2">
             <FAQ
               q="Is this a real publish pipeline?"
-              a="Yes. It generates content and publishes a public URL. Persistence and auth can be added post-launch."
+              a="Yes. Publish2 is a reliable MVP path. Persistence and auth come post-launch."
             />
             <FAQ
               q="Do I need to code?"
-              a="No. Start with prompts. Later, you can extend and refine like a normal Next.js app."
+              a="No. Start with prompts. Later, you can refine output like any Next.js project."
             />
             <FAQ
               q="Is it ethical conversion?"
-              a="Yes. We optimize clarity and trust: clean layout, proof, and straightforward CTAs."
+              a="Yes. We optimize clarity and trust with clean layouts and straightforward CTAs."
             />
             <FAQ
               q="Can this become KV/DB-backed later?"
-              a="Absolutely. The UX stays the same — we only swap storage behind the scenes."
+              a="Yes. The UX stays identical; storage swaps behind the scenes."
             />
           </div>
         </Container>
       </section>
+
+      {/* LIVE DEMO (REAL API CALLS) */}
+      <HomeDemo />
 
       <Footer />
     </div>
