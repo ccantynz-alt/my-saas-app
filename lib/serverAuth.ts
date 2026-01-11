@@ -1,10 +1,17 @@
-import { auth } from "@clerk/nextjs/server";
+export type AuthResult =
+  | { ok: true; userId: string; source: "dev-header" }
+  | { ok: false; status: number; error: string };
 
-/**
- * Always returns a userId or null.
- * Safe for API routes.
- */
-export async function getCurrentUserId(): Promise<string | null> {
-  const session = await auth();
-  return session.userId ?? null;
+export async function requireUserId(req: Request): Promise<AuthResult> {
+  // Dev-only header auth (matches your locked-in approach)
+  if (process.env.NODE_ENV !== "production") {
+    const devUser = req.headers.get("x-dev-user");
+    if (devUser) {
+      return { ok: true, userId: devUser, source: "dev-header" };
+    }
+    return { ok: false, status: 401, error: "Missing x-dev-user header (dev)" };
+  }
+
+  // Production: secure default (until real Clerk auth is wired)
+  return { ok: false, status: 401, error: "Unauthenticated" };
 }
