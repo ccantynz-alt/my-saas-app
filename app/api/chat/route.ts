@@ -1,32 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 
-<<<<<<< HEAD
-=======
-// Important: never crash at import-time during build
->>>>>>> f11fe85 (Fix build: remove export/static output so API routes build)
+// Never crash at import-time during build:
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest) {
+export async function POST(
+  req: NextRequest
+) {
   try {
-<<<<<<< HEAD
-    // Parse body safely
-    const body = await req.json().catch(() => ({} as any));
-    const message = typeof body?.message === "string" ? body.message : "";
-
-    // Never throw at import-time during builds. Validate env here instead.
-    const openaiKey = process.env.OPENAI_API_KEY;
-
-    // If you haven't configured OPENAI_API_KEY yet, return a safe response
-    // (prevents "Failed to collect page data" from import-time crashes)
-=======
-    const body = await req.json().catch(() => ({} as any));
+    const body = await req.json().catch(() => ({ } as any));
     const message = typeof body?.message === "string" ? body.message : "";
 
     // Validate env INSIDE the handler (never at top-level)
     const openaiKey = process.env.OPENAI_API_KEY;
 
->>>>>>> f11fe85 (Fix build: remove export/static output so API routes build)
+    // If not configured yet, return a safe response (keeps build green)
     if (!openaiKey) {
       return NextResponse.json(
         {
@@ -38,14 +26,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-<<<<<<< HEAD
-    // TODO: Replace this with your real chat implementation.
-    // This placeholder keeps builds green and proves the route works.
-=======
-    // Stub response to keep build green.
-    // Replace with real OpenAI call later.
->>>>>>> f11fe85 (Fix build: remove export/static output so API routes build)
-    return NextResponse.json({
+    // Stub response for now (replace with real OpenAI call later)
+    return NextResponse.json( {
       ok: true,
       reply: `Stub reply received: ${message || "(no message)"}`,
     });
