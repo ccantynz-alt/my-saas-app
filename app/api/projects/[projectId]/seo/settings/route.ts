@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUserId } from "@/lib/serverAuth";
+import { requireUserId } from "../../../../../../lib/serverAuth";
 
 export async function GET(
   req: Request,
