@@ -1,21 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireUserId } from "../../../../../lib/serverAuth";
 
-export async function GET(
+export async function POST(
   req: Request,
   { params }: { params: { projectId: string } }
 ) {
-  const userId = await getCurrentUserId();
-
-  if (!userId) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 }
-    );
-  }
-
   return NextResponse.json({
     ok: true,
-    projectId: params.projectId,
+    route: "seo",
+    marker: "SEO-STUB-V2",
+    projectId: params.projectId
   });
 }
