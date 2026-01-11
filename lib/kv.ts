@@ -1,12 +1,6 @@
 ﻿import "server-only";
 import { kv as vercelKv } from "@vercel/kv";
 
-/**
- * ROOT KV MODULE
- * This file satisfies ALL imports like:
- *   ../../../lib/kv
- */
-
 export const kv = vercelKv;
 
 export function kvNowISO() {

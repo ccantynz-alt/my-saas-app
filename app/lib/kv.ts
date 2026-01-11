@@ -1,11 +1,11 @@
 ﻿import "server-only";
 import { kv as vercelKv } from "@vercel/kv";
 
-/**
- * Vercel KV wrapper.
- * Keeping this file small + server-only prevents accidental client imports.
- */
 export const kv = vercelKv;
+
+export function kvNowISO() {
+  return new Date().toISOString();
+}
 
 export async function kvJsonGet<T = unknown>(key: string): Promise<T | null> {
   const value = await kv.get<T>(key);
