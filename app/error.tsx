@@ -1,79 +1,47 @@
-// app/error.tsx
-"use client";
+﻿'use client';
 
-import { useEffect } from "react";
-
-export default function GlobalError({
+export default function Error({
   error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    // Logs to browser console for quick visibility
-    console.error("App error:", error);
-  }, [error]);
-
   return (
-    <main style={{ padding: 24, fontFamily: "ui-sans-serif, system-ui" }}>
-      <h1 style={{ fontSize: 20, fontWeight: 800 }}>Application error</h1>
-      <p style={{ marginTop: 10 }}>
-        A server-side exception occurred. This page is here so you can see the actual error message instead
-        of a generic digest screen.
+    <div style={{ fontFamily: 'system-ui', padding: 24 }}>
+      <h1 style={{ margin: 0, fontSize: 22 }}>Something went wrong</h1>
+      <p style={{ marginTop: 10, color: '#666' }}>
+        An unexpected error occurred while rendering this page.
       </p>
 
-      <div style={{ marginTop: 16 }}>
-        <div style={{ fontWeight: 700 }}>Message</div>
-        <pre
-          style={{
-            marginTop: 8,
-            padding: 12,
-            background: "#111",
-            color: "#fff",
-            borderRadius: 10,
-            overflowX: "auto",
-            fontSize: 12,
-          }}
-        >
-          {String(error?.message || error)}
-        </pre>
-      </div>
-
-      <div style={{ marginTop: 16 }}>
-        <div style={{ fontWeight: 700 }}>Digest</div>
-        <pre
-          style={{
-            marginTop: 8,
-            padding: 12,
-            background: "#111",
-            color: "#fff",
-            borderRadius: 10,
-            overflowX: "auto",
-            fontSize: 12,
-          }}
-        >
-          {String((error as any)?.digest || "no digest")}
-        </pre>
-      </div>
+      <pre
+        style={{
+          marginTop: 16,
+          padding: 12,
+          background: '#111',
+          color: '#eee',
+          borderRadius: 8,
+          overflowX: 'auto',
+          whiteSpace: 'pre-wrap',
+        }}
+      >
+        {String(error?.message ?? error)}
+      </pre>
 
       <button
         onClick={() => reset()}
         style={{
           marginTop: 16,
-          padding: "10px 14px",
+          padding: '10px 14px',
           borderRadius: 10,
-          border: "1px solid #ccc",
-          cursor: "pointer",
-          fontWeight: 700,
+          border: '1px solid #ddd',
+          background: '#fff',
+          cursor: 'pointer',
+          fontWeight: 600,
         }}
       >
-        Retry
+        Try again
       </button>
-
-      <p style={{ marginTop: 16 }}>
-        Next: open <code>/api/kv-test</code> and <code>/api/projects</code> and paste the JSON here.
-      </p>
-    </main>
+    </div>
   );
 }
