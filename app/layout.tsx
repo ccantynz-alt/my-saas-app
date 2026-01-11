@@ -1,8 +1,9 @@
 import "./globals.css";
+import { ClerkProvider } from "@clerk/nextjs";
 
 export const metadata = {
-  title: "MySaaS Builder",
-  description: "Premium AI website builder",
+  title: "My SaaS App",
+  description: "AI website builder",
 };
 
 export default function RootLayout({
@@ -11,10 +12,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="bg-white text-zinc-900 antialiased">
-        {children}
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en">
+        <body>{children}</body>
+      </html>
+    </ClerkProvider>
   );
 }
