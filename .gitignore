@@ -7,7 +7,12 @@ out
 
 # env files
 .env
-.env.local
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_or_test_REPLACE_ME
+CLERK_SECRET_KEY=sk_live_or_test_REPLACE_ME
+KV_REST_API_URL=REPLACE_ME
+KV_REST_API_TOKEN=REPLACE_ME
+KV_REST_API_READ_ONLY_TOKEN=REPLACE_ME
+
 .env.*.local
 
 # logs

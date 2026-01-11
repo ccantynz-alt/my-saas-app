@@ -24,7 +24,12 @@ export default async function DomainCatchAllPage() {
             / KV_REST_API_TOKEN are not set in this environment.
           </p>
           <p className="text-gray-600 mb-6">
-            Add these to <code className="px-1 py-0.5 bg-gray-100 rounded">.env.local</code>{" "}
+            Add these to <code className="px-1 py-0.5 bg-gray-100 rounded">NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_or_test_REPLACE_ME
+CLERK_SECRET_KEY=sk_live_or_test_REPLACE_ME
+KV_REST_API_URL=REPLACE_ME
+KV_REST_API_TOKEN=REPLACE_ME
+KV_REST_API_READ_ONLY_TOKEN=REPLACE_ME
+</code>{" "}
             (Codespaces) and to Vercel Environment Variables (Production).
           </p>
           <div className="flex gap-3">
