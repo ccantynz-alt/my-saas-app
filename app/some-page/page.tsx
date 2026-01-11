@@ -1,51 +1,54 @@
-"use client";
-
-import { useState } from "react";
 import PublishButton from "./PublishButton";
 
-async function publishProject(projectId: string) {
+async function publishProjectAction(projectId: string) {
   const res = await fetch(`/api/projects/${projectId}/publish`, {
     method: "POST",
+    headers: { "content-type": "application/json" },
   });
 
-  const data = await res.json().catch(() => null);
-  if (!res.ok || !data?.ok) {
-    throw new Error(data?.error || `Publish failed (${res.status})`);
+  // IMPORTANT: read text first so we don't crash if the server returns HTML
+  const text = await res.text();
+
+  let data: any = null;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    // If HTML comes back, surface a useful error
+    throw new Error(
+      `Expected JSON but received non-JSON response.\nStatus: ${res.status}\nFirst 200 chars:\n${text.slice(
+        0,
+        200
+      )}`
+    );
   }
+
+  if (!res.ok || !data?.ok) {
+    throw new Error(data?.error || `Publish failed (HTTP ${res.status})`);
+  }
+
   return data;
 }
 
 export default function Page() {
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [msg, setMsg] = useState<string>("");
-
-  // TODO: replace with your real project id source (route param, state, etc.)
-  const projectId = "REPLACE_ME";
+  // Replace this with the real projectId for the page you're testing.
+  // If you don't know it yet, leave it as-is and just ensure the build passes first.
+  const projectId = "proj_REPLACE_ME";
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1>Publish</h1>
+    <main style={{ padding: 24, fontFamily: "system-ui, Arial" }}>
+      <h1 style={{ margin: 0 }}>Publish Test</h1>
+      <p style={{ marginTop: 8, opacity: 0.8 }}>
+        This page tests publishing a project via the API route.
+      </p>
 
       <div style={{ marginTop: 12 }}>
-        <PublishButton
-          disabled={isPublishing}
-          onClick={async () => {
-            try {
-              setIsPublishing(true);
-              setMsg("Publishing...");
-              await publishProject(projectId);
-              setMsg("Published ✅");
-            } catch (e: any) {
-              setMsg(e?.message || "Publish failed");
-            } finally {
-              setIsPublishing(false);
-            }
-          }}
-        />
+        <PublishButton action={publishProjectAction} projectId={projectId} />
       </div>
 
-      <p style={{ marginTop: 12 }}>{msg}</p>
+      <p style={{ marginTop: 12, fontSize: 12, opacity: 0.75 }}>
+        Note: If you see an error about HTML/DOCTYPE, it means the API returned an
+        HTML page (often a redirect/auth page or 404), not JSON.
+      </p>
     </main>
   );
 }
-
