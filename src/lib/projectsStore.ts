@@ -17,10 +17,10 @@ export type ProjectRecord = {
 
   status?: "draft" | "generating" | "ready" | "error" | string;
 
-  // Optional fields that some generator routes may attach
-  prompt?: string;
-  generatedHtml?: string;
-  lastGeneratedAt?: number;
+  // Optional fields that some generator routes may attach (routes sometimes send null)
+  prompt?: string | null;
+  generatedHtml?: string | null;
+  lastGeneratedAt?: number | null;
 
   data?: any;
 
