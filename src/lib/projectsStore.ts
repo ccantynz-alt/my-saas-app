@@ -4,7 +4,12 @@ export type ProjectRecord = {
   id: string;
   name: string;
   templateId?: string | null;
+
+  // Backwards compatibility:
+  // Some routes expect project.userId, others use project.ownerId.
+  userId?: string | null;
   ownerId?: string | null;
+
   createdAt: string;
   updatedAt: string;
   status?: "draft" | "generating" | "ready" | "error" | string;
@@ -81,15 +86,13 @@ export function userProjectsIndexKey(userId: string) {
   return `projects:user:${userId}`;
 }
 
-// --------- Missing exports expected by routes ----------
+// --------- Exports expected by existing routes ----------
 export function newProjectId(): string {
-  // deterministic enough + safe for URLs
   const rand = Math.random().toString(16).slice(2);
   return `proj_${Date.now().toString(16)}${rand}`;
 }
 
 export async function saveProject(project: ProjectRecord): Promise<ProjectRecord> {
-  // alias used by existing routes
   return upsertProject(project);
 }
 
@@ -108,19 +111,28 @@ export async function upsertProject(project: ProjectRecord): Promise<ProjectReco
     updatedAt: nowIso(),
   };
 
+  // Keep userId/ownerId in sync so older/newer code paths both work
+  if (p.ownerId && !p.userId) p.userId = p.ownerId;
+  if (p.userId && !p.ownerId) p.ownerId = p.userId;
+
   const wroteKv = await kvSafeSet(projectKey(p.id), p);
   if (wroteKv) {
     await kvSafeSAdd(projectsIndexKey(), p.id);
+
+    // Prefer ownerId for indexing, but it will be in sync with userId anyway
     if (p.ownerId) await kvSafeSAdd(userProjectsIndexKey(p.ownerId), p.id);
+
     return p;
   }
 
   memProjects.set(p.id, p);
   memIndex.add(p.id);
+
   if (p.ownerId) {
     if (!memUserIndex.has(p.ownerId)) memUserIndex.set(p.ownerId, new Set());
     memUserIndex.get(p.ownerId)!.add(p.id);
   }
+
   return p;
 }
 
@@ -134,7 +146,11 @@ export async function registerProject(params: {
     id: params.id,
     name: params.name,
     templateId: params.templateId ?? null,
+
+    // Set BOTH for compatibility
+    userId: params.ownerId ?? null,
     ownerId: params.ownerId ?? null,
+
     createdAt: nowIso(),
     updatedAt: nowIso(),
     status: "draft",
@@ -191,6 +207,10 @@ export async function patchProject(
     createdAt: existing.createdAt,
     updatedAt: nowIso(),
   };
+
+  // Keep userId/ownerId aligned on patches too
+  if (next.ownerId && !next.userId) next.userId = next.ownerId;
+  if (next.userId && !next.ownerId) next.ownerId = next.userId;
 
   await upsertProject(next);
   return next;
