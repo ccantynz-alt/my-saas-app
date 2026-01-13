@@ -1,8 +1,10 @@
-import "./globals.css";
+import type { Metadata } from "next";
 
-export const metadata = {
-  title: "MySaaS Builder",
-  description: "Premium AI website building that actually ships.",
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function RootLayout({
