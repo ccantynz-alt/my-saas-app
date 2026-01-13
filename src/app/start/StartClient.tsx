@@ -4,29 +4,19 @@ import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-type Option = {
+export type StartOption = {
   slug: string;
   title: string;
   description: string;
+  tag?: string;
 };
 
-const USE_CASES: Option[] = [
-  { slug: "saas", title: "SaaS", description: "Subscription-ready site structure." },
-  { slug: "startups", title: "Startups", description: "Fast MVP landing pages." },
-  { slug: "local-services", title: "Local Services", description: "Local SEO + trust flow." },
-  { slug: "ecommerce", title: "Ecommerce", description: "Product pages + objections handled." },
-  { slug: "creators", title: "Creators", description: "Premium personal brand + portfolio." },
-  { slug: "agencies", title: "Agencies", description: "Case studies + services + capture." },
-];
+type Props = {
+  useCases: StartOption[];
+  templates: StartOption[];
+};
 
-const TEMPLATES: Option[] = [
-  { slug: "saas", title: "SaaS Template", description: "Pricing-first layout." },
-  { slug: "startup", title: "Startup Template", description: "Clean MVP landing page." },
-  { slug: "service", title: "Service Template", description: "Local services layout." },
-  { slug: "portfolio", title: "Portfolio Template", description: "Personal brand layout." },
-];
-
-export default function StartClient() {
+export default function StartClient({ useCases, templates }: Props) {
   const router = useRouter();
   const search = useSearchParams();
 
@@ -39,13 +29,13 @@ export default function StartClient() {
   const [error, setError] = useState<string | null>(null);
 
   const chosenUseCase = useMemo(
-    () => USE_CASES.find((u) => u.slug === useCase) || null,
-    [useCase]
+    () => useCases.find((u) => u.slug === useCase) || null,
+    [useCase, useCases]
   );
 
   const chosenTemplate = useMemo(
-    () => TEMPLATES.find((t) => t.slug === template) || null,
-    [template]
+    () => templates.find((t) => t.slug === template) || null,
+    [template, templates]
   );
 
   async function onCreate() {
@@ -53,6 +43,8 @@ export default function StartClient() {
     setBusy(true);
 
     try {
+      // ✅ Keep backend-safe: do NOT change payload shape.
+      // We encode choices in name for now (until templateId mapping is implemented).
       const nameParts = ["New Project"];
       if (chosenUseCase) nameParts.push(`(${chosenUseCase.title})`);
       if (chosenTemplate) nameParts.push(`- ${chosenTemplate.title}`);
@@ -118,7 +110,7 @@ export default function StartClient() {
           <section className="rounded-2xl border border-gray-200 p-6 shadow-sm">
             <h2 className="text-lg font-semibold">1) Choose a use case</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {USE_CASES.map((u) => (
+              {useCases.map((u) => (
                 <button
                   key={u.slug}
                   type="button"
@@ -129,7 +121,14 @@ export default function StartClient() {
                     "hover:bg-gray-50",
                   ].join(" ")}
                 >
-                  <div className="text-sm font-semibold">{u.title}</div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold">{u.title}</div>
+                    {u.tag ? (
+                      <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">
+                        {u.tag}
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="mt-1 text-sm text-gray-600">{u.description}</div>
                 </button>
               ))}
@@ -139,7 +138,7 @@ export default function StartClient() {
           <section className="rounded-2xl border border-gray-200 p-6 shadow-sm">
             <h2 className="text-lg font-semibold">2) Choose a template</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {TEMPLATES.map((t) => (
+              {templates.map((t) => (
                 <button
                   key={t.slug}
                   type="button"
@@ -150,7 +149,14 @@ export default function StartClient() {
                     "hover:bg-gray-50",
                   ].join(" ")}
                 >
-                  <div className="text-sm font-semibold">{t.title}</div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold">{t.title}</div>
+                    {t.tag ? (
+                      <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">
+                        {t.tag}
+                      </span>
+                    ) : null}
+                  </div>
                   <div className="mt-1 text-sm text-gray-600">{t.description}</div>
                 </button>
               ))}
@@ -160,6 +166,7 @@ export default function StartClient() {
 
         <div className="mt-8 rounded-2xl border border-gray-200 p-6 shadow-sm">
           <h3 className="text-base font-semibold">Summary</h3>
+
           <div className="mt-2 text-sm text-gray-600">
             Use case:{" "}
             <span className="font-medium text-gray-900">
@@ -203,7 +210,7 @@ export default function StartClient() {
           </div>
 
           <div className="mt-3 text-xs text-gray-500">
-            This uses <code>/api/projects/register</code> and redirects to{" "}
+            Uses <code>/api/projects/register</code> then redirects to{" "}
             <code>/projects/[projectId]</code>.
           </div>
         </div>
