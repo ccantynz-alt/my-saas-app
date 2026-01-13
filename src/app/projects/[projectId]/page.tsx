@@ -1,158 +1,64 @@
-"use client";
+// projects/[projectId]/page.tsx
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import type { Metadata } from "next";
+import { getProjectTemplateId } from "@/app/lib/projectTemplateStore";
+import { getProjectScaffold, hasScaffoldApplied, setProjectScaffold } from "@/app/lib/projectScaffoldStore";
+import { buildScaffoldForTemplate } from "@/app/lib/templateScaffolds";
 
-type Project = {
-  id: string;
-  name: string;
-  createdAt: number;
-  updatedAt: number;
-  userId: string;
-  prompt?: string | null;
-  generatedHtml?: string | null;
-  lastGeneratedAt?: number | null;
+export const metadata: Metadata = {
+  title: "Project Builder",
+  description: "Project builder view (bootstrap scaffold V1).",
 };
 
-export default function ProjectPage({ params }: { params: { projectId: string } }) {
-  const { projectId } = params;
+export default async function Page({ params }: { params: { projectId: string } }) {
+  const projectId = params.projectId;
 
-  const [project, setProject] = useState<Project | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [prompt, setPrompt] = useState("");
+  const templateId = await getProjectTemplateId(projectId);
+  const applied = await hasScaffoldApplied(projectId);
+  let scaffold = await getProjectScaffold(projectId);
 
-  const hasPreview = useMemo(() => !!project?.generatedHtml, [project?.generatedHtml]);
-
-  async function loadProject() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/status`, { cache: "no-store" });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error || "Project not found");
-      setProject(json.project);
-      setPrompt(json.project?.prompt || "");
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+  // ✅ Apply scaffold exactly once (unless already applied)
+  if (templateId && !applied) {
+    scaffold = buildScaffoldForTemplate(templateId);
+    await setProjectScaffold(projectId, scaffold);
   }
-
-  async function generate() {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-      });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error || "Generate failed");
-      setProject(json.project);
-      setPrompt(json.project?.prompt || prompt);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  useEffect(() => {
-    loadProject();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
-      <div className="flex items-center justify-between">
-        <Link href="/projects" className="text-sm font-semibold text-zinc-600 hover:text-zinc-900">
-          ← Back to projects
-        </Link>
-        <button
-          onClick={loadProject}
-          className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-semibold hover:bg-zinc-50"
-        >
-          Refresh
-        </button>
+    <div style={{ maxWidth: 980, margin: "0 auto", padding: 24 }}>
+      <h1 style={{ fontSize: 28, fontWeight: 900, marginBottom: 6 }}>
+        Project Builder (Bootstrap V1)
+      </h1>
+
+      <div style={{ opacity: 0.8, marginBottom: 18 }}>
+        <div><b>projectId:</b> {projectId}</div>
+        <div><b>templateId:</b> {templateId ?? "null"}</div>
+        <div><b>scaffold applied:</b> {String(!!(templateId && (applied || scaffold)))}</div>
       </div>
 
-      {loading ? (
-        <p className="mt-6 text-sm font-semibold text-zinc-500">Loading project…</p>
-      ) : error ? (
-        <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
-          {error}
-        </div>
-      ) : project ? (
-        <>
-          <h1 className="mt-6 text-3xl font-extrabold text-zinc-900">{project.name}</h1>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-              <div className="text-sm font-semibold text-zinc-600">Project ID</div>
-              <div className="mt-1 font-mono text-sm text-zinc-900">{project.id}</div>
-
-              <div className="mt-6 text-sm font-extrabold text-zinc-900">Generate</div>
-              <p className="mt-2 text-sm font-semibold text-zinc-600">
-                Enter a prompt, generate a clean HTML preview, and store it on this project.
-              </p>
-
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder='e.g. "Create a premium SaaS landing page for a website builder with hero, features, and CTA."'
-                className="mt-4 h-32 w-full rounded-xl border border-zinc-200 p-4 text-sm font-semibold text-zinc-900 placeholder:text-zinc-400"
-              />
-
-              <div className="mt-4 flex gap-3">
-                <button
-                  onClick={generate}
-                  disabled={busy}
-                  className="rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white hover:bg-zinc-900 disabled:opacity-60"
-                >
-                  {busy ? "Generating…" : "Generate preview"}
-                </button>
-
-                <button
-                  disabled
-                  className="rounded-xl border border-zinc-200 bg-zinc-100 px-5 py-3 text-sm font-semibold text-zinc-500"
-                >
-                  Publish (next)
-                </button>
-              </div>
-
-              <div className="mt-4 text-xs font-semibold text-zinc-500">
-                Last generated:{" "}
-                {project.lastGeneratedAt ? new Date(project.lastGeneratedAt).toLocaleString() : "—"}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-              <div className="flex items-center justify-between px-3 py-2">
-                <div className="text-sm font-extrabold text-zinc-900">Live preview</div>
-                <div className="text-xs font-semibold text-zinc-500">
-                  {hasPreview ? "Generated" : "Not generated yet"}
-                </div>
-              </div>
-
-              {hasPreview ? (
-                <iframe
-                  title="preview"
-                  className="h-[520px] w-full rounded-xl border border-zinc-200 bg-white"
-                  srcDoc={project.generatedHtml || ""}
-                />
-              ) : (
-                <div className="m-3 rounded-xl border border-dashed border-zinc-200 p-6 text-sm font-semibold text-zinc-600">
-                  No preview yet. Click <span className="font-extrabold">Generate preview</span>.
-                </div>
-              )}
-            </div>
+      {!templateId ? (
+        <div style={{ border: "1px solid rgba(255,165,0,0.35)", background: "rgba(255,165,0,0.08)", padding: 14, borderRadius: 12 }}>
+          <div style={{ fontWeight: 900, marginBottom: 6 }}>No templateId found</div>
+          <div style={{ opacity: 0.85 }}>
+            This project was created without a template selection, or the mapping wasn’t saved.
+            <br />
+            If you created it from <code>/start</code>, confirm the template save route is working:
+            <br />
+            <code>/api/projects/{projectId}/template</code>
           </div>
-        </>
+        </div>
       ) : null}
-    </main>
+
+      <div style={{ marginTop: 18, border: "1px solid rgba(0,0,0,0.12)", borderRadius: 12, padding: 16 }}>
+        <div style={{ fontWeight: 900, marginBottom: 10 }}>Scaffold JSON (V1)</div>
+        <pre style={{ margin: 0, whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 13 }}>
+          {JSON.stringify(scaffold, null, 2)}
+        </pre>
+      </div>
+
+      <div style={{ marginTop: 18, opacity: 0.75, fontSize: 14 }}>
+        Next step: replace this JSON render with your real builder renderer:
+        read scaffold → convert to sections/blocks → render editable UI → save project content.
+      </div>
+    </div>
   );
 }
