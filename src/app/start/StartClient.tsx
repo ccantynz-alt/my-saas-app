@@ -1,220 +1,219 @@
+// src/app/start/StartClient.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-
-export type StartOption = {
-  slug: string;
-  title: string;
-  description: string;
-  tag?: string;
-};
+import type { MarketingTemplate, MarketingUseCase } from "../lib/marketingCatalog";
 
 type Props = {
-  useCases: StartOption[];
-  templates: StartOption[];
+  useCases: MarketingUseCase[];
+  templates: MarketingTemplate[];
 };
+
+type RegisterResponse =
+  | { ok: true; projectId: string; publicUrl?: string }
+  | { ok: false; error: string };
 
 export default function StartClient({ useCases, templates }: Props) {
   const router = useRouter();
-  const search = useSearchParams();
+  const searchParams = useSearchParams();
 
-  const preUseCase = search.get("useCase") || "";
-  const preTemplate = search.get("template") || "";
+  const initialUseCase = (searchParams.get("useCase") || "").trim();
+  const initialTemplate = (searchParams.get("template") || "").trim();
 
-  const [useCase, setUseCase] = useState(preUseCase);
-  const [template, setTemplate] = useState(preTemplate);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedUseCase, setSelectedUseCase] = React.useState<string>(initialUseCase);
+  const [selectedTemplateSlug, setSelectedTemplateSlug] = React.useState<string>(initialTemplate);
 
-  const chosenUseCase = useMemo(
-    () => useCases.find((u) => u.slug === useCase) || null,
-    [useCase, useCases]
-  );
+  const [name, setName] = React.useState<string>("New Project");
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const chosenTemplate = useMemo(
-    () => templates.find((t) => t.slug === template) || null,
-    [template, templates]
-  );
+  const chosenTemplate = React.useMemo(() => {
+    return templates.find((t) => t.slug === selectedTemplateSlug) || null;
+  }, [templates, selectedTemplateSlug]);
 
-  async function onCreate() {
+  const computedTemplateId = React.useMemo(() => {
+    if (!chosenTemplate) return null;
+    return chosenTemplate.templateId || chosenTemplate.slug || null;
+  }, [chosenTemplate]);
+
+  function updateUrl(nextUseCase: string, nextTemplate: string) {
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    if (nextUseCase) params.set("useCase", nextUseCase);
+    else params.delete("useCase");
+
+    if (nextTemplate) params.set("template", nextTemplate);
+    else params.delete("template");
+
+    const qs = params.toString();
+    router.replace(qs ? `/start?${qs}` : "/start");
+  }
+
+  async function onStart() {
     setError(null);
-    setBusy(true);
-
+    setLoading(true);
     try {
-      // ✅ Keep backend-safe: do NOT change payload shape.
-      // We encode choices in name for now (until templateId mapping is implemented).
-      const nameParts = ["New Project"];
-      if (chosenUseCase) nameParts.push(`(${chosenUseCase.title})`);
-      if (chosenTemplate) nameParts.push(`- ${chosenTemplate.title}`);
-      const name = nameParts.join(" ");
+      const payload = {
+        name: name || "New Project",
+        templateId: computedTemplateId, // V1 mapping (slug or explicit templateId)
+      };
 
       const res = await fetch("/api/projects/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, templateId: null }),
+        body: JSON.stringify(payload),
       });
 
-      const data = await res.json().catch(() => null);
+      const data = (await res.json()) as RegisterResponse;
 
-      if (!res.ok) {
+      if (!res.ok || !data || data.ok === false) {
         const msg =
-          (data && (data.error || data.message)) ||
+          (data && "error" in data && data.error) ||
           `Failed to create project (HTTP ${res.status})`;
         throw new Error(msg);
       }
 
-      const projectId = data?.projectId;
-      if (!projectId) throw new Error("Project created but projectId missing in response.");
-
-      router.push(`/projects/${projectId}`);
+      router.push(`/projects/${data.projectId}`);
     } catch (e: any) {
       setError(e?.message || "Something went wrong.");
-      setBusy(false);
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-white">
-      <div className="mx-auto max-w-6xl px-6 py-14">
-        <div className="flex flex-col gap-4">
-          <h1 className="text-4xl font-semibold tracking-tight">Start a project</h1>
-          <p className="max-w-2xl text-base text-gray-600">
-            Pick a use case and template. We’ll create your project and drop you into the builder.
-          </p>
+    <div style={{ maxWidth: 980, margin: "0 auto", padding: 24 }}>
+      <h1 style={{ fontSize: 32, fontWeight: 800, marginBottom: 6 }}>
+        Start your project
+      </h1>
+      <p style={{ opacity: 0.8, marginTop: 0, marginBottom: 24 }}>
+        Pick a use case and a template. We’ll create your project and take you into the builder.
+      </p>
 
-          <div className="mt-2 flex flex-wrap gap-3">
-            <Link
-              href="/"
-              className="rounded-xl border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
-            >
-              Back to home
-            </Link>
-            <Link
-              href="/use-cases"
-              className="rounded-xl border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
-            >
-              Use cases
-            </Link>
-            <Link
-              href="/templates"
-              className="rounded-xl border border-gray-200 px-4 py-2 text-sm hover:bg-gray-50"
-            >
-              Templates
-            </Link>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 18 }}>
+        {/* Project name */}
+        <div style={{ border: "1px solid rgba(0,0,0,0.12)", borderRadius: 12, padding: 16 }}>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Project name</div>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="New Project"
+            style={{
+              width: "100%",
+              padding: 12,
+              borderRadius: 10,
+              border: "1px solid rgba(0,0,0,0.18)",
+              outline: "none",
+            }}
+          />
+        </div>
+
+        {/* Use cases */}
+        <div style={{ border: "1px solid rgba(0,0,0,0.12)", borderRadius: 12, padding: 16 }}>
+          <div style={{ fontWeight: 700, marginBottom: 12 }}>Choose a use case</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+            {useCases.map((uc) => {
+              const active = selectedUseCase === uc.slug;
+              return (
+                <button
+                  key={uc.slug}
+                  type="button"
+                  onClick={() => {
+                    setSelectedUseCase(uc.slug);
+                    updateUrl(uc.slug, selectedTemplateSlug);
+                  }}
+                  style={{
+                    textAlign: "left",
+                    padding: 14,
+                    borderRadius: 12,
+                    border: active ? "2px solid rgba(0,0,0,0.6)" : "1px solid rgba(0,0,0,0.16)",
+                    background: active ? "rgba(0,0,0,0.05)" : "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ fontWeight: 800, marginBottom: 4 }}>{uc.title}</div>
+                  <div style={{ opacity: 0.8, fontSize: 14 }}>{uc.description}</div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="mt-10 grid gap-6 lg:grid-cols-2">
-          <section className="rounded-2xl border border-gray-200 p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">1) Choose a use case</h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {useCases.map((u) => (
-                <button
-                  key={u.slug}
-                  type="button"
-                  onClick={() => setUseCase(u.slug)}
-                  className={[
-                    "rounded-2xl border p-4 text-left",
-                    useCase === u.slug ? "border-black" : "border-gray-200",
-                    "hover:bg-gray-50",
-                  ].join(" ")}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold">{u.title}</div>
-                    {u.tag ? (
-                      <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">
-                        {u.tag}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="mt-1 text-sm text-gray-600">{u.description}</div>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-gray-200 p-6 shadow-sm">
-            <h2 className="text-lg font-semibold">2) Choose a template</h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {templates.map((t) => (
+        {/* Templates */}
+        <div style={{ border: "1px solid rgba(0,0,0,0.12)", borderRadius: 12, padding: 16 }}>
+          <div style={{ fontWeight: 700, marginBottom: 12 }}>Choose a template</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+            {templates.map((t) => {
+              const active = selectedTemplateSlug === t.slug;
+              return (
                 <button
                   key={t.slug}
                   type="button"
-                  onClick={() => setTemplate(t.slug)}
-                  className={[
-                    "rounded-2xl border p-4 text-left",
-                    template === t.slug ? "border-black" : "border-gray-200",
-                    "hover:bg-gray-50",
-                  ].join(" ")}
+                  onClick={() => {
+                    setSelectedTemplateSlug(t.slug);
+                    updateUrl(selectedUseCase, t.slug);
+                  }}
+                  style={{
+                    textAlign: "left",
+                    padding: 14,
+                    borderRadius: 12,
+                    border: active ? "2px solid rgba(0,0,0,0.6)" : "1px solid rgba(0,0,0,0.16)",
+                    background: active ? "rgba(0,0,0,0.05)" : "white",
+                    cursor: "pointer",
+                  }}
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold">{t.title}</div>
-                    {t.tag ? (
-                      <span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">
-                        {t.tag}
-                      </span>
-                    ) : null}
+                  <div style={{ fontWeight: 800, marginBottom: 4 }}>{t.title}</div>
+                  <div style={{ opacity: 0.8, fontSize: 14 }}>{t.description}</div>
+                  <div style={{ marginTop: 8, opacity: 0.65, fontSize: 12 }}>
+                    templateId: {t.templateId || t.slug}
                   </div>
-                  <div className="mt-1 text-sm text-gray-600">{t.description}</div>
                 </button>
-              ))}
-            </div>
-          </section>
-        </div>
+              );
+            })}
+          </div>
 
-        <div className="mt-8 rounded-2xl border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-base font-semibold">Summary</h3>
-
-          <div className="mt-2 text-sm text-gray-600">
-            Use case:{" "}
-            <span className="font-medium text-gray-900">
-              {chosenUseCase?.title || "Not selected"}
-            </span>
-            <br />
-            Template:{" "}
-            <span className="font-medium text-gray-900">
-              {chosenTemplate?.title || "Not selected"}
+          <div style={{ marginTop: 14, opacity: 0.8, fontSize: 14 }}>
+            Selected templateId to send:{" "}
+            <span style={{ fontWeight: 800 }}>
+              {computedTemplateId ?? "null"}
             </span>
           </div>
-
-          {error ? (
-            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-              {error}
-              <div className="mt-2 text-xs text-red-700">
-                If this says 401 Unauthorized, you’re not signed in — sign in and try again.
-              </div>
-            </div>
-          ) : null}
-
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={onCreate}
-              disabled={busy}
-              className={[
-                "rounded-xl bg-black px-5 py-3 text-sm text-white",
-                busy ? "opacity-60" : "hover:opacity-90",
-              ].join(" ")}
-            >
-              {busy ? "Creating..." : "Create project and open builder"}
-            </button>
-
-            <Link
-              href="/projects"
-              className="rounded-xl border border-gray-200 px-5 py-3 text-sm hover:bg-gray-50"
-            >
-              Go to dashboard
-            </Link>
-          </div>
-
-          <div className="mt-3 text-xs text-gray-500">
-            Uses <code>/api/projects/register</code> then redirects to{" "}
-            <code>/projects/[projectId]</code>.
-          </div>
         </div>
+
+        {/* CTA */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+          <div style={{ color: "rgba(0,0,0,0.75)", fontSize: 14 }}>
+            {selectedUseCase ? `Use case: ${selectedUseCase}` : "Pick a use case (optional)."}{" "}
+            {selectedTemplateSlug ? `Template: ${selectedTemplateSlug}` : "Pick a template (optional)."}
+          </div>
+
+          <button
+            type="button"
+            onClick={onStart}
+            disabled={loading}
+            style={{
+              padding: "12px 18px",
+              borderRadius: 12,
+              border: "1px solid rgba(0,0,0,0.22)",
+              background: "black",
+              color: "white",
+              fontWeight: 800,
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading ? 0.75 : 1,
+              minWidth: 160,
+            }}
+          >
+            {loading ? "Creating..." : "Start"}
+          </button>
+        </div>
+
+        {error ? (
+          <div style={{ border: "1px solid rgba(255,0,0,0.3)", background: "rgba(255,0,0,0.06)", padding: 12, borderRadius: 12 }}>
+            <div style={{ fontWeight: 800, marginBottom: 4 }}>Error</div>
+            <div style={{ whiteSpace: "pre-wrap" }}>{error}</div>
+          </div>
+        ) : null}
       </div>
-    </main>
+    </div>
   );
 }
