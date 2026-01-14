@@ -68,7 +68,6 @@ export default function AgentsClient({ projectId }: Props) {
           `Pages: ${(json.pages || []).join(", ")}\n`
       );
 
-      // Open published page so you instantly see KV-updated content
       window.open(pubHome, "_blank", "noopener,noreferrer");
     } catch (e: any) {
       setStatus(`❌ Error: ${e?.message || "Unknown error"}`);
