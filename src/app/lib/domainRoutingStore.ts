@@ -19,13 +19,15 @@ function claimKey(domain: string) {
 
 /**
  * Get mapped projectId for a domain (apex only; middleware canonicalizes www -> apex).
+ * Empty string is treated as "no mapping".
  */
 export async function getDomainProjectMapping(domain: string): Promise<string | null> {
   const d = normalizeDomain(domain);
   if (!d) return null;
 
   const value = (await kv.get(routeKey(d))) as unknown as string | null;
-  return value || null;
+  const v = (value || "").trim();
+  return v ? v : null;
 }
 
 /**
@@ -39,12 +41,13 @@ export async function setDomainProjectMapping(domain: string, projectId: string)
 }
 
 /**
- * Remove mapping for a domain.
+ * "Delete" mapping for a domain.
+ * Your kv wrapper has no del(), so we write an empty string.
  */
 export async function deleteDomainProjectMapping(domain: string): Promise<void> {
   const d = normalizeDomain(domain);
   if (!d) return;
-  await kv.del(routeKey(d));
+  await kv.set(routeKey(d), "");
 }
 
 /**
@@ -56,7 +59,6 @@ export async function getProjectIdForHost(host: string): Promise<string | null> 
   if (!d) return null;
 
   const apex = d.startsWith("www.") ? d.slice(4) : d;
-
   return await getDomainProjectMapping(apex);
 }
 
@@ -73,8 +75,9 @@ export async function claimDomain(domain: string, projectId: string): Promise<vo
   if (!projectId) throw new Error("Missing projectId");
 
   const existing = (await kv.get(claimKey(d))) as unknown as string | null;
+  const e = (existing || "").trim();
 
-  if (existing && existing !== projectId) {
+  if (e && e !== projectId) {
     throw new Error("Domain already claimed by another project");
   }
 
@@ -83,6 +86,7 @@ export async function claimDomain(domain: string, projectId: string): Promise<vo
 
 /**
  * Release a claimed domain (only if it belongs to this project).
+ * No del() available, so we write empty string.
  */
 export async function releaseDomain(domain: string, projectId: string): Promise<void> {
   const d = normalizeDomain(domain);
@@ -90,8 +94,9 @@ export async function releaseDomain(domain: string, projectId: string): Promise<
   if (!projectId) return;
 
   const existing = (await kv.get(claimKey(d))) as unknown as string | null;
+  const e = (existing || "").trim();
 
-  if (existing === projectId) {
-    await kv.del(claimKey(d));
+  if (e === projectId) {
+    await kv.set(claimKey(d), "");
   }
 }
