@@ -1,4 +1,4 @@
-// projects/[projectId]/page.tsx
+// src/app/projects/[projectId]/page.tsx
 
 import type { Metadata } from "next";
 import EditorClient from "./EditorClient";
@@ -31,7 +31,13 @@ export default async function Page({ params }: { params: { projectId: string } }
     savedContent?.sections ||
     scaffold?.sections ||
     [
-      { id: "hero", type: "hero", heading: "Welcome", subheading: "No scaffold found yet.", items: ["Pick a template in /start"] },
+      {
+        id: "hero",
+        type: "hero",
+        heading: "Welcome",
+        subheading: "No scaffold found yet.",
+        items: ["Pick a template in /start"],
+      },
     ];
 
   const source: "saved-content" | "scaffold" = savedContent ? "saved-content" : "scaffold";
