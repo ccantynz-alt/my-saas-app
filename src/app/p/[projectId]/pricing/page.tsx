@@ -6,14 +6,14 @@ type Props = {
   params: { projectId: string };
 };
 
-export function generateMetadata({ params }: Props): Metadata {
-  return getPublishedMetadata({ projectId: params.projectId, pageSlug: "faq" });
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  return await getPublishedMetadata({ projectId: params.projectId, pageSlug: "pricing" });
 }
 
-export default function PublishedFaqPage({ params }: Props) {
+export default function PublishedPricingPage({ params }: Props) {
   return (
     <CatchAllPublishedPage
-      params={{ projectId: params.projectId, path: ["faq"] }}
+      params={{ projectId: params.projectId, path: ["pricing"] }}
     />
   );
 }
