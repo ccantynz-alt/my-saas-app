@@ -30,18 +30,13 @@ export async function POST(
     const projectId = params.projectId;
     const body = await req.json().catch(() => ({}));
 
-    // Accept content shape from client
     const content = body?.content;
     if (!content || typeof content !== "object") {
       return NextResponse.json({ ok: false, error: "Missing content" }, { status: 400 });
     }
 
-    // Minimal validation
-    if (content.version !== 1) {
-      return NextResponse.json({ ok: false, error: "Invalid content version" }, { status: 400 });
-    }
-    if (!Array.isArray(content.sections)) {
-      return NextResponse.json({ ok: false, error: "Invalid sections" }, { status: 400 });
+    if (content.version !== 1 || !Array.isArray(content.sections)) {
+      return NextResponse.json({ ok: false, error: "Invalid content format" }, { status: 400 });
     }
 
     await setProjectContent(projectId, content);
