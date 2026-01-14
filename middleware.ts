@@ -25,7 +25,6 @@ function isStaticOrInternalPath(pathname: string) {
 }
 
 export async function middleware(req: NextRequest) {
-  // Prefer forwarded host if present (common in proxies)
   const xfHost = req.headers.get("x-forwarded-host") || "";
   const hostHeader = req.headers.get("host") || "";
   const host = normalizeIncomingHost(xfHost || hostHeader);
@@ -40,6 +39,15 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // ✅ Canonicalize: www -> apex (only for custom domains)
+  if (host.startsWith("www.")) {
+    const apex = host.replace(/^www\./, "");
+    const url = req.nextUrl.clone();
+    url.hostname = apex;
+    // keep path + query
+    return NextResponse.redirect(url, 308);
+  }
+
   const projectId = await getProjectIdForHost(host);
 
   if (!projectId) {
@@ -48,7 +56,12 @@ export async function middleware(req: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  // V1: send all custom-domain requests to the published project root
+  // Avoid loops: if someone hits /p/... on a custom domain, let it render normally
+  if (pathname.startsWith("/p/")) {
+    return NextResponse.next();
+  }
+
+  // Route all custom domain pages to published site root for V1
   const url = req.nextUrl.clone();
   url.pathname = `/p/${projectId}`;
   return NextResponse.rewrite(url);
