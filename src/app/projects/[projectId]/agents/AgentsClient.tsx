@@ -1,255 +1,154 @@
 "use client";
 
-import * as React from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 
 type Props = {
   projectId: string;
 };
 
-function safePreview(text: string, max = 900) {
-  const t = (text || "").trim();
-  if (!t) return "(empty response body)";
-  return t.length > max ? t.slice(0, max) + "…" : t;
-}
-
 export default function AgentsClient({ projectId }: Props) {
-  const [businessName, setBusinessName] = React.useState("");
-  const [tone, setTone] = React.useState("premium, automated, website-only");
-  const [status, setStatus] = React.useState<string>("");
-  const [busy, setBusy] = React.useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const apiUrl = `/api/projects/${projectId}/agents/finish-for-me`;
-  const pubHome = `/p/${projectId}`;
-  const pubPricing = `/p/${projectId}/pricing`;
-  const pubAbout = `/p/${projectId}/about`;
-  const pubContact = `/p/${projectId}/contact`;
-
-  async function testGetPing() {
-    setBusy(true);
-    setStatus(`Testing route…\nGET ${apiUrl}`);
-
-    try {
-      const res = await fetch(apiUrl, { method: "GET" });
-      const text = await res.text();
-
-      setStatus(
-        `GET ${apiUrl}\n` +
-          `HTTP ${res.status} ${res.statusText}\n\n` +
-          `Body:\n${safePreview(text)}`
-      );
-    } catch (e: any) {
-      setStatus(`❌ Error: ${e?.message || "Unknown error"}`);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const urls = useMemo(() => {
+    const basePublished = `/p/${projectId}`;
+    return {
+      api: `/api/projects/${projectId}/agents/finish-for-me`,
+      publishedHome: basePublished,
+      publishedPricing: `${basePublished}/pricing`,
+      publishedAbout: `${basePublished}/about`,
+      publishedFaq: `${basePublished}/faq`,
+      publishedContact: `${basePublished}/contact`,
+    };
+  }, [projectId]);
 
   async function runFinishForMe() {
-    setBusy(true);
-    setStatus(`Running agent…\nPOST ${apiUrl}`);
+    setLoading(true);
+    setError(null);
+    setResult(null);
 
     try {
-      const res = await fetch(apiUrl, {
+      const r = await fetch(urls.api, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ businessName, tone }),
+        body: JSON.stringify({}),
       });
 
-      const text = await res.text();
+      const text = await r.text();
 
       let json: any = null;
       try {
-        json = text ? JSON.parse(text) : null;
+        json = JSON.parse(text);
       } catch {
-        json = null;
+        json = { raw: text };
       }
 
-      if (!res.ok) {
-        setStatus(
-          `❌ HTTP ${res.status} ${res.statusText}\n` +
-            `POST ${apiUrl}\n\n` +
-            `Body:\n${safePreview(text)}`
-        );
-        return;
+      if (!r.ok) {
+        setError(`HTTP ${r.status}`);
       }
 
-      if (!json || json.ok !== true) {
-        setStatus(
-          `❌ Unexpected response (not ok JSON)\n` +
-            `HTTP ${res.status}\n` +
-            `POST ${apiUrl}\n\n` +
-            `Body:\n${safePreview(text)}`
-        );
-        return;
-      }
-
-      setStatus(
-        `✅ Agent completed\n` +
-          `Updated at: ${json.updatedAt}\n` +
-          `Project: ${json.projectId}\n` +
-          `Pages: ${(json.pages || []).join(", ")}\n`
-      );
-
-      // Instantly show the KV-backed output
-      window.open(pubHome, "_blank", "noopener,noreferrer");
+      setResult({
+        ok: r.ok,
+        status: r.status,
+        json,
+      });
     } catch (e: any) {
-      setStatus(`❌ Error: ${e?.message || "Unknown error"}`);
+      setError(e?.message || "Unknown error");
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
   }
 
   return (
-    <main style={{ padding: 24, maxWidth: 980, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 28, fontWeight: 850, margin: 0 }}>Agents</h1>
+    <section style={{ display: "grid", gap: 12 }}>
+      <div
+        style={{
+          border: "1px solid rgba(255,255,255,0.15)",
+          borderRadius: 12,
+          padding: 16,
+        }}
+      >
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+          Finish-for-me
+        </h2>
 
-      <p style={{ marginTop: 10, opacity: 0.85 }}>
-        Trigger KV-backed content generation for this project. This does not
-        redeploy — it writes content to KV used by <code>/p/[projectId]</code>.
-      </p>
+        <p style={{ marginBottom: 12, opacity: 0.85 }}>
+          Calls: <code>{urls.api}</code>
+        </p>
+
+        <button
+          onClick={runFinishForMe}
+          disabled={loading}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 10,
+            border: "1px solid rgba(255,255,255,0.2)",
+            cursor: loading ? "not-allowed" : "pointer",
+            fontWeight: 700,
+          }}
+        >
+          {loading ? "Running…" : "Run Finish-for-me"}
+        </button>
+
+        {error ? (
+          <p style={{ marginTop: 10, color: "tomato" }}>Error: {error}</p>
+        ) : null}
+      </div>
 
       <div
         style={{
-          marginTop: 18,
+          border: "1px solid rgba(255,255,255,0.15)",
+          borderRadius: 12,
           padding: 16,
-          border: "1px solid #e5e7eb",
-          borderRadius: 14,
         }}
       >
-        <div style={{ fontSize: 13, opacity: 0.75 }}>
-          API: <code>{apiUrl}</code>
-        </div>
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+          Published links
+        </h2>
 
-        <label style={{ display: "block", marginTop: 12, fontWeight: 700 }}>
-          Business name (optional)
-        </label>
-        <input
-          value={businessName}
-          onChange={(e) => setBusinessName(e.target.value)}
-          placeholder="e.g. Book A Ride NZ"
-          style={{
-            marginTop: 8,
-            width: "100%",
-            padding: 10,
-            borderRadius: 12,
-            border: "1px solid #e5e7eb",
-          }}
-        />
+        <ul style={{ display: "grid", gap: 8, margin: 0, paddingLeft: 18 }}>
+          <li>
+            <Link href={urls.publishedHome}>Published: Home</Link>
+          </li>
+          <li>
+            <Link href={urls.publishedPricing}>Published: Pricing</Link>
+          </li>
+          <li>
+            <Link href={urls.publishedAbout}>Published: About</Link>
+          </li>
+          <li>
+            <Link href={urls.publishedFaq}>Published: FAQ</Link>
+          </li>
+          <li>
+            <Link href={urls.publishedContact}>Published: Contact</Link>
+          </li>
+        </ul>
+      </div>
 
-        <label style={{ display: "block", marginTop: 14, fontWeight: 700 }}>
-          Tone (optional)
-        </label>
-        <input
-          value={tone}
-          onChange={(e) => setTone(e.target.value)}
-          placeholder="premium, automated, website-only"
-          style={{
-            marginTop: 8,
-            width: "100%",
-            padding: 10,
-            borderRadius: 12,
-            border: "1px solid #e5e7eb",
-          }}
-        />
-
-        <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button
-            onClick={runFinishForMe}
-            disabled={busy}
-            style={{
-              padding: "10px 12px",
-              borderRadius: 12,
-              border: "1px solid #e5e7eb",
-              background: busy ? "#f3f4f6" : "white",
-              cursor: busy ? "not-allowed" : "pointer",
-              fontWeight: 750,
-            }}
-          >
-            {busy ? "Running…" : "Run Finish-for-me Agent"}
-          </button>
-
-          <button
-            onClick={testGetPing}
-            disabled={busy}
-            style={{
-              padding: "10px 12px",
-              borderRadius: 12,
-              border: "1px solid #e5e7eb",
-              background: busy ? "#f3f4f6" : "white",
-              cursor: busy ? "not-allowed" : "pointer",
-              fontWeight: 750,
-            }}
-          >
-            {busy ? "Testing…" : "Test Agent Route (GET)"}
-          </button>
-        </div>
+      <div
+        style={{
+          border: "1px solid rgba(255,255,255,0.15)",
+          borderRadius: 12,
+          padding: 16,
+        }}
+      >
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+          Latest response
+        </h2>
 
         <pre
           style={{
-            marginTop: 12,
-            fontSize: 13,
-            background: "#fafafa",
-            border: "1px solid #eee",
-            padding: 12,
-            borderRadius: 12,
             whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            margin: 0,
+            opacity: 0.95,
           }}
         >
-          {status}
+          {result ? JSON.stringify(result, null, 2) : "No response yet."}
         </pre>
-
-        <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <a href={pubHome} style={{ textDecoration: "none" }}>
-            <span
-              style={{
-                padding: "8px 10px",
-                border: "1px solid #e5e7eb",
-                borderRadius: 10,
-                display: "inline-block",
-              }}
-            >
-              Open Published Home
-            </span>
-          </a>
-          <a href={pubPricing} style={{ textDecoration: "none" }}>
-            <span
-              style={{
-                padding: "8px 10px",
-                border: "1px solid #e5e7eb",
-                borderRadius: 10,
-                display: "inline-block",
-              }}
-            >
-              Open Pricing
-            </span>
-          </a>
-          <a href={pubAbout} style={{ textDecoration: "none" }}>
-            <span
-              style={{
-                padding: "8px 10px",
-                border: "1px solid #e5e7eb",
-                borderRadius: 10,
-                display: "inline-block",
-              }}
-            >
-              Open About
-            </span>
-          </a>
-          <a href={pubContact} style={{ textDecoration: "none" }}>
-            <span
-              style={{
-                padding: "8px 10px",
-                border: "1px solid #e5e7eb",
-                borderRadius: 10,
-                display: "inline-block",
-              }}
-            >
-              Open Contact
-            </span>
-          </a>
-        </div>
       </div>
-    </main>
+    </section>
   );
 }
-
