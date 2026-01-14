@@ -1,3 +1,4 @@
+cat > middleware.ts <<'EOF'
 // middleware.ts
 
 import { NextResponse } from "next/server";
@@ -39,12 +40,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // ✅ Canonicalize: www -> apex (only for custom domains)
+  // Canonicalize: www -> apex for custom domains
   if (host.startsWith("www.")) {
     const apex = host.replace(/^www\./, "");
     const url = req.nextUrl.clone();
     url.hostname = apex;
-    // keep path + query
     return NextResponse.redirect(url, 308);
   }
 
@@ -56,17 +56,19 @@ export async function middleware(req: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  // Avoid loops: if someone hits /p/... on a custom domain, let it render normally
+  // Avoid loops: let internal published routes render normally
   if (pathname.startsWith("/p/")) {
     return NextResponse.next();
   }
 
-  // Route all custom domain pages to published site root for V1
+  // ✅ Preserve path:
+  // example.com/pricing -> /p/proj_xxx/pricing
   const url = req.nextUrl.clone();
-  url.pathname = `/p/${projectId}`;
+  url.pathname = pathname === "/" ? `/p/${projectId}` : `/p/${projectId}${pathname}`;
   return NextResponse.rewrite(url);
 }
 
 export const config = {
   matcher: ["/((?!_next|api|favicon.ico|robots.txt|sitemap.xml).*)"],
 };
+EOF
