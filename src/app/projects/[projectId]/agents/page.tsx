@@ -7,3 +7,4 @@ type Props = {
 export default function AgentsPage({ params }: Props) {
   return <AgentsClient projectId={params.projectId} />;
 }
+
