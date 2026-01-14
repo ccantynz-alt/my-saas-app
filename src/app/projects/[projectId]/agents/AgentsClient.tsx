@@ -152,3 +152,4 @@ export default function AgentsClient({ projectId }: Props) {
     </section>
   );
 }
+
