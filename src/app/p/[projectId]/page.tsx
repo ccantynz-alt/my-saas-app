@@ -6,8 +6,8 @@ type PageProps = {
   params: { projectId: string };
 };
 
-export function generateMetadata({ params }: PageProps): Metadata {
-  return getPublishedMetadata({ projectId: params.projectId, pageSlug: "" });
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  return await getPublishedMetadata({ projectId: params.projectId, pageSlug: "" });
 }
 
 export default function PublishedHomePage({ params }: PageProps) {
