@@ -35,3 +35,4 @@ export default function PublishedCatchAllPage({ params }: PageProps) {
   // PublicRenderer is expected to support internal section-based rendering.
   return <PublicRenderer projectId={params.projectId} pathSlug={slug} />;
 }
+
