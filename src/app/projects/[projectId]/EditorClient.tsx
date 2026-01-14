@@ -110,7 +110,6 @@ export default function EditorClient({
         throw new Error(json?.error || `Reset failed (HTTP ${res.status})`);
       }
 
-      // Refresh the page (server will fall back to scaffold)
       window.location.reload();
     } catch (e: any) {
       setError(e?.message || "Reset failed.");
@@ -185,10 +184,8 @@ export default function EditorClient({
       <div style={{ marginTop: 18, display: "grid", gap: 12 }}>
         {sections.map((sec, idx) => (
           <div key={sec.id || idx} style={{ border: "1px solid rgba(0,0,0,0.12)", borderRadius: 14, padding: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-              <div style={{ fontWeight: 900 }}>
-                {sec.type.toUpperCase()} <span style={{ opacity: 0.6, fontWeight: 700 }}>(id: {sec.id})</span>
-              </div>
+            <div style={{ fontWeight: 900 }}>
+              {sec.type.toUpperCase()} <span style={{ opacity: 0.6, fontWeight: 700 }}>(id: {sec.id})</span>
             </div>
 
             <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
@@ -243,12 +240,6 @@ export default function EditorClient({
                   </button>
                 </div>
 
-                {(sec.items || []).length === 0 ? (
-                  <div style={{ opacity: 0.65, fontSize: 13 }}>
-                    No items yet (optional).
-                  </div>
-                ) : null}
-
                 {(sec.items || []).map((it, itemIdx) => (
                   <div key={itemIdx} style={{ display: "flex", gap: 10, alignItems: "center" }}>
                     <input
@@ -278,6 +269,10 @@ export default function EditorClient({
                     </button>
                   </div>
                 ))}
+
+                {(!sec.items || sec.items.length === 0) ? (
+                  <div style={{ opacity: 0.65, fontSize: 13 }}>No items yet (optional).</div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -285,7 +280,7 @@ export default function EditorClient({
       </div>
 
       <div style={{ marginTop: 18, opacity: 0.7, fontSize: 13 }}>
-        V1 note: this editor saves to KV only. Next build: render these sections as real marketing blocks + publish pipeline.
+        V1 note: this editor saves to KV only. Next build: render these sections as real blocks + publish pipeline.
       </div>
     </div>
   );
