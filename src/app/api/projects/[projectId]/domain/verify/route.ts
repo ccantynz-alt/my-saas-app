@@ -42,6 +42,22 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "No domain saved for this project." }, { status: 400 });
     }
 
+    const devBypass = process.env.DOMAIN_DEV_BYPASS === "1";
+
+    // ✅ DEV BYPASS: instantly verify without DNS
+    if (devBypass) {
+      const updated = await markDomainVerified(params.projectId);
+      await setDomainProjectMapping(updated.domain, updated.projectId);
+
+      return NextResponse.json({
+        ok: true,
+        verified: true,
+        record: updated,
+        message: "Domain verified ✅ (DEV BYPASS) Routing activated.",
+      });
+    }
+
+    // ✅ Real DNS verification
     const host = verificationHost(record.domain);
     const expected = expectedValue(record.token);
 
@@ -60,10 +76,7 @@ export async function POST(
       });
     }
 
-    // ✅ Mark verified
     const updated = await markDomainVerified(params.projectId);
-
-    // ✅ Activate routing: domain -> projectId mapping
     await setDomainProjectMapping(updated.domain, updated.projectId);
 
     return NextResponse.json({
