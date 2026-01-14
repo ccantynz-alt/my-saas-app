@@ -1,4 +1,3 @@
-// src/app/api/projects/[projectId]/agents/finish-for-me/route.ts
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
@@ -14,10 +13,17 @@ function safeString(v: unknown) {
   return typeof v === "string" ? v : "";
 }
 
-export async function POST(
-  req: Request,
-  ctx: { params: Params }
-): Promise<Response> {
+// ✅ Quick browser test:
+// /api/projects/PROJ_ID/agents/finish-for-me
+export async function GET(_req: Request, ctx: { params: Params }) {
+  return NextResponse.json({
+    ok: true,
+    route: "finish-for-me",
+    projectId: ctx.params.projectId,
+  });
+}
+
+export async function POST(req: Request, ctx: { params: Params }): Promise<Response> {
   try {
     const { projectId } = ctx.params;
 
@@ -29,9 +35,8 @@ export async function POST(
     }
 
     const businessName = safeString(body?.businessName).trim();
-    const tone = safeString(body?.tone).trim(); // optional
+    const tone = safeString(body?.tone).trim();
 
-    // Start from defaults, then personalize a little (safe + deterministic)
     const content: PublishedSiteContent = defaultPublishedContent(projectId);
 
     if (businessName) {
