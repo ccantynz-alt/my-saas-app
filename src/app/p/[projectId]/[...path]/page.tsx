@@ -1,86 +1,37 @@
-mkdir -p src/app/p/[projectId]/[...path] 2>/dev/null || true
-
-cat > src/app/p/[projectId]/[...path]/page.tsx <<'EOF'
-// src/app/p/[projectId]/[...path]/page.tsx
-
-import type { Metadata } from "next";
-import { getPublishedProject } from "@/app/lib/projectPublishStore";
+import { Metadata } from "next";
 import PublicRenderer from "../PublicRenderer";
 
-function pathToSectionId(pathParts: string[] | undefined): string | null {
-  const first = (pathParts?.[0] || "").toLowerCase();
-  if (!first) return null;
+type PageProps = {
+  params: { projectId: string; path?: string[] };
+};
 
-  if (first === "features") return "features";
-  if (first === "pricing") return "pricing";
-  if (first === "faq") return "faq";
-  if (first === "contact") return "contact";
-  if (first === "testimonials") return "testimonials";
-  if (first === "about") return "about";
-  if (first === "cta") return "cta";
-
-  // Unknown routes just show the page without scroll
-  return null;
+function normalizeSlug(path?: string[]) {
+  const slug = Array.isArray(path) && path.length > 0 ? String(path[0] || "") : "";
+  return slug.trim().toLowerCase();
 }
 
-export async function generateMetadata(
-  { params }: { params: { projectId: string; path?: string[] } }
-): Promise<Metadata> {
-  const published = await getPublishedProject(params.projectId);
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const slug = normalizeSlug(params.path);
 
-  if (!published) {
+  if (!slug) {
     return {
-      title: "Not published yet",
-      description: "This site hasn’t been published yet.",
-      robots: { index: false, follow: false },
+      title: "Home",
+      description: "Published website",
     };
   }
 
-  const hero = published.content.sections.find((s) => s.type === "hero");
-  const baseTitle = (hero?.heading || "Published Site").slice(0, 60);
-  const baseDescription = (hero?.subheading || "A published project page.").slice(0, 160);
-
-  const sectionId = pathToSectionId(params.path);
-  const suffix =
-    sectionId ? ` — ${sectionId.charAt(0).toUpperCase()}${sectionId.slice(1)}` : "";
+  const pretty = slug.charAt(0).toUpperCase() + slug.slice(1);
 
   return {
-    title: `${baseTitle}${suffix}`.slice(0, 60),
-    description: baseDescription,
-    openGraph: {
-      title: `${baseTitle}${suffix}`.slice(0, 60),
-      description: baseDescription,
-      type: "website",
-    },
+    title: pretty,
+    description: `${pretty} page`,
   };
 }
 
-export default async function Page({ params }: { params: { projectId: string; path?: string[] } }) {
-  const published = await getPublishedProject(params.projectId);
+export default function PublishedCatchAllPage({ params }: PageProps) {
+  const slug = normalizeSlug(params.path);
 
-  if (!published) {
-    return (
-      <div style={{ maxWidth: 980, margin: "0 auto", padding: 24 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 900, marginBottom: 8 }}>
-          This site isn’t published yet
-        </h1>
-        <p style={{ opacity: 0.8, marginTop: 0 }}>
-          The project exists, but it hasn’t been published. Go back to the builder and click Publish.
-        </p>
-        <a href="/projects" style={{ fontWeight: 900 }}>
-          Back to Projects
-        </a>
-      </div>
-    );
-  }
-
-  const sectionId = pathToSectionId(params.path);
-
-  return (
-    <PublicRenderer
-      sections={published.content.sections || []}
-      initialSectionId={sectionId}
-    />
-  );
+  // Legacy behavior: /p/[projectId]/pricing etc.
+  // PublicRenderer is expected to support internal section-based rendering.
+  return <PublicRenderer projectId={params.projectId} pathSlug={slug} />;
 }
-EOF
