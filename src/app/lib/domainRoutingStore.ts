@@ -1,81 +1,46 @@
-// src/app/lib/domainRoutingStore.ts
+import { kv } from "./kv";
 
-import { kv } from "@vercel/kv";
+const KEY_PREFIX = "domain:route:";
 
-function normalizeHost(host: string): string {
-  const h = (host || "").trim().toLowerCase();
-  const noPort = h.split(":")[0];
-  return noPort.replace(/\.$/, "");
+export function normalizeDomain(input: string) {
+  // Lowercase, strip port, trim
+  const host = (input || "").trim().toLowerCase();
+  if (!host) return "";
+  return host.split(":")[0];
 }
 
-export function normalizeIncomingHost(host: string): string {
-  return normalizeHost(host);
-}
-
-const mappingKey = (host: string) => `domain:${normalizeHost(host)}:projectId`;
-
-export async function getProjectIdForHost(host: string): Promise<string | null> {
-  const h = normalizeHost(host);
-  if (!h) return null;
-
-  const val = await kv.get<string>(mappingKey(h));
-  return typeof val === "string" && val.length > 0 ? val : null;
+function keyFor(domain: string) {
+  return `${KEY_PREFIX}${normalizeDomain(domain)}`;
 }
 
 /**
- * Returns the projectId that owns the apex domain mapping (example.com).
- * This is how we prevent two projects claiming the same domain.
+ * Get mapped projectId for a domain (apex only; middleware canonicalizes www -> apex).
  */
-export async function getDomainOwnerProjectId(domainApex: string): Promise<string | null> {
-  const apex = normalizeHost(domainApex);
-  if (!apex) return null;
-  return await getProjectIdForHost(apex);
+export async function getDomainProjectMapping(domain: string): Promise<string | null> {
+  const d = normalizeDomain(domain);
+  if (!d) return null;
+
+  const value = await kv.get<string>(keyFor(d));
+  return value || null;
 }
 
 /**
- * Claim a domain for a project.
- * - If unclaimed -> claim succeeds
- * - If already claimed by same project -> ok (idempotent)
- * - If claimed by other project -> throw error
- *
- * Also writes www mapping.
+ * Set mapped projectId for a domain.
+ * This is the export your API route expects: setDomainProjectMapping(...)
  */
-export async function claimDomain(domainApex: string, projectId: string) {
-  const apex = normalizeHost(domainApex);
-  if (!apex) throw new Error("Invalid domain");
+export async function setDomainProjectMapping(domain: string, projectId: string): Promise<void> {
+  const d = normalizeDomain(domain);
+  if (!d) throw new Error("Missing domain");
+  if (!projectId) throw new Error("Missing projectId");
 
-  const existingOwner = await kv.get<string>(mappingKey(apex));
-  if (existingOwner && existingOwner !== projectId) {
-    throw new Error("This domain is already connected to another project.");
-  }
-
-  await kv.set(mappingKey(apex), projectId);
-  await kv.set(mappingKey(`www.${apex}`), projectId);
+  await kv.set(keyFor(d), projectId);
 }
 
 /**
- * Release a domain mapping (only if caller is owner).
- * Also removes www mapping.
+ * Remove mapping for a domain.
  */
-export async function releaseDomain(domainApex: string, projectId: string) {
-  const apex = normalizeHost(domainApex);
-  if (!apex) return;
-
-  const owner = await kv.get<string>(mappingKey(apex));
-  if (owner && owner !== projectId) {
-    throw new Error("Cannot remove mapping: domain belongs to another project.");
-  }
-
-  await kv.del(mappingKey(apex));
-  await kv.del(mappingKey(`www.${apex}`));
-}
-
-/**
- * Internal/admin-only helper (use carefully)
- */
-export async function setDomainProjectMappingUnsafe(domainApex: string, projectId: string) {
-  const apex = normalizeHost(domainApex);
-  if (!apex) throw new Error("Invalid domain");
-  await kv.set(mappingKey(apex), projectId);
-  await kv.set(mappingKey(`www.${apex}`), projectId);
+export async function deleteDomainProjectMapping(domain: string): Promise<void> {
+  const d = normalizeDomain(domain);
+  if (!d) return;
+  await kv.del(keyFor(d));
 }
