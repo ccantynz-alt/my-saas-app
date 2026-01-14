@@ -9,18 +9,16 @@ import {
 
 type Params = { projectId: string };
 
-function safeString(v: unknown) {
-  return typeof v === "string" ? v : "";
-}
-
-// ✅ Quick browser test:
-// /api/projects/PROJ_ID/agents/finish-for-me
 export async function GET(_req: Request, ctx: { params: Params }) {
   return NextResponse.json({
     ok: true,
     route: "finish-for-me",
     projectId: ctx.params.projectId,
   });
+}
+
+function safeString(v: unknown) {
+  return typeof v === "string" ? v : "";
 }
 
 export async function POST(req: Request, ctx: { params: Params }): Promise<Response> {
