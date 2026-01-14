@@ -1,5 +1,7 @@
-import { Metadata } from "next";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import PublicRenderer from "../PublicRenderer";
+import { getPublishedMetadata } from "../publishedSeo";
 
 type PageProps = {
   params: { projectId: string; path?: string[] };
@@ -10,29 +12,25 @@ function normalizeSlug(path?: string[]) {
   return slug.trim().toLowerCase();
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+function isAllowedPublishedSlug(slug: string) {
+  // "" means "home" (but catch-all is only used when a path exists)
+  // Still keeping this list explicit for safety.
+  const allowed = new Set(["about", "pricing", "faq", "contact"]);
+  return allowed.has(slug);
+}
+
+export function generateMetadata({ params }: PageProps): Metadata {
   const slug = normalizeSlug(params.path);
-
-  if (!slug) {
-    return {
-      title: "Home",
-      description: "Published website",
-    };
-  }
-
-  const pretty = slug.charAt(0).toUpperCase() + slug.slice(1);
-
-  return {
-    title: pretty,
-    description: `${pretty} page`,
-  };
+  return getPublishedMetadata({ projectId: params.projectId, pageSlug: slug });
 }
 
 export default function PublishedCatchAllPage({ params }: PageProps) {
   const slug = normalizeSlug(params.path);
 
-  // Legacy behavior: /p/[projectId]/pricing etc.
-  // PublicRenderer is expected to support internal section-based rendering.
+  // If someone hits /p/[projectId]/something-else -> real 404
+  if (!isAllowedPublishedSlug(slug)) {
+    notFound();
+  }
+
   return <PublicRenderer projectId={params.projectId} pathSlug={slug} />;
 }
-
