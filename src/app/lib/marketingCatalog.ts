@@ -1,71 +1,59 @@
-// src/app/lib/marketingCatalog.ts
-
-export type MarketingUseCase = {
+export type MarketingItem = {
   slug: string;
   title: string;
   description: string;
+  kind: "template" | "use-case";
 };
 
-export type MarketingTemplate = {
-  slug: string;
-  title: string;
-  description: string;
-  /**
-   * V1 strategy:
-   * - templateId is OPTIONAL.
-   * - If present, it is sent to backend as templateId.
-   * - If not present, fall back to slug (still stable).
-   * Later you can swap these to real IDs like "tmpl_..." without breaking UI.
-   */
-  templateId?: string;
-};
-
-export const USE_CASES: MarketingUseCase[] = [
-  {
-    slug: "saas",
-    title: "SaaS",
-    description: "Launch a modern SaaS site with pricing, features, and onboarding.",
-  },
+const templates: MarketingItem[] = [
   {
     slug: "startup",
-    title: "Startup",
-    description: "A fast, conversion-first startup landing page with clear CTAs.",
+    title: "Startup Template",
+    description: "A clean startup landing page with sections for pricing, FAQ, and contact.",
+    kind: "template",
   },
   {
-    slug: "service",
-    title: "Service Business",
-    description: "Perfect for service providers — benefits, trust, and lead capture.",
-  },
-  {
-    slug: "portfolio",
-    title: "Portfolio",
-    description: "Showcase your work, testimonials, and contact details cleanly.",
+    slug: "local-business",
+    title: "Local Business Template",
+    description: "A simple, conversion-focused site for local services.",
+    kind: "template",
   },
 ];
 
-export const TEMPLATES: MarketingTemplate[] = [
+const useCases: MarketingItem[] = [
   {
-    slug: "saas",
-    title: "SaaS Launch",
-    description: "Hero + pricing + feature grid + FAQs — built to convert.",
-    templateId: "saas",
+    slug: "ai-website-builder",
+    title: "AI Website Builder",
+    description: "Generate a conversion-ready website in minutes with AI.",
+    kind: "use-case",
   },
   {
-    slug: "startup",
-    title: "Startup Sprint",
-    description: "Simple, crisp, and fast — narrative sections + CTA blocks.",
-    templateId: "startup",
-  },
-  {
-    slug: "service",
-    title: "Service Pro",
-    description: "Trust-building layout with proof, offerings, and contact flow.",
-    templateId: "service",
-  },
-  {
-    slug: "portfolio",
-    title: "Portfolio Clean",
-    description: "Projects-first layout with a strong personal brand style.",
-    templateId: "portfolio",
+    slug: "saas-landing-page",
+    title: "SaaS Landing Page",
+    description: "Launch faster with a modern SaaS landing page layout.",
+    kind: "use-case",
   },
 ];
+
+export function listTemplates() {
+  return templates;
+}
+
+export function listUseCases() {
+  return useCases;
+}
+
+/**
+ * Find any marketing item by slug.
+ * This is the export your pages are expecting.
+ */
+export function findBySlug(slug: string): MarketingItem | null {
+  const s = String(slug || "").trim().toLowerCase();
+  if (!s) return null;
+
+  return (
+    templates.find((t) => t.slug === s) ||
+    useCases.find((u) => u.slug === s) ||
+    null
+  );
+}
