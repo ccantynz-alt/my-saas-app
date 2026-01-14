@@ -6,7 +6,7 @@ type Props = {
   projectId: string;
 };
 
-function safePreview(text: string, max = 700) {
+function safePreview(text: string, max = 900) {
   const t = (text || "").trim();
   if (!t) return "(empty response body)";
   return t.length > max ? t.slice(0, max) + "…" : t;
@@ -21,6 +21,28 @@ export default function AgentsClient({ projectId }: Props) {
   const apiUrl = `/api/projects/${projectId}/agents/finish-for-me`;
   const pubHome = `/p/${projectId}`;
   const pubPricing = `/p/${projectId}/pricing`;
+  const pubAbout = `/p/${projectId}/about`;
+  const pubContact = `/p/${projectId}/contact`;
+
+  async function testGetPing() {
+    setBusy(true);
+    setStatus(`Testing route…\nGET ${apiUrl}`);
+
+    try {
+      const res = await fetch(apiUrl, { method: "GET" });
+      const text = await res.text();
+
+      setStatus(
+        `GET ${apiUrl}\n` +
+          `HTTP ${res.status} ${res.statusText}\n\n` +
+          `Body:\n${safePreview(text)}`
+      );
+    } catch (e: any) {
+      setStatus(`❌ Error: ${e?.message || "Unknown error"}`);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function runFinishForMe() {
     setBusy(true);
@@ -45,7 +67,7 @@ export default function AgentsClient({ projectId }: Props) {
       if (!res.ok) {
         setStatus(
           `❌ HTTP ${res.status} ${res.statusText}\n` +
-            `POST ${apiUrl}\n` +
+            `POST ${apiUrl}\n\n` +
             `Body:\n${safePreview(text)}`
         );
         return;
@@ -55,7 +77,7 @@ export default function AgentsClient({ projectId }: Props) {
         setStatus(
           `❌ Unexpected response (not ok JSON)\n` +
             `HTTP ${res.status}\n` +
-            `POST ${apiUrl}\n` +
+            `POST ${apiUrl}\n\n` +
             `Body:\n${safePreview(text)}`
         );
         return;
@@ -68,6 +90,7 @@ export default function AgentsClient({ projectId }: Props) {
           `Pages: ${(json.pages || []).join(", ")}\n`
       );
 
+      // Instantly show the KV-backed output
       window.open(pubHome, "_blank", "noopener,noreferrer");
     } catch (e: any) {
       setStatus(`❌ Error: ${e?.message || "Unknown error"}`);
@@ -76,33 +99,13 @@ export default function AgentsClient({ projectId }: Props) {
     }
   }
 
-  async function testGetPing() {
-    setBusy(true);
-    setStatus(`Testing route…\nGET ${apiUrl}`);
-
-    try {
-      const res = await fetch(apiUrl, { method: "GET" });
-      const text = await res.text();
-
-      setStatus(
-        `GET ${apiUrl}\n` +
-          `HTTP ${res.status} ${res.statusText}\n` +
-          `Body:\n${safePreview(text)}`
-      );
-    } catch (e: any) {
-      setStatus(`❌ Error: ${e?.message || "Unknown error"}`);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
-    <main style={{ padding: 24, maxWidth: 960, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>Agents</h1>
+    <main style={{ padding: 24, maxWidth: 980, margin: "0 auto" }}>
+      <h1 style={{ fontSize: 28, fontWeight: 850, margin: 0 }}>Agents</h1>
 
       <p style={{ marginTop: 10, opacity: 0.85 }}>
-        This page triggers the <code>Finish-for-me</code> agent which writes
-        content to KV. Published pages update immediately.
+        Trigger KV-backed content generation for this project. This does not
+        redeploy — it writes content to KV used by <code>/p/[projectId]</code>.
       </p>
 
       <div
@@ -110,30 +113,30 @@ export default function AgentsClient({ projectId }: Props) {
           marginTop: 18,
           padding: 16,
           border: "1px solid #e5e7eb",
-          borderRadius: 12,
+          borderRadius: 14,
         }}
       >
         <div style={{ fontSize: 13, opacity: 0.75 }}>
           API: <code>{apiUrl}</code>
         </div>
 
-        <label style={{ display: "block", marginTop: 12, fontWeight: 650 }}>
+        <label style={{ display: "block", marginTop: 12, fontWeight: 700 }}>
           Business name (optional)
         </label>
         <input
           value={businessName}
           onChange={(e) => setBusinessName(e.target.value)}
-          placeholder="e.g. Rovez Websites"
+          placeholder="e.g. Book A Ride NZ"
           style={{
             marginTop: 8,
             width: "100%",
             padding: 10,
-            borderRadius: 10,
+            borderRadius: 12,
             border: "1px solid #e5e7eb",
           }}
         />
 
-        <label style={{ display: "block", marginTop: 14, fontWeight: 650 }}>
+        <label style={{ display: "block", marginTop: 14, fontWeight: 700 }}>
           Tone (optional)
         </label>
         <input
@@ -144,7 +147,7 @@ export default function AgentsClient({ projectId }: Props) {
             marginTop: 8,
             width: "100%",
             padding: 10,
-            borderRadius: 10,
+            borderRadius: 12,
             border: "1px solid #e5e7eb",
           }}
         />
@@ -159,7 +162,7 @@ export default function AgentsClient({ projectId }: Props) {
               border: "1px solid #e5e7eb",
               background: busy ? "#f3f4f6" : "white",
               cursor: busy ? "not-allowed" : "pointer",
-              fontWeight: 650,
+              fontWeight: 750,
             }}
           >
             {busy ? "Running…" : "Run Finish-for-me Agent"}
@@ -174,7 +177,7 @@ export default function AgentsClient({ projectId }: Props) {
               border: "1px solid #e5e7eb",
               background: busy ? "#f3f4f6" : "white",
               cursor: busy ? "not-allowed" : "pointer",
-              fontWeight: 650,
+              fontWeight: 750,
             }}
           >
             {busy ? "Testing…" : "Test Agent Route (GET)"}
@@ -188,7 +191,7 @@ export default function AgentsClient({ projectId }: Props) {
             background: "#fafafa",
             border: "1px solid #eee",
             padding: 12,
-            borderRadius: 10,
+            borderRadius: 12,
             whiteSpace: "pre-wrap",
           }}
         >
@@ -197,13 +200,51 @@ export default function AgentsClient({ projectId }: Props) {
 
         <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
           <a href={pubHome} style={{ textDecoration: "none" }}>
-            <span style={{ padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: 10, display: "inline-block" }}>
+            <span
+              style={{
+                padding: "8px 10px",
+                border: "1px solid #e5e7eb",
+                borderRadius: 10,
+                display: "inline-block",
+              }}
+            >
               Open Published Home
             </span>
           </a>
           <a href={pubPricing} style={{ textDecoration: "none" }}>
-            <span style={{ padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: 10, display: "inline-block" }}>
-              Open Published Pricing
+            <span
+              style={{
+                padding: "8px 10px",
+                border: "1px solid #e5e7eb",
+                borderRadius: 10,
+                display: "inline-block",
+              }}
+            >
+              Open Pricing
+            </span>
+          </a>
+          <a href={pubAbout} style={{ textDecoration: "none" }}>
+            <span
+              style={{
+                padding: "8px 10px",
+                border: "1px solid #e5e7eb",
+                borderRadius: 10,
+                display: "inline-block",
+              }}
+            >
+              Open About
+            </span>
+          </a>
+          <a href={pubContact} style={{ textDecoration: "none" }}>
+            <span
+              style={{
+                padding: "8px 10px",
+                border: "1px solid #e5e7eb",
+                borderRadius: 10,
+                display: "inline-block",
+              }}
+            >
+              Open Contact
             </span>
           </a>
         </div>
