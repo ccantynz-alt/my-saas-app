@@ -23,6 +23,7 @@ export default function DomainsClient({ projectId }: { projectId: string }) {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [verifying, setVerifying] = React.useState(false);
+  const [disconnecting, setDisconnecting] = React.useState(false);
 
   const [domainInput, setDomainInput] = React.useState("");
   const [record, setRecord] = React.useState<RecordV1 | null>(null);
@@ -98,21 +99,21 @@ export default function DomainsClient({ projectId }: { projectId: string }) {
     }
   }
 
-  async function onClear() {
-    setSaving(true);
+  async function onDisconnect() {
+    setDisconnecting(true);
     setError(null);
     setStatus(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/domain`, { method: "DELETE" });
+      const res = await fetch(`/api/projects/${projectId}/domain/disconnect`, { method: "POST" });
       const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.ok) throw new Error(json?.error || "Clear failed");
+      if (!res.ok || !json?.ok) throw new Error(json?.error || "Disconnect failed");
       setRecord(null);
       setDomainInput("");
-      setStatus("Cleared ✅");
+      setStatus("Disconnected ✅ Domain removed and routing cleared.");
     } catch (e: any) {
-      setError(e?.message || "Clear failed");
+      setError(e?.message || "Disconnect failed");
     } finally {
-      setSaving(false);
+      setDisconnecting(false);
     }
   }
 
@@ -148,7 +149,7 @@ export default function DomainsClient({ projectId }: { projectId: string }) {
           <button
             type="button"
             onClick={onSave}
-            disabled={saving || verifying}
+            disabled={saving || verifying || disconnecting}
             style={{
               padding: "10px 14px",
               borderRadius: 12,
@@ -156,8 +157,8 @@ export default function DomainsClient({ projectId }: { projectId: string }) {
               background: "black",
               color: "white",
               fontWeight: 900,
-              cursor: (saving || verifying) ? "not-allowed" : "pointer",
-              opacity: (saving || verifying) ? 0.7 : 1,
+              cursor: (saving || verifying || disconnecting) ? "not-allowed" : "pointer",
+              opacity: (saving || verifying || disconnecting) ? 0.7 : 1,
             }}
           >
             {saving ? "Saving…" : "Save domain"}
@@ -165,19 +166,19 @@ export default function DomainsClient({ projectId }: { projectId: string }) {
 
           <button
             type="button"
-            onClick={onClear}
-            disabled={saving || verifying}
+            onClick={onDisconnect}
+            disabled={!record || disconnecting || saving || verifying}
             style={{
               padding: "10px 14px",
               borderRadius: 12,
               border: "1px solid rgba(0,0,0,0.22)",
               background: "white",
               fontWeight: 900,
-              cursor: (saving || verifying) ? "not-allowed" : "pointer",
-              opacity: (saving || verifying) ? 0.7 : 1,
+              cursor: (!record || disconnecting || saving || verifying) ? "not-allowed" : "pointer",
+              opacity: (!record || disconnecting || saving || verifying) ? 0.7 : 1,
             }}
           >
-            Clear
+            {disconnecting ? "Disconnecting…" : "Disconnect domain"}
           </button>
         </div>
 
@@ -193,7 +194,7 @@ export default function DomainsClient({ projectId }: { projectId: string }) {
         <div style={{ marginTop: 14, border: "1px solid rgba(0,0,0,0.12)", borderRadius: 14, padding: 16 }}>
           <div style={{ fontWeight: 900, marginBottom: 10 }}>2) Add this DNS TXT record</div>
           <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 10 }}>
-            Go to your domain registrar (Cloudflare, GoDaddy, Namecheap, etc) → DNS settings → add a TXT record:
+            Go to your domain registrar → DNS settings → add a TXT record:
           </div>
 
           <div style={{ display: "grid", gap: 10 }}>
@@ -212,7 +213,7 @@ export default function DomainsClient({ projectId }: { projectId: string }) {
             </div>
 
             <div style={{ opacity: 0.75, fontSize: 13 }}>
-              DNS can take a while to propagate (sometimes minutes, sometimes longer). After you add it, click Verify.
+              DNS can take time to propagate. After adding it, click Verify.
             </div>
           </div>
 
@@ -220,7 +221,7 @@ export default function DomainsClient({ projectId }: { projectId: string }) {
             <button
               type="button"
               onClick={onVerify}
-              disabled={verifying || saving}
+              disabled={verifying || saving || disconnecting}
               style={{
                 padding: "10px 14px",
                 borderRadius: 12,
@@ -228,8 +229,8 @@ export default function DomainsClient({ projectId }: { projectId: string }) {
                 background: "#0b5",
                 color: "white",
                 fontWeight: 950,
-                cursor: (verifying || saving) ? "not-allowed" : "pointer",
-                opacity: (verifying || saving) ? 0.7 : 1,
+                cursor: (verifying || saving || disconnecting) ? "not-allowed" : "pointer",
+                opacity: (verifying || saving || disconnecting) ? 0.7 : 1,
               }}
             >
               {verifying ? "Verifying…" : "Verify DNS"}
