@@ -68,7 +68,7 @@ export default function AgentsClient({ projectId }: Props) {
           `Pages: ${(json.pages || []).join(", ")}\n`
       );
 
-      // Open the published home so you instantly see KV-updated content
+      // Open published page so you instantly see KV-updated content
       window.open(pubHome, "_blank", "noopener,noreferrer");
     } catch (e: any) {
       setStatus(`❌ Error: ${e?.message || "Unknown error"}`);
@@ -198,26 +198,12 @@ export default function AgentsClient({ projectId }: Props) {
 
         <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
           <a href={pubHome} style={{ textDecoration: "none" }}>
-            <span
-              style={{
-                padding: "8px 10px",
-                border: "1px solid #e5e7eb",
-                borderRadius: 10,
-                display: "inline-block",
-              }}
-            >
+            <span style={{ padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: 10, display: "inline-block" }}>
               Open Published Home
             </span>
           </a>
           <a href={pubPricing} style={{ textDecoration: "none" }}>
-            <span
-              style={{
-                padding: "8px 10px",
-                border: "1px solid #e5e7eb",
-                borderRadius: 10,
-                display: "inline-block",
-              }}
-            >
+            <span style={{ padding: "8px 10px", border: "1px solid #e5e7eb", borderRadius: 10, display: "inline-block" }}>
               Open Published Pricing
             </span>
           </a>
