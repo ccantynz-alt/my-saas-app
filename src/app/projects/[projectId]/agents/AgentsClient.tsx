@@ -6,7 +6,7 @@ type Props = {
   projectId: string;
 };
 
-function safePreview(text: string, max = 500) {
+function safePreview(text: string, max = 700) {
   const t = (text || "").trim();
   if (!t) return "(empty response body)";
   return t.length > max ? t.slice(0, max) + "…" : t;
@@ -18,18 +18,21 @@ export default function AgentsClient({ projectId }: Props) {
   const [status, setStatus] = React.useState<string>("");
   const [busy, setBusy] = React.useState(false);
 
+  const apiUrl = `/api/projects/${projectId}/agents/finish-for-me`;
+  const pubHome = `/p/${projectId}`;
+  const pubPricing = `/p/${projectId}/pricing`;
+
   async function runFinishForMe() {
     setBusy(true);
-    setStatus("Running agent…");
+    setStatus(`Running agent…\nPOST ${apiUrl}`);
 
     try {
-      const res = await fetch(`/api/projects/${projectId}/agents/finish-for-me`, {
+      const res = await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ businessName, tone }),
       });
 
-      // IMPORTANT: read text first, then try JSON parse
       const text = await res.text();
 
       let json: any = null;
@@ -42,9 +45,9 @@ export default function AgentsClient({ projectId }: Props) {
       if (!res.ok) {
         setStatus(
           `❌ HTTP ${res.status} ${res.statusText}\n` +
-            `Body: ${safePreview(text)}`
+            `POST ${apiUrl}\n` +
+            `Body:\n${safePreview(text)}`
         );
-        setBusy(false);
         return;
       }
 
@@ -52,13 +55,21 @@ export default function AgentsClient({ projectId }: Props) {
         setStatus(
           `❌ Unexpected response (not ok JSON)\n` +
             `HTTP ${res.status}\n` +
-            `Body: ${safePreview(text)}`
+            `POST ${apiUrl}\n` +
+            `Body:\n${safePreview(text)}`
         );
-        setBusy(false);
         return;
       }
 
-      setStatus(`✅ Agent completed. Updated at ${json.updatedAt}`);
+      setStatus(
+        `✅ Agent completed\n` +
+          `Updated at: ${json.updatedAt}\n` +
+          `Project: ${json.projectId}\n` +
+          `Pages: ${(json.pages || []).join(", ")}\n`
+      );
+
+      // Open the published home so you instantly see KV-updated content
+      window.open(pubHome, "_blank", "noopener,noreferrer");
     } catch (e: any) {
       setStatus(`❌ Error: ${e?.message || "Unknown error"}`);
     } finally {
@@ -66,8 +77,25 @@ export default function AgentsClient({ projectId }: Props) {
     }
   }
 
-  const pubHome = `/p/${projectId}`;
-  const pubPricing = `/p/${projectId}/pricing`;
+  async function testGetPing() {
+    setBusy(true);
+    setStatus(`Testing route…\nGET ${apiUrl}`);
+
+    try {
+      const res = await fetch(apiUrl, { method: "GET" });
+      const text = await res.text();
+
+      setStatus(
+        `GET ${apiUrl}\n` +
+          `HTTP ${res.status} ${res.statusText}\n` +
+          `Body:\n${safePreview(text)}`
+      );
+    } catch (e: any) {
+      setStatus(`❌ Error: ${e?.message || "Unknown error"}`);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <main style={{ padding: 24, maxWidth: 960, margin: "0 auto" }}>
@@ -86,7 +114,11 @@ export default function AgentsClient({ projectId }: Props) {
           borderRadius: 12,
         }}
       >
-        <label style={{ display: "block", fontWeight: 650 }}>
+        <div style={{ fontSize: 13, opacity: 0.75 }}>
+          API: <code>{apiUrl}</code>
+        </div>
+
+        <label style={{ display: "block", marginTop: 12, fontWeight: 650 }}>
           Business name (optional)
         </label>
         <input
@@ -118,21 +150,37 @@ export default function AgentsClient({ projectId }: Props) {
           }}
         />
 
-        <button
-          onClick={runFinishForMe}
-          disabled={busy}
-          style={{
-            marginTop: 14,
-            padding: "10px 12px",
-            borderRadius: 12,
-            border: "1px solid #e5e7eb",
-            background: busy ? "#f3f4f6" : "white",
-            cursor: busy ? "not-allowed" : "pointer",
-            fontWeight: 650,
-          }}
-        >
-          {busy ? "Running…" : "Run Finish-for-me Agent"}
-        </button>
+        <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button
+            onClick={runFinishForMe}
+            disabled={busy}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid #e5e7eb",
+              background: busy ? "#f3f4f6" : "white",
+              cursor: busy ? "not-allowed" : "pointer",
+              fontWeight: 650,
+            }}
+          >
+            {busy ? "Running…" : "Run Finish-for-me Agent"}
+          </button>
+
+          <button
+            onClick={testGetPing}
+            disabled={busy}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid #e5e7eb",
+              background: busy ? "#f3f4f6" : "white",
+              cursor: busy ? "not-allowed" : "pointer",
+              fontWeight: 650,
+            }}
+          >
+            {busy ? "Testing…" : "Test Agent Route (GET)"}
+          </button>
+        </div>
 
         <pre
           style={{
