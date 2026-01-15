@@ -1,11 +1,24 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    appDir: true,
+  },
+
   reactStrictMode: true,
 
-  // IMPORTANT:
-  // Do NOT use `output: "export"` for this project.
-  // Static export breaks/limits dynamic App Router routes and causes build-time export failures (like /start).
-  // We want standard Vercel Next.js routing (pages + API) to work normally.
+  async headers() {
+    return [
+      {
+        source: "/api/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-store",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;
