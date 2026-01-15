@@ -2,22 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * SAFE middleware:
- * - Never blocks /api/*
- * - Allows POST, GET, etc
- * - Prevents auth/method interference
+ * SAFE NO-OP middleware (temporary)
+ * Prevents Edge runtime crashes: MIDDLEWARE_INVOCATION_FAILED
  */
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-
-  // NEVER intercept API routes
-  if (pathname.startsWith("/api/")) {
-    return NextResponse.next();
-  }
-
+export function middleware(_req: NextRequest) {
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/:path*"],
 };
