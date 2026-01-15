@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 
-// IMPORTANT: use relative imports inside app/ tree (avoids alias mismatch)
-import { kv } from "../../../../lib/kv";
-import { getPlanForUserId } from "../../../../lib/plan";
+// Your libs exist in src/app/lib
+import { kv } from "@/src/app/lib/kv";
+import { getPlanForUserId } from "@/src/app/lib/plan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,7 +46,7 @@ export async function POST(req: Request, ctx: { params: { projectId: string } })
       );
     }
 
-    // NO kv.get<string>() generics
+    // IMPORTANT: no kv.get<string>()
     const kvPlan = (await kv.get(`user:${userId}:plan`)) as string | null;
 
     const input = await req.json().catch(() => ({}));
