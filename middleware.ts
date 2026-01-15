@@ -1,22 +1,23 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-const isPublicRoute = createRouteMatcher([
-  "/",               // home
-  "/api/version(.*)",// production sha check
-  "/p/(.*)",         // published sites
+/**
+ * SAFE middleware:
+ * - Never blocks /api/*
+ * - Allows POST, GET, etc
+ * - Prevents auth/method interference
+ */
+export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
 
-  // MUST be public or Clerk can rewrite to /404
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-]);
+  // NEVER intercept API routes
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
 
-export default clerkMiddleware((auth, req) => {
-  if (isPublicRoute(req)) return;
-  auth().protect();
-});
+  return NextResponse.next();
+}
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|js|map)$).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
