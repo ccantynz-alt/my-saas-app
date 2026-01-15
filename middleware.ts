@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 /**
  * MIDDLEWARE DISABLED (temporary, safe)
- * This prevents MIDDLEWARE_INVOCATION_FAILED by matching NOTHING.
+ * Prevents MIDDLEWARE_INVOCATION_FAILED by matching NOTHING.
  */
 export function middleware(_req: NextRequest) {
   return NextResponse.next();
