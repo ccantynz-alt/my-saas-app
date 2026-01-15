@@ -1,8 +1,14 @@
 import { SiteSpec } from "./siteSpec";
 import * as kvMod from "./kv";
 
+/**
+ * Build-safe KV accessor:
+ * - Supports kv exported as named export: export const kv = ...
+ * - Supports kv exported as default export: export default kv
+ * - Supports module exporting functions directly
+ */
 function getKvAny(): any {
-  return (kvMod as any).kv ?? (kvMod as any).default ?? kvMod;
+  return (kvMod as any).kv ?? (kvMod as any).default ?? (kvMod as any);
 }
 
 function publishedKey(projectId: string) {
@@ -15,19 +21,16 @@ function publishedFlagKey(projectId: string) {
 
 export async function publishSiteSpec(projectId: string, spec: SiteSpec) {
   const kv = getKvAny();
-  if (!kv?.set) throw new Error("KV store not available");
+  if (!kv?.set) throw new Error("KV store not available (kv.set missing)");
 
   await kv.set(publishedKey(projectId), JSON.stringify(spec));
   await kv.set(publishedFlagKey(projectId), "true");
-
   return true;
 }
 
-export async function loadPublishedSiteSpec(
-  projectId: string
-): Promise<SiteSpec | null> {
+export async function loadPublishedSiteSpec(projectId: string): Promise<SiteSpec | null> {
   const kv = getKvAny();
-  if (!kv?.get) throw new Error("KV store not available");
+  if (!kv?.get) throw new Error("KV store not available (kv.get missing)");
 
   const raw = await kv.get(publishedKey(projectId));
   if (!raw) return null;
