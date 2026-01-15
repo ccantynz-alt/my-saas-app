@@ -10,8 +10,12 @@ type RouteParams = {
   };
 };
 
-export async function POST(req: Request, { params }: RouteParams) {
+export async function POST(
+  req: Request,
+  { params }: RouteParams
+) {
   const { userId } = auth();
+
   if (!userId) {
     return NextResponse.json(
       { ok: false, error: "Unauthorized" },
@@ -19,7 +23,7 @@ export async function POST(req: Request, { params }: RouteParams) {
     );
   }
 
-  const { projectId } = params;
+  const projectId = params.projectId;
 
   const spec = await loadSiteSpec(projectId);
   if (!spec) {
