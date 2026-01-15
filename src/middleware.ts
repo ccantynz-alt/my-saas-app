@@ -1,22 +1,14 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-const isPublicRoute = createRouteMatcher([
-  "/",               // home
-  "/api/version(.*)",// production sha check
-  "/p/(.*)",         // published sites
-
-  // MUST be public or Clerk can rewrite to /404
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-]);
-
-export default clerkMiddleware((auth, req) => {
-  if (isPublicRoute(req)) return;
-  auth().protect();
-});
+/**
+ * SAFE NO-OP middleware (temporary)
+ * Prevents Edge runtime crashes: MIDDLEWARE_INVOCATION_FAILED
+ */
+export function middleware(_req: NextRequest) {
+  return NextResponse.next();
+}
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|js|map)$).*)",
-  ],
+  matcher: ["/:path*"],
 };
