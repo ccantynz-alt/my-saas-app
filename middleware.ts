@@ -1,22 +1,22 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isPublicRoute = createRouteMatcher([
-  "/", // marketing home (if you have it)
-  "/api/version(.*)", // allow version checks
-  "/p/(.*)", // published renderer should be public
+  "/",                   // marketing
+  "/api/version(.*)",     // version check
+  "/p/(.*)",              // published sites
+
+  // 🚨 MUST be public or Clerk will protect-rewrite to /404
+  "/sign-in(.*)",
+  "/sign-up(.*)",
 ]);
 
 export default clerkMiddleware((auth, req) => {
-  // Public routes: let through
   if (isPublicRoute(req)) return;
-
-  // Everything else requires sign-in (including /projects/*)
   auth().protect();
 });
 
 export const config = {
   matcher: [
-    // Run middleware on all routes except static files
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|css|js|map)$).*)",
   ],
 };
