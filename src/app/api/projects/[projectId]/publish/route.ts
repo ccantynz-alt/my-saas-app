@@ -1,92 +1,40 @@
-// src/app/api/projects/[projectId]/publish/route.ts
-
 import { NextResponse } from "next/server";
-import { getProjectTemplateId } from "@/app/lib/projectTemplateStore";
-import { getProjectContent } from "@/app/lib/projectContentStore";
-import { getProjectScaffold } from "@/app/lib/projectScaffoldStore";
-import { setPublishedProject, getPublishedProject, clearPublishedProject } from "@/app/lib/projectPublishStore";
+import { auth } from "@clerk/nextjs/server";
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { projectId: string } }
-) {
-  try {
-    const projectId = params.projectId;
-    const published = await getPublishedProject(projectId);
-    return NextResponse.json({ ok: true, projectId, published });
-  } catch (e: any) {
+import { loadSiteSpec } from "@/app/lib/projectSpecStore";
+import { publishSiteSpec } from "@/app/lib/publishedSpecStore";
+
+type RouteParams = {
+  params: {
+    projectId: string;
+  };
+};
+
+export async function POST(req: Request, { params }: RouteParams) {
+  const { userId } = auth();
+  if (!userId) {
     return NextResponse.json(
-      { ok: false, error: e?.message || "Failed to read publish state" },
-      { status: 500 }
+      { ok: false, error: "Unauthorized" },
+      { status: 401 }
     );
   }
-}
 
-export async function POST(
-  _req: Request,
-  { params }: { params: { projectId: string } }
-) {
-  try {
-    const projectId = params.projectId;
+  const { projectId } = params;
 
-    const templateId = await getProjectTemplateId(projectId);
-
-    // Prefer saved content; fallback to scaffold so you can publish immediately
-    const saved = await getProjectContent(projectId);
-    const scaffold = await getProjectScaffold(projectId);
-
-    const contentToPublish = saved || (scaffold
-      ? {
-          version: 1 as const,
-          updatedAt: new Date().toISOString(),
-          templateId: templateId ?? null,
-          sections: scaffold.sections,
-        }
-      : null);
-
-    if (!contentToPublish) {
-      return NextResponse.json(
-        { ok: false, error: "No content found to publish (save something first)." },
-        { status: 400 }
-      );
-    }
-
-    const published = {
-      version: 1 as const,
-      publishedAt: new Date().toISOString(),
-      projectId,
-      templateId: templateId ?? null,
-      content: contentToPublish,
-    };
-
-    await setPublishedProject(projectId, published);
-
-    return NextResponse.json({
-      ok: true,
-      projectId,
-      publishedAt: published.publishedAt,
-      publicUrl: `/p/${projectId}`,
-    });
-  } catch (e: any) {
+  const spec = await loadSiteSpec(projectId);
+  if (!spec) {
     return NextResponse.json(
-      { ok: false, error: e?.message || "Failed to publish" },
-      { status: 500 }
+      { ok: false, error: "No site spec found to publish" },
+      { status: 400 }
     );
   }
-}
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { projectId: string } }
-) {
-  try {
-    const projectId = params.projectId;
-    await clearPublishedProject(projectId);
-    return NextResponse.json({ ok: true, projectId, unpublished: true });
-  } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: e?.message || "Failed to unpublish" },
-      { status: 500 }
-    );
-  }
+  await publishSiteSpec(projectId, spec);
+
+  return NextResponse.json({
+    ok: true,
+    projectId,
+    publicUrl: `/p/${projectId}`,
+    publishedAtIso: new Date().toISOString(),
+  });
 }
