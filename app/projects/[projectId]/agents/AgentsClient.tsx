@@ -1,46 +1,49 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
-type AgentIssue = { code: string; severity: string; message: string };
+type Issue = { code: string; severity: string; message: string };
 
 type AgentResult = {
   ok: boolean;
   agent: string;
   projectId: string;
   summary?: { totalIssues?: number; blocking?: number };
-  issues?: AgentIssue[];
+  issues?: Issue[];
   pages?: string[];
-  auditedAt?: string;
-  updatedAt?: string;
+  error?: string;
 };
 
 export default function AgentsClient({ projectId }: { projectId: string }) {
   const [running, setRunning] = useState<string | null>(null);
   const [result, setResult] = useState<AgentResult | null>(null);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState("");
 
-  const finishForMeUrl = useMemo(
-    () => `/api/projects/${projectId}/agents/finish-for-me`,
-    [projectId]
-  );
+  function endpoint(agent: string) {
+    return `/api/projects/${projectId}/agents/${agent}`;
+  }
 
-  const auditUrl = useMemo(
-    () => `/api/projects/${projectId}/agents/audit`,
-    [projectId]
-  );
-
-  async function runAgent(url: string, agentName: string) {
-    setRunning(agentName);
+  async function run(agent: string) {
+    setRunning(agent);
     setResult(null);
     setError("");
 
     try {
-      const res = await fetch(url, { method: "POST" });
+      const res = await fetch(endpoint(agent), { method: "POST" });
       const text = await res.text();
 
       if (!res.ok) {
-        setError(`HTTP ${res.status}\n\n${text}`);
+        // Try parse JSON error body
+        try {
+          const j = JSON.parse(text);
+          if (j?.error === "PRO_REQUIRED") {
+            setError(`PRO REQUIRED\n\nUpgrade to run: ${agent}`);
+          } else {
+            setError(`HTTP ${res.status}\n\n${text}`);
+          }
+        } catch {
+          setError(`HTTP ${res.status}\n\n${text}`);
+        }
         return;
       }
 
@@ -52,98 +55,68 @@ export default function AgentsClient({ projectId }: { projectId: string }) {
     }
   }
 
+  const showUpgrade = error.startsWith("PRO REQUIRED");
+
   return (
     <main style={{ padding: 32, fontFamily: "system-ui, sans-serif" }}>
-      <h1 style={{ marginTop: 0 }}>Agents</h1>
+      <h1>Agents</h1>
       <p>
         Project ID: <code>{projectId}</code>
       </p>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        <button
-          onClick={() => runAgent(finishForMeUrl, "finish-for-me")}
-          disabled={!!running}
-          style={{ padding: "10px 14px", fontWeight: 700 }}
-        >
+      <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+        <button onClick={() => run("finish-for-me")} disabled={!!running}>
           {running === "finish-for-me" ? "Running…" : "Finish-for-me"}
         </button>
 
-        <button
-          onClick={() => runAgent(auditUrl, "audit")}
-          disabled={!!running}
-          style={{ padding: "10px 14px", fontWeight: 700 }}
-        >
-          {running === "audit" ? "Running…" : "Audit"}
+        <button onClick={() => run("audit")} disabled={!!running}>
+          {running === "audit" ? "Running…" : "Audit (Free)"}
         </button>
 
-        <button disabled style={{ padding: "10px 14px", fontWeight: 700, opacity: 0.6 }}>
-          SEO (next)
+        <button onClick={() => run("seo")} disabled={!!running}>
+          {running === "seo" ? "Running…" : "SEO (Pro)"}
         </button>
       </div>
 
       {error && (
-        <pre
+        <div
           style={{
-            whiteSpace: "pre-wrap",
             padding: 12,
-            border: "1px solid rgba(255,0,0,0.35)",
-            background: "rgba(255,0,0,0.06)",
             borderRadius: 10,
+            border: "1px solid rgba(255,0,0,0.25)",
+            background: "rgba(255,0,0,0.06)",
+            marginBottom: 16,
+            whiteSpace: "pre-wrap",
           }}
         >
           {error}
-        </pre>
+          {showUpgrade && (
+            <div style={{ marginTop: 10 }}>
+              <a href="/upgrade" style={{ fontWeight: 800 }}>
+                Go to Upgrade →
+              </a>
+            </div>
+          )}
+        </div>
       )}
 
       {result && (
-        <section style={{ marginTop: 18 }}>
-          <h2 style={{ marginTop: 0 }}>Result: {result.agent}</h2>
-
-          {result.summary && (
-            <pre
-              style={{
-                whiteSpace: "pre-wrap",
-                padding: 12,
-                border: "1px solid rgba(0,0,0,0.12)",
-                background: "rgba(0,0,0,0.03)",
-                borderRadius: 10,
-              }}
-            >
-              {JSON.stringify(result.summary, null, 2)}
-            </pre>
-          )}
-
-          {result.issues && result.issues.length > 0 && (
-            <ul style={{ lineHeight: 1.9 }}>
+        <section>
+          <h2>Result: {result.agent}</h2>
+          {result.summary && <pre>{JSON.stringify(result.summary, null, 2)}</pre>}
+          {result.issues && (
+            <ul>
               {result.issues.map((i, idx) => (
                 <li key={idx}>
                   <strong>{i.severity.toUpperCase()}</strong>: {i.message}{" "}
-                  <span style={{ opacity: 0.7 }}>
-                    (<code>{i.code}</code>)
-                  </span>
+                  <code>({i.code})</code>
                 </li>
               ))}
             </ul>
           )}
-
-          <details style={{ marginTop: 12 }}>
-            <summary style={{ cursor: "pointer" }}>Raw JSON</summary>
-            <pre
-              style={{
-                whiteSpace: "pre-wrap",
-                padding: 12,
-                border: "1px solid rgba(0,0,0,0.12)",
-                background: "rgba(0,0,0,0.03)",
-                borderRadius: 10,
-                marginTop: 8,
-              }}
-            >
-              {JSON.stringify(result, null, 2)}
-            </pre>
-          </details>
+          {result.pages && <pre>{JSON.stringify(result.pages, null, 2)}</pre>}
         </section>
       )}
     </main>
   );
 }
-
