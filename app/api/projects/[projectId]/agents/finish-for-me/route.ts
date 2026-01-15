@@ -1,18 +1,28 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
+function payload(projectId: string) {
+  return {
+    ok: true,
+    projectId,
+    updatedAt: new Date().toISOString(),
+    pages: ["", "about", "pricing", "faq", "contact"],
+  };
+}
+
+// Allow GET so you can test in a browser (and it won't 405)
+export async function GET(
+  _req: Request,
+  { params }: { params: { projectId: string } }
+) {
+  return NextResponse.json(payload(params.projectId));
+}
+
+// Allow POST for the agent button
 export async function POST(
   _req: Request,
   { params }: { params: { projectId: string } }
 ) {
-  const { projectId } = params;
-
-  // TEMP: stub response to prove POST works
-  // We will replace this with real agent logic next
-  return NextResponse.json({
-    ok: true,
-    agent: "finish-for-me",
-    projectId,
-    message: "Finish-for-me agent triggered successfully",
-    timestamp: new Date().toISOString(),
-  });
+  return NextResponse.json(payload(params.projectId));
 }
