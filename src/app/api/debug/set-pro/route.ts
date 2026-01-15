@@ -1,56 +1,60 @@
 import { NextResponse } from "next/server";
-import { kv } from "@/app/lib/kv";
 import { auth } from "@clerk/nextjs/server";
+import { kv } from "@/src/app/lib/kv";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-export async function POST(req: Request) {
-=======
-async function handle(req: Request) {
->>>>>>> 8149524 (fix: repair seo agent route syntax)
-=======
-export async function POST(req: Request) {
->>>>>>> a51c1da (fix: ensure set-pro debug route supports POST)
+const DEV_TOKEN = "dev-pro-unlock";
+
+async function setPlanForUser(userId: string, plan: "free" | "pro") {
+  await kv.set(`user:${userId}:plan`, plan);
+}
+
+async function setGlobalPlan(plan: "free" | "pro") {
+  await kv.set("debug:global:plan", plan);
+}
+
+export async function GET() {
   const { userId } = auth();
+  const globalPlan = (await kv.get("debug:global:plan")) as string | null;
+  const userPlan = userId ? ((await kv.get(`user:${userId}:plan`)) as string | null) : null;
 
-  if (!userId) {
-    return NextResponse.json({ ok: false, error: "NOT_AUTHENTICATED" }, { status: 401 });
-  }
-
-  const body = await req.json().catch(() => ({}));
-  const token = body?.token;
-
-  if (!token || token !== process.env.DEBUG_PRO_TOKEN) {
-    return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
-  }
-
-  await kv.set(`user:${userId}:plan`, "pro");
-
-<<<<<<< HEAD
   return NextResponse.json({
     ok: true,
-    userId,
-    plan: "pro",
-    message: "User upgraded to Pro (debug)",
+    userId: userId ?? null,
+    globalPlan,
+    userPlan,
   });
 }
 
-<<<<<<< HEAD
-// Optional: if someone visits it in a browser, return a helpful message
-=======
 export async function POST(req: Request) {
-  return handle(req);
-=======
-  return NextResponse.json({ ok: true, userId, plan: "pro" });
->>>>>>> a51c1da (fix: ensure set-pro debug route supports POST)
-}
+  try {
+    const { userId } = auth();
+    if (!userId) {
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
 
->>>>>>> 8149524 (fix: repair seo agent route syntax)
-export async function GET() {
-  return NextResponse.json(
-    { ok: false, error: "USE_POST", hint: "Send POST with JSON { token }" },
-    { status: 405 }
-  );
+    const body = await req.json().catch(() => ({} as any));
+    const token = String(body?.token ?? "");
+    const scope = String(body?.scope ?? "user");
+    const plan = (String(body?.plan ?? "pro") as "free" | "pro") || "pro";
+
+    if (token !== DEV_TOKEN) {
+      return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
+    }
+
+    if (scope === "global") {
+      await setGlobalPlan(plan);
+      return NextResponse.json({ ok: true, scope: "global", plan });
+    }
+
+    await setPlanForUser(userId, plan);
+    return NextResponse.json({ ok: true, scope: "user", userId, plan });
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: "exception", message: String(e?.message ?? e) },
+      { status: 500 }
+    );
+  }
 }
