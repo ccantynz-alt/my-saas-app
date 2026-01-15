@@ -1,7 +1,26 @@
 import { NextResponse } from "next/server";
 import { kv } from "@/app/lib/kv";
+import { auth } from "@clerk/nextjs/server";
 
 export const dynamic = "force-dynamic";
+
+async function getPlan(): Promise<"pro" | "free"> {
+  const { userId, sessionClaims } = auth();
+
+  if (!userId) return "free";
+
+  const claimPlan =
+    (sessionClaims as any)?.publicMetadata?.plan ||
+    (sessionClaims as any)?.metadata?.plan ||
+    (sessionClaims as any)?.plan;
+
+  if (claimPlan === "pro") return "pro";
+
+  const kvPlan = await kv.get<string>(`user:${userId}:plan`);
+  if (kvPlan === "pro") return "pro";
+
+  return "free";
+}
 
 type Issue = {
   code: string;
@@ -13,11 +32,18 @@ export async function POST(
   _req: Request,
   { params }: { params: { projectId: string } }
 ) {
+  const plan = await getPlan();
+  if (plan !== "pro") {
+    return NextResponse.json(
+      { ok: false, error: "PRO_REQUIRED", agent: "seo" },
+      { status: 402 }
+    );
+  }
+
   const { projectId } = params;
 
   const issues: Issue[] = [];
 
-  // ---- Pages ----
   const pages = (await kv.get<string[]>(`project:${projectId}:pages`)) || [];
 
   if (pages.length === 0) {
@@ -28,18 +54,7 @@ export async function POST(
     });
   }
 
-  // ---- Slug hygiene ----
-  for (const slug of pages) {
-    if (slug.includes("_")) {
-      issues.push({
-        code: "BAD_SLUG",
-        severity: "warning",
-        message: `Slug "${slug || "home"}" contains underscores`,
-      });
-    }
-  }
-
-  // ---- Required SEO pages ----
+  // Basic page coverage checks
   const recommended = ["", "about", "pricing", "contact"];
   for (const slug of recommended) {
     if (!pages.includes(slug)) {
@@ -51,26 +66,27 @@ export async function POST(
     }
   }
 
-  // ---- Meta coverage (project-level for now) ----
-  const project = await kv.get<any>(`project:${projectId}`);
-
-  if (!project?.metaTitle) {
-    issues.push({
-      code: "NO_META_TITLE",
-      severity: "warning",
-      message: "Project has no meta title",
-    });
-  }
-
-  if (!project?.metaDescription) {
-    issues.push({
-      code: "NO_META_DESCRIPTION",
-      severity: "warning",
-      message: "Project has no meta description",
-    });
+  // Basic slug hygiene
+  for (const slug of pages) {
+    if (slug.includes("_")) {
+      issues.push({
+        code: "BAD_SLUG",
+        severity: "warning",
+        message: `Slug "${slug || "home"}" contains underscores`,
+      });
+    }
   }
 
   return NextResponse.json({
     ok: true,
     agent: "seo",
-    projec
+    projectId,
+    pages,
+    summary: {
+      totalIssues: issues.length,
+      blocking: issues.filter((i) => i.severity === "error").length,
+    },
+    issues,
+    analyzedAt: new Date().toISOString(),
+  });
+}
