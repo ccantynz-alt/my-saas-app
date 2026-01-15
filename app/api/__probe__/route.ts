@@ -19,3 +19,4 @@ export async function POST() {
     time: new Date().toISOString(),
   });
 }
+
