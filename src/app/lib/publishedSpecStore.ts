@@ -40,3 +40,4 @@ export async function isProjectPublished(projectId: string): Promise<boolean> {
   const flag = await kv.get(publishedFlagKey(projectId));
   return flag === "true";
 }
+
