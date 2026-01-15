@@ -31,4 +31,3 @@ export default async function handler(
     publishedAtIso: new Date().toISOString(),
   });
 }
-
