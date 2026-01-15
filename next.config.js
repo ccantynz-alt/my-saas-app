@@ -1,25 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
-
   reactStrictMode: true,
 
-  async headers() {
-    return [
-      {
-        source: "/api/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "no-store",
-          },
-        ],
-      },
-    ];
-  },
+  // IMPORTANT:
+  // Do NOT set `output: "export"` — it disables all API routes.
+  // Do NOT use `next export` for this app.
 };
 
 module.exports = nextConfig;
-
