@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 
-import { kv } from "../../../../lib/kv";
-import { getPlanForUserId } from "../../../../lib/plan";
+// ✅ Correct path depth (3 levels up → src/app/lib)
+import { kv } from "../../../lib/kv";
+import { getPlanForUserId } from "../../../lib/plan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,7 +46,6 @@ export async function POST(req: Request, ctx: { params: { projectId: string } })
       );
     }
 
-    // ✅ no generics
     const kvPlan = (await kv.get(`user:${userId}:plan`)) as string | null;
 
     const input = await req.json().catch(() => ({}));
