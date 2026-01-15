@@ -4,7 +4,11 @@ import { auth } from "@clerk/nextjs/server";
 
 export const dynamic = "force-dynamic";
 
+<<<<<<< HEAD
 export async function POST(req: Request) {
+=======
+async function handle(req: Request) {
+>>>>>>> 8149524 (fix: repair seo agent route syntax)
   const { userId } = auth();
 
   if (!userId) {
@@ -28,7 +32,14 @@ export async function POST(req: Request) {
   });
 }
 
+<<<<<<< HEAD
 // Optional: if someone visits it in a browser, return a helpful message
+=======
+export async function POST(req: Request) {
+  return handle(req);
+}
+
+>>>>>>> 8149524 (fix: repair seo agent route syntax)
 export async function GET() {
   return NextResponse.json(
     { ok: false, error: "USE_POST", hint: "Send POST with JSON { token }" },
