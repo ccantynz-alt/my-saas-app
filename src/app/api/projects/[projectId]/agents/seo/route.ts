@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 
-// ✅ RELATIVE imports (guaranteed to work)
-// from: src/app/api/projects/[projectId]/agents/seo/route.ts
-// to:   src/app/lib/kv.ts and src/app/lib/plan.ts
-import { kv } from "../../../../../../lib/kv";
-import { getPlanForUserId } from "../../../../../../lib/plan";
+// ✅ CORRECT relative imports (4 levels up → src/app/lib)
+import { kv } from "../../../../lib/kv";
+import { getPlanForUserId } from "../../../../lib/plan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,22 +31,32 @@ function buildSeoRecommendations(input: any) {
   };
 }
 
-export async function POST(req: Request, ctx: { params: { projectId: string } }) {
+export async function POST(
+  req: Request,
+  ctx: { params: { projectId: string } }
+) {
   try {
     const { userId } = auth();
     if (!userId) {
-      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: "unauthorized" },
+        { status: 401 }
+      );
     }
 
     const plan = await getPlanForUserId(userId);
     if (plan !== "pro") {
       return NextResponse.json(
-        { ok: false, error: "pro_required", message: "SEO agent is available on Pro." },
+        {
+          ok: false,
+          error: "pro_required",
+          message: "SEO agent is available on Pro.",
+        },
         { status: 402 }
       );
     }
 
-    // ✅ never use kv.get<string>()
+    // ✅ no generics
     const kvPlan = (await kv.get(`user:${userId}:plan`)) as string | null;
 
     const input = await req.json().catch(() => ({}));
