@@ -16,7 +16,8 @@ async function getPlan(): Promise<"pro" | "free"> {
 
   if (claimPlan === "pro") return "pro";
 
-  const kvPlan = await kv.get<string>(`user:${userId}:plan`);
+  // KV fallback (kv.get is NOT generic here)
+  const kvPlan = (await kv.get(`user:${userId}:plan`)) as string | null;
   if (kvPlan === "pro") return "pro";
 
   return "free";
@@ -43,8 +44,7 @@ export async function POST(
   const { projectId } = params;
 
   const issues: Issue[] = [];
-
-  const pages = (await kv.get<string[]>(`project:${projectId}:pages`)) || [];
+  const pages = ((await kv.get(`project:${projectId}:pages`)) as string[] | null) || [];
 
   if (pages.length === 0) {
     issues.push({
@@ -54,7 +54,6 @@ export async function POST(
     });
   }
 
-  // Basic page coverage checks
   const recommended = ["", "about", "pricing", "contact"];
   for (const slug of recommended) {
     if (!pages.includes(slug)) {
@@ -66,7 +65,6 @@ export async function POST(
     }
   }
 
-  // Basic slug hygiene
   for (const slug of pages) {
     if (slug.includes("_")) {
       issues.push({
