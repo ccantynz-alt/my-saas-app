@@ -1,33 +1,37 @@
+// src/app/p/[projectId]/page.tsx
 export const runtime = "nodejs";
 
-import { PublishedTemplate, type PublishedSpec } from "../_components/PublishedTemplate";
-import { readPublishedSpec } from "../_lib/readPublishedSpec";
+import { PublishedTemplate, type PublishedSpec } from "../../../../app/p/_components/PublishedTemplate";
+import { readPublishedSpec } from "../../../../app/p/_lib/readPublishedSpec";
 
 type PageProps = {
   params: { projectId: string };
 };
 
-const BUILD_TAG = "published-spec-v1";
-
 export default async function PublishedProjectPage({ params }: PageProps) {
-  const projectId = params.projectId;
+  const projectId = params?.projectId;
 
-  const { value } = await readPublishedSpec(projectId);
+  if (!projectId) {
+    return (
+      <main className="mx-auto max-w-3xl p-8">
+        <h1 className="text-2xl font-semibold">Missing projectId</h1>
+        <p className="mt-2 opacity-80">This route requires /p/[projectId].</p>
+      </main>
+    );
+  }
 
-  // Map whatever you have into our template shape (best-effort).
-  const spec: PublishedSpec | null = value
-    ? {
-        brand: { name: value.brandName || value.brand?.name, tagline: value.tagline || value.brand?.tagline },
-        hero: {
-          headline: value.hero?.headline || value.headline,
-          subheadline: value.hero?.subheadline || value.subheadline,
-          primaryCta: value.hero?.primaryCta || "Open Builder",
-          secondaryCta: value.hero?.secondaryCta || "Refresh",
-        },
-        features: Array.isArray(value.features) ? value.features : undefined,
-        pricing: value.pricing,
-      }
-    : null;
+  const spec = (await readPublishedSpec(projectId)) as PublishedSpec | null;
 
-  return <PublishedTemplate projectId={projectId} spec={spec} buildTag={BUILD_TAG} />;
+  if (!spec) {
+    return (
+      <main className="mx-auto max-w-3xl p-8">
+        <h1 className="text-2xl font-semibold">Published site not found</h1>
+        <p className="mt-2 opacity-80">
+          No published spec was found for <code className="rounded bg-black/5 px-2 py-1">{projectId}</code>.
+        </p>
+      </main>
+    );
+  }
+
+  return <PublishedTemplate projectId={projectId} spec={spec} />;
 }
