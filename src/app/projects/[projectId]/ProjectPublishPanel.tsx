@@ -1,10 +1,9 @@
-// app/projects/[projectId]/ProjectPublishPanel.tsx
+// src/app/projects/[projectId]/ProjectPublishPanel.tsx
 "use client";
 
 import { useMemo, useState } from "react";
 
 type Props = { projectId: string };
-
 type ApiResult = { status: number; text: string };
 
 async function postText(path: string): Promise<ApiResult> {
@@ -50,6 +49,7 @@ export default function ProjectPublishPanel({ projectId }: Props) {
     setSeedResult(null);
     setCopied(false);
     setBusy("seed");
+
     try {
       const res = await postText(`/api/projects/${projectId}/seed-spec`);
       setSeedResult(res);
@@ -66,6 +66,7 @@ export default function ProjectPublishPanel({ projectId }: Props) {
     setPublishResult(null);
     setCopied(false);
     setBusy("publish");
+
     try {
       const res = await postText(`/api/projects/${projectId}/publish`);
       setPublishResult(res);
@@ -94,7 +95,7 @@ export default function ProjectPublishPanel({ projectId }: Props) {
         <div>
           <div className="text-sm font-semibold text-neutral-900">Publish</div>
           <div className="mt-1 text-sm text-neutral-600">
-            Create a draft spec (optional), then publish to generate a public URL.
+            Seed a draft spec (optional), then publish to generate a public URL.
           </div>
         </div>
         <div className="text-xs text-neutral-500 font-mono">projectId: {projectId}</div>
@@ -154,29 +155,27 @@ export default function ProjectPublishPanel({ projectId }: Props) {
         </div>
       ) : null}
 
-      {(seedResult || publishResult) ? (
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <div className="rounded-3xl border border-neutral-200 bg-white p-5">
-            <div className="text-sm font-semibold">seed-spec response</div>
-            <div className="mt-2 text-xs text-neutral-600">
-              Status: <span className="font-mono">{seedResult?.status ?? "-"}</span>
-            </div>
-            <pre className="mt-3 max-h-56 overflow-auto rounded-2xl bg-neutral-50 p-3 text-xs text-neutral-700">
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <div className="rounded-3xl border border-neutral-200 bg-white p-5">
+          <div className="text-sm font-semibold">seed-spec response</div>
+          <div className="mt-2 text-xs text-neutral-600">
+            Status: <span className="font-mono">{seedResult?.status ?? "-"}</span>
+          </div>
+          <pre className="mt-3 max-h-56 overflow-auto rounded-2xl bg-neutral-50 p-3 text-xs text-neutral-700">
 {seedResult?.text ?? "(not run)"}{" "}
-            </pre>
-          </div>
-
-          <div className="rounded-3xl border border-neutral-200 bg-white p-5">
-            <div className="text-sm font-semibold">publish response</div>
-            <div className="mt-2 text-xs text-neutral-600">
-              Status: <span className="font-mono">{publishResult?.status ?? "-"}</span>
-            </div>
-            <pre className="mt-3 max-h-56 overflow-auto rounded-2xl bg-neutral-50 p-3 text-xs text-neutral-700">
-{publishResult?.text ?? "(not run)"}{" "}
-            </pre>
-          </div>
+          </pre>
         </div>
-      ) : null}
+
+        <div className="rounded-3xl border border-neutral-200 bg-white p-5">
+          <div className="text-sm font-semibold">publish response</div>
+          <div className="mt-2 text-xs text-neutral-600">
+            Status: <span className="font-mono">{publishResult?.status ?? "-"}</span>
+          </div>
+          <pre className="mt-3 max-h-56 overflow-auto rounded-2xl bg-neutral-50 p-3 text-xs text-neutral-700">
+{publishResult?.text ?? "(not run)"}{" "}
+          </pre>
+        </div>
+      </div>
     </div>
   );
 }
