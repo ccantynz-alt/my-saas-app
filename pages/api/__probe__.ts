@@ -3,6 +3,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
+
   res.status(200).json({
     ok: true,
     source: "pages/api/__probe__.ts",
