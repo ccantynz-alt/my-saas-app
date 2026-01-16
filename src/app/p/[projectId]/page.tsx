@@ -23,8 +23,7 @@ function asStringArray(v: unknown): string[] {
 
 function safeGetSpec(published: any): any | null {
   if (!published) return null;
-  // Some stores return { spec: {...}, publishedAtIso: ... }
-  if (published && typeof published === "object" && published.spec) return published.spec;
+  if (published && typeof published === "object" && (published as any).spec) return (published as any).spec;
   return published;
 }
 
@@ -50,7 +49,7 @@ function getSubtitle(spec: any): string {
 
 function getPrimaryCta(spec: any): { text: string; href: string } {
   const text = asString(spec?.cta?.text) || asString(spec?.hero?.ctaText) || "Get started";
-  const href = asString(spec?.cta?.href) || "#get-started";
+  const href = asString(spec?.cta?.href) || "#contact";
   return { text, href };
 }
 
@@ -61,10 +60,6 @@ function getSecondaryCta(spec: any): { text: string; href: string } {
 }
 
 function getFeatures(spec: any): Array<{ title: string; description: string }> {
-  // Common shapes:
-  // - features: [{ title, description }]
-  // - features: ["Fast", "Secure"]
-  // - sections: [{ type: "features", items: [...] }]
   const raw = spec?.features;
 
   if (Array.isArray(raw)) {
@@ -73,9 +68,7 @@ function getFeatures(spec: any): Array<{ title: string; description: string }> {
         .map((f: any) => {
           const title = asString(f?.title) || asString(f?.name) || "";
           const description =
-            asString(f?.description) ||
-            asString(f?.detail) ||
-            "A practical benefit that helps visitors take action.";
+            asString(f?.description) || asString(f?.detail) || "A practical benefit that helps visitors take action.";
           return title ? { title, description } : null;
         })
         .filter(Boolean) as Array<{ title: string; description: string }>;
@@ -95,16 +88,14 @@ function getFeatures(spec: any): Array<{ title: string; description: string }> {
   const sections = spec?.sections;
   if (Array.isArray(sections)) {
     const featuresSection = sections.find((s: any) => s?.type === "features" || s?.kind === "features");
-    const items = featuresSection?.items || featuresSection?.features;
+    const items = (featuresSection as any)?.items || (featuresSection as any)?.features;
     if (Array.isArray(items)) {
       if (items.length && typeof items[0] === "object") {
         const mapped = items
           .map((f: any) => {
             const title = asString(f?.title) || asString(f?.name) || "";
             const description =
-              asString(f?.description) ||
-              asString(f?.detail) ||
-              "A practical benefit that helps visitors take action.";
+              asString(f?.description) || asString(f?.detail) || "A practical benefit that helps visitors take action.";
             return title ? { title, description } : null;
           })
           .filter(Boolean) as Array<{ title: string; description: string }>;
@@ -121,7 +112,6 @@ function getFeatures(spec: any): Array<{ title: string; description: string }> {
     }
   }
 
-  // Fallback (looks good even if spec is minimal)
   return [
     { title: "Clear, conversion-first layout", description: "Hero, proof, benefits, and CTA are structured to reduce friction." },
     { title: "Fast to load, easy to scan", description: "Clean typography and spacing designed for modern browsing." },
@@ -157,6 +147,71 @@ function Badge({ children }: { children: React.ReactNode }) {
     <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-medium text-neutral-700 shadow-sm">
       {children}
     </span>
+  );
+}
+
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      className="rounded-xl px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
+    >
+      {children}
+    </a>
+  );
+}
+
+function PricingCard({
+  name,
+  price,
+  bullets,
+  emphasis,
+}: {
+  name: string;
+  price: string;
+  bullets: string[];
+  emphasis?: boolean;
+}) {
+  return (
+    <div
+      className={[
+        "rounded-3xl border p-7 shadow-sm",
+        emphasis ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 bg-white text-neutral-900",
+      ].join(" ")}
+    >
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold">{name}</div>
+        {emphasis ? (
+          <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">Recommended</span>
+        ) : (
+          <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-700">Starter</span>
+        )}
+      </div>
+
+      <div className="mt-4 text-3xl font-semibold">{price}</div>
+      <div className={["mt-1 text-sm", emphasis ? "text-white/80" : "text-neutral-600"].join(" ")}>
+        Simple monthly pricing.
+      </div>
+
+      <ul className={["mt-6 space-y-3 text-sm", emphasis ? "text-white/90" : "text-neutral-700"].join(" ")}>
+        {bullets.map((b) => (
+          <li key={b} className="flex gap-3">
+            <span className={["mt-1 h-2 w-2 rounded-full", emphasis ? "bg-white" : "bg-neutral-900"].join(" ")} />
+            <span>{b}</span>
+          </li>
+        ))}
+      </ul>
+
+      <a
+        href="#contact"
+        className={[
+          "mt-7 inline-flex w-full items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold",
+          emphasis ? "bg-white text-neutral-900 hover:bg-neutral-100" : "bg-neutral-900 text-white hover:bg-neutral-800",
+        ].join(" ")}
+      >
+        Get started
+      </a>
+    </div>
   );
 }
 
@@ -205,7 +260,7 @@ export default async function PublicProjectPage({ params }: PageProps) {
   return (
     <main className="min-h-screen bg-neutral-50 text-neutral-900">
       {/* Top bar */}
-      <div className="border-b border-neutral-200 bg-white/80 backdrop-blur">
+      <div id="home" className="border-b border-neutral-200 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-2xl bg-neutral-900" />
@@ -213,6 +268,14 @@ export default async function PublicProjectPage({ params }: PageProps) {
               <div className="text-sm font-semibold">{title}</div>
               <div className="text-xs text-neutral-500 font-mono">{projectId}</div>
             </div>
+          </div>
+
+          <div className="hidden items-center gap-2 md:flex">
+            <NavLink href="#home">Home</NavLink>
+            <NavLink href="#about">About</NavLink>
+            <NavLink href="#pricing">Pricing</NavLink>
+            <NavLink href="#faq">FAQ</NavLink>
+            <NavLink href="#contact">Contact</NavLink>
           </div>
 
           <div className="flex items-center gap-3">
@@ -235,13 +298,9 @@ export default async function PublicProjectPage({ params }: PageProps) {
                 <Badge>Conversion-ready</Badge>
               </div>
 
-              <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">
-                {title}
-              </h1>
+              <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">{title}</h1>
 
-              <p className="mt-4 text-lg text-neutral-600">
-                {subtitle}
-              </p>
+              <p className="mt-4 text-lg text-neutral-600">{subtitle}</p>
 
               <div className="mt-8 flex flex-wrap gap-3">
                 <a
@@ -263,7 +322,7 @@ export default async function PublicProjectPage({ params }: PageProps) {
               </p>
             </div>
 
-            {/* Simple “preview card” */}
+            {/* “preview card” */}
             <div className="w-full max-w-md">
               <div className="rounded-3xl border border-neutral-200 bg-neutral-50 p-6">
                 <div className="text-sm font-semibold">What you get</div>
@@ -283,7 +342,7 @@ export default async function PublicProjectPage({ params }: PageProps) {
                 </ul>
 
                 <div className="mt-6 rounded-2xl bg-white p-4 text-xs text-neutral-500">
-                  Tip: wire the builder “Publish” button next to “Preview” to make this fully self-serve.
+                  Next: wire a real Publish button in the builder so this becomes 1-click.
                 </div>
               </div>
             </div>
@@ -316,8 +375,8 @@ export default async function PublicProjectPage({ params }: PageProps) {
             <h2 className="text-2xl font-semibold tracking-tight">Features that move visitors forward</h2>
             <p className="mt-2 text-neutral-600">Built to be simple, fast, and conversion-friendly.</p>
           </div>
-          <a href="#get-started" className="hidden text-sm font-semibold text-neutral-800 hover:text-neutral-900 md:inline">
-            Jump to CTA →
+          <a href="#contact" className="hidden text-sm font-semibold text-neutral-800 hover:text-neutral-900 md:inline">
+            Jump to contact →
           </a>
         </div>
 
@@ -331,11 +390,17 @@ export default async function PublicProjectPage({ params }: PageProps) {
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="mx-auto max-w-6xl px-6 pb-12">
+      {/* About / How it works */}
+      <section id="about" className="mx-auto max-w-6xl px-6 pb-12">
         <div className="rounded-[32px] border border-neutral-200 bg-white p-10 shadow-sm">
-          <h2 className="text-2xl font-semibold tracking-tight">How it works</h2>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
+          <h2 className="text-2xl font-semibold tracking-tight">About</h2>
+          <p className="mt-2 text-neutral-600">
+            This public page is generated from your project’s <span className="font-mono">published spec</span>.
+            It’s designed to be a clean foundation you can extend with forms, payments, and automation.
+          </p>
+
+          <h3 className="mt-8 text-lg font-semibold">How it works</h3>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
             <div className="rounded-3xl bg-neutral-50 p-7">
               <div className="text-sm font-semibold">1) Draft</div>
               <p className="mt-2 text-sm text-neutral-600">Create or generate a draft spec in the builder.</p>
@@ -352,37 +417,43 @@ export default async function PublicProjectPage({ params }: PageProps) {
         </div>
       </section>
 
-      {/* CTA */}
-      <section id="get-started" className="mx-auto max-w-6xl px-6 pb-12">
-        <div className="rounded-[32px] border border-neutral-200 bg-neutral-900 p-10 text-white shadow-sm">
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-            <div className="max-w-2xl">
-              <h2 className="text-2xl font-semibold tracking-tight">Ready to publish your site?</h2>
-              <p className="mt-2 text-white/80">
-                Go back to the builder, update your spec, and publish again. This page will update from the published spec.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/projects"
-                className="inline-flex items-center justify-center rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-neutral-900 hover:bg-neutral-100"
-              >
-                Open builder
-              </Link>
-              <a
-                href="#features"
-                className="inline-flex items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-6 py-3 text-sm font-semibold text-white hover:bg-white/15"
-              >
-                View features
-              </a>
-            </div>
+      {/* Pricing */}
+      <section id="pricing" className="mx-auto max-w-6xl px-6 pb-12">
+        <div className="flex items-end justify-between gap-6">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">Pricing</h2>
+            <p className="mt-2 text-neutral-600">Simple plans that scale with you.</p>
           </div>
+          <a href="#contact" className="hidden text-sm font-semibold text-neutral-800 hover:text-neutral-900 md:inline">
+            Talk to us →
+          </a>
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <PricingCard
+            name="Free"
+            price="$0"
+            bullets={[
+              "Publish a basic site",
+              "Single public URL",
+              "Great for testing and drafts",
+            ]}
+          />
+          <PricingCard
+            name="Pro"
+            price="$19/mo"
+            bullets={[
+              "Priority publishing",
+              "More advanced layouts + sections",
+              "Future: custom domains + SEO pages",
+            ]}
+            emphasis
+          />
         </div>
       </section>
 
       {/* FAQ */}
-      <section id="faq" className="mx-auto max-w-6xl px-6 pb-16">
+      <section id="faq" className="mx-auto max-w-6xl px-6 pb-12">
         <div className="rounded-[32px] border border-neutral-200 bg-white p-10 shadow-sm">
           <h2 className="text-2xl font-semibold tracking-tight">FAQ</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -396,22 +467,50 @@ export default async function PublicProjectPage({ params }: PageProps) {
         </div>
       </section>
 
+      {/* Contact */}
+      <section id="contact" className="mx-auto max-w-6xl px-6 pb-16">
+        <div className="rounded-[32px] border border-neutral-200 bg-neutral-900 p-10 text-white shadow-sm">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-2xl">
+              <h2 className="text-2xl font-semibold tracking-tight">Contact</h2>
+              <p className="mt-2 text-white/80">
+                This is a placeholder contact section. Next step: wire a real form + automation.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/projects"
+                className="inline-flex items-center justify-center rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-neutral-900 hover:bg-neutral-100"
+              >
+                Open builder
+              </Link>
+              <a
+                href="#home"
+                className="inline-flex items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-6 py-3 text-sm font-semibold text-white hover:bg-white/15"
+              >
+                Back to top
+              </a>
+            </div>
+          </div>
+
+          <div className="mt-8 rounded-2xl bg-white/10 p-4 text-xs text-white/70">
+            Want the next step? Add a builder-side Publish button and lock Pro features behind your Stripe plan.
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-neutral-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-8 md:flex-row md:items-center md:justify-between">
           <div className="text-sm text-neutral-600">
             Powered by <span className="font-semibold text-neutral-900">my-saas-app</span>
           </div>
-          <div className="flex gap-4 text-sm">
-            <a className="text-neutral-600 hover:text-neutral-900" href="#features">
-              Features
-            </a>
-            <a className="text-neutral-600 hover:text-neutral-900" href="#faq">
-              FAQ
-            </a>
-            <a className="text-neutral-600 hover:text-neutral-900" href="#get-started">
-              Get started
-            </a>
+          <div className="flex gap-2 text-sm">
+            <NavLink href="#features">Features</NavLink>
+            <NavLink href="#pricing">Pricing</NavLink>
+            <NavLink href="#faq">FAQ</NavLink>
+            <NavLink href="#contact">Contact</NavLink>
           </div>
         </div>
       </footer>
