@@ -10,4 +10,3 @@ export async function GET() {
     nowIso: new Date().toISOString(),
   });
 }
-
