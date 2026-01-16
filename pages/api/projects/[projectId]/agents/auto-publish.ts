@@ -1,4 +1,4 @@
-// pages/api/projects/[projectId]/agents/auto-publish.ts
+// auto-publish.ts (use this identical content in BOTH locations)
 import type { NextApiRequest, NextApiResponse } from "next";
 
 type StepResult = {
@@ -33,71 +33,67 @@ async function callJson(url: string, init: RequestInit): Promise<{ status: numbe
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  try {
-    if (req.method !== "POST") {
-      return res.status(405).json({ ok: false, error: "Method Not Allowed" });
-    }
-
-    const projectId = String(req.query.projectId || "");
-    if (!projectId) return res.status(400).json({ ok: false, error: "Missing projectId" });
-
-    const origin = baseUrl(req);
-    const steps: StepResult[] = [];
-
-    // 1) Seed (safe to run even if draft exists)
-    try {
-      const { status, json } = await callJson(`${origin}/api/projects/${projectId}/seed-spec`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-      });
-      steps.push({ step: "seed-spec", ok: status >= 200 && status < 300, status, json });
-    } catch (e: any) {
-      steps.push({ step: "seed-spec", ok: false, error: e?.message ?? "seed-spec failed" });
-    }
-
-    // 2) Finish-for-me
-    try {
-      const { status, json } = await callJson(
-        `${origin}/api/projects/${projectId}/agents/finish-for-me`,
-        { method: "POST", headers: { "content-type": "application/json" } }
-      );
-      steps.push({ step: "finish-for-me", ok: status >= 200 && status < 300, status, json });
-    } catch (e: any) {
-      steps.push({ step: "finish-for-me", ok: false, error: e?.message ?? "finish-for-me failed" });
-    }
-
-    // 3) SEO (optional)
-    try {
-      const { status, json } = await callJson(`${origin}/api/projects/${projectId}/agents/seo`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-      });
-      steps.push({ step: "seo", ok: status >= 200 && status < 300, status, json });
-    } catch (e: any) {
-      steps.push({ step: "seo", ok: false, error: e?.message ?? "seo failed" });
-    }
-
-    // 4) Publish (required)
-    try {
-      const { status, json } = await callJson(`${origin}/api/projects/${projectId}/publish`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-      });
-      steps.push({ step: "publish", ok: status >= 200 && status < 300, status, json });
-    } catch (e: any) {
-      steps.push({ step: "publish", ok: false, error: e?.message ?? "publish failed" });
-    }
-
-    const publishStep = steps.find((s) => s.step === "publish");
-    const ok = !!publishStep?.ok;
-
-    return res.status(ok ? 200 : 500).json({
-      ok,
-      projectId,
-      publicUrl: `/p/${projectId}`,
-      steps,
-    });
-  } catch (e: any) {
-    return res.status(500).json({ ok: false, error: e?.message ?? "Unknown error" });
+  if (req.method !== "POST") {
+    return res.status(405).json({ ok: false, error: "Method Not Allowed" });
   }
+
+  const projectId = String(req.query.projectId || "");
+  if (!projectId) return res.status(400).json({ ok: false, error: "Missing projectId" });
+
+  const origin = baseUrl(req);
+  const steps: StepResult[] = [];
+
+  // 1) Seed
+  try {
+    const { status, json } = await callJson(`${origin}/api/projects/${projectId}/seed-spec`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+    });
+    steps.push({ step: "seed-spec", ok: status >= 200 && status < 300, status, json });
+  } catch (e: any) {
+    steps.push({ step: "seed-spec", ok: false, error: e?.message ?? "seed-spec failed" });
+  }
+
+  // 2) Finish-for-me
+  try {
+    const { status, json } = await callJson(`${origin}/api/projects/${projectId}/agents/finish-for-me`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+    });
+    steps.push({ step: "finish-for-me", ok: status >= 200 && status < 300, status, json });
+  } catch (e: any) {
+    steps.push({ step: "finish-for-me", ok: false, error: e?.message ?? "finish-for-me failed" });
+  }
+
+  // 3) SEO (optional)
+  try {
+    const { status, json } = await callJson(`${origin}/api/projects/${projectId}/agents/seo`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+    });
+    steps.push({ step: "seo", ok: status >= 200 && status < 300, status, json });
+  } catch (e: any) {
+    steps.push({ step: "seo", ok: false, error: e?.message ?? "seo failed" });
+  }
+
+  // 4) Publish (required)
+  try {
+    const { status, json } = await callJson(`${origin}/api/projects/${projectId}/publish`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+    });
+    steps.push({ step: "publish", ok: status >= 200 && status < 300, status, json });
+  } catch (e: any) {
+    steps.push({ step: "publish", ok: false, error: e?.message ?? "publish failed" });
+  }
+
+  const publishStep = steps.find((s) => s.step === "publish");
+  const ok = !!publishStep?.ok;
+
+  return res.status(ok ? 200 : 500).json({
+    ok,
+    projectId,
+    publicUrl: `/p/${projectId}`,
+    steps,
+  });
 }
