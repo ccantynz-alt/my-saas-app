@@ -1,125 +1,225 @@
+// pages/api/projects/[projectId]/debug/spec.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 
-type KVGetResponse = { result?: any; error?: string };
+type Result = {
+  ok: boolean;
+  projectId: string;
+  nowIso: string;
+  found?: {
+    key: string;
+    type: string;
+    bytes: number;
+    preview: any;
+  };
+  tried?: Array<{ key: string; hit: boolean; type?: string; bytes?: number }>;
+  keysLikeProjectId?: string[];
+  note?: string;
+  error?: string;
+};
 
-const CANDIDATE_KEYS = [
-  // common patterns
-  "project:{projectId}:siteSpec",
-  "project:{projectId}:spec",
-  "project:{projectId}:draftSpec",
-  "project:{projectId}:publishedSpec",
-  "project:{projectId}:site_spec",
-  "project:{projectId}:seedSpec",
+function safeJsonParse(s: string) {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
 
-  // other plausible patterns
-  "projects:{projectId}:siteSpec",
-  "projects:{projectId}:spec",
-  "siteSpec:{projectId}",
-  "spec:{projectId}",
-];
+function clipString(s: string, max = 8000) {
+  if (s.length <= max) return s;
+  return s.slice(0, max) + `…(clipped, len=${s.length})`;
+}
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "GET") {
-    res.setHeader("Allow", ["GET"]);
-    return res.status(405).json({ ok: false, error: "Method Not Allowed", allow: ["GET"] });
+async function getKvClient(): Promise<any> {
+  // Primary (most common in Vercel KV projects)
+  try {
+    const mod = await import("@vercel/kv");
+    if ((mod as any).kv) return (mod as any).kv;
+  } catch {}
+
+  // If your repo uses a local kv helper (common in your project history), try a few safe paths.
+  const candidates = [
+    "../../../../../src/app/lib/kv",
+    "../../../../../app/lib/kv",
+    "../../../../../src/lib/kv",
+    "../../../../../lib/kv",
+  ];
+
+  for (const p of candidates) {
+    try {
+      const mod = await import(p);
+      if ((mod as any).kv) return (mod as any).kv;
+      if ((mod as any).default) return (mod as any).default;
+    } catch {}
   }
 
+  throw new Error(
+    "KV client not found. Install/use @vercel/kv or export kv from a local helper."
+  );
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse<Result>) {
   const projectId = String(req.query.projectId || "").trim();
-  if (!projectId) return res.status(400).json({ ok: false, error: "Missing projectId" });
+  const nowIso = new Date().toISOString();
 
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-
-  if (!url || !token) {
-    return res.status(500).json({
+  if (!projectId) {
+    return res.status(400).json({
       ok: false,
-      error: "Missing KV REST env vars",
-      missing: {
-        KV_REST_API_URL: !url,
-        KV_REST_API_TOKEN: !token,
-      },
+      projectId: "",
+      nowIso,
+      error: "Missing projectId",
     });
   }
 
-  const tried: Array<{ key: string; found: boolean; type: string | null }> = [];
+  try {
+    const kv: any = await getKvClient();
 
-  for (const raw of CANDIDATE_KEYS) {
-    const key = raw.replace("{projectId}", projectId);
+    // Strategy A (best): scan for keys that contain the projectId (if scan exists).
+    // Not all KV clients expose scan; we detect at runtime.
+    let keysLikeProjectId: string[] = [];
+    if (typeof kv.scan === "function") {
+      // Try multiple patterns; keep counts low to avoid timeouts.
+      const patterns = [`*${projectId}*`, `*:${projectId}:*`, `*${projectId}`];
+      for (const match of patterns) {
+        try {
+          // Many clients use (cursor, { match, count }) or (cursor, match, count).
+          // We support both shapes defensively.
+          let cursor: any = "0";
+          let loops = 0;
+          while (loops < 3) {
+            loops++;
+            let out: any;
 
-    const v = await kvGetJson(url, token, key);
-    const found = v !== null && v !== undefined;
+            try {
+              out = await kv.scan(cursor, { match, count: 200 });
+            } catch {
+              out = await kv.scan(cursor, match, 200);
+            }
 
-    tried.push({ key, found, type: found ? typeof v : null });
+            const nextCursor = Array.isArray(out) ? out[0] : out?.cursor ?? "0";
+            const keys = Array.isArray(out) ? out[1] : out?.keys ?? [];
+            if (Array.isArray(keys)) keysLikeProjectId.push(...keys);
 
-    if (found) {
+            cursor = String(nextCursor ?? "0");
+            if (cursor === "0") break;
+          }
+        } catch {}
+      }
+
+      // de-dupe
+      keysLikeProjectId = Array.from(new Set(keysLikeProjectId)).slice(0, 200);
+    }
+
+    // Strategy B: try a short list of likely spec keys.
+    // This does NOT assume which one is correct — it just checks and reports hits.
+    const candidates = [
+      `project:${projectId}:publishedSpec`,
+      `project:${projectId}:spec`,
+      `project:${projectId}:siteSpec`,
+      `project:${projectId}:draftSpec`,
+      `project:${projectId}:latestSpec`,
+      `proj:${projectId}:publishedSpec`,
+      `proj:${projectId}:spec`,
+      `${projectId}:publishedSpec`,
+      `${projectId}:spec`,
+    ];
+
+    const tried: Array<{ key: string; hit: boolean; type?: string; bytes?: number }> = [];
+
+    const tryGet = async (key: string) => {
+      try {
+        const v = await kv.get(key);
+        if (v == null) {
+          tried.push({ key, hit: false });
+          return null;
+        }
+
+        const raw =
+          typeof v === "string" ? v : JSON.stringify(v);
+
+        tried.push({
+          key,
+          hit: true,
+          type: typeof v,
+          bytes: raw.length,
+        });
+
+        // Best-effort preview
+        if (typeof v === "string") {
+          const parsed = safeJsonParse(v);
+          return parsed ?? clipString(v, 2000);
+        }
+        return v;
+      } catch {
+        tried.push({ key, hit: false });
+        return null;
+      }
+    };
+
+    // If scan found keys, try the first few keys from scan first.
+    let foundKey: string | null = null;
+    let foundVal: any = null;
+
+    const scanKeysToTry = keysLikeProjectId.slice(0, 25);
+    for (const k of scanKeysToTry) {
+      const v = await tryGet(k);
+      if (v != null) {
+        foundKey = k;
+        foundVal = v;
+        break;
+      }
+    }
+
+    if (!foundKey) {
+      for (const k of candidates) {
+        const v = await tryGet(k);
+        if (v != null) {
+          foundKey = k;
+          foundVal = v;
+          break;
+        }
+      }
+    }
+
+    if (!foundKey) {
       return res.status(200).json({
         ok: true,
         projectId,
-        foundKey: key,
-        preview: summarize(v),
-        full: v,
+        nowIso,
+        keysLikeProjectId,
         tried,
+        note:
+          "No spec found via scan/candidates. Next step: make publish write project:<id>:publishedSpec explicitly (Milestone 2).",
       });
     }
+
+    const previewJson = foundVal;
+    const previewStr =
+      typeof previewJson === "string" ? clipString(previewJson, 3000) : previewJson;
+
+    return res.status(200).json({
+      ok: true,
+      projectId,
+      nowIso,
+      found: {
+        key: foundKey,
+        type: typeof foundVal,
+        bytes:
+          typeof foundVal === "string"
+            ? foundVal.length
+            : JSON.stringify(foundVal).length,
+        preview: previewStr,
+      },
+      keysLikeProjectId,
+      tried,
+    });
+  } catch (e: any) {
+    return res.status(500).json({
+      ok: false,
+      projectId,
+      nowIso,
+      error: e?.message || String(e),
+    });
   }
-
-  return res.status(404).json({
-    ok: false,
-    projectId,
-    error: "No spec found under known keys",
-    tried,
-  });
 }
 
-async function kvGetJson(baseUrl: string, token: string, key: string) {
-  // Works for Vercel KV / Upstash-style REST GET
-  const endpoint = `${baseUrl.replace(/\/$/, "")}/get/${encodeURIComponent(key)}`;
-
-  const r = await fetch(endpoint, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  if (!r.ok) return null;
-
-  const data = (await r.json()) as KVGetResponse;
-  const result = data?.result;
-
-  // Upstash/Vercel often returns JSON as a string; try to parse
-  if (typeof result === "string") {
-    try {
-      return JSON.parse(result);
-    } catch {
-      return result;
-    }
-  }
-
-  return result ?? null;
-}
-
-function summarize(v: any) {
-  const out: any = {};
-
-  // brand-ish
-  if (v?.brandName) out.brandName = v.brandName;
-  if (v?.brand?.name) out.brand = v.brand.name;
-  if (v?.tagline) out.tagline = v.tagline;
-  if (v?.brand?.tagline) out.brandTagline = v.brand.tagline;
-
-  // hero-ish
-  if (v?.headline) out.headline = v.headline;
-  if (v?.subheadline) out.subheadline = v.subheadline;
-  if (v?.hero?.headline) out.heroHeadline = v.hero.headline;
-  if (v?.hero?.subheadline) out.heroSubheadline = v.hero.subheadline;
-
-  // features/pricing-ish
-  if (Array.isArray(v?.features)) out.featuresCount = v.features.length;
-  if (v?.pricing && typeof v.pricing === "object") out.pricingKeys = Object.keys(v.pricing);
-
-  // meta
-  out.valueType = typeof v;
-
-  return out;
-}
