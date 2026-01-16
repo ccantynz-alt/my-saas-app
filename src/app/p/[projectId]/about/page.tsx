@@ -1,7 +1,7 @@
-// src/app/p/[projectId]/faq/page.tsx
+// src/app/p/[projectId]/about/page.tsx
 import { redirect } from "next/navigation";
 
-export default function PublishedFaqPage({
+export default function PublishedAboutPage({
   params,
 }: {
   params: { projectId: string };
