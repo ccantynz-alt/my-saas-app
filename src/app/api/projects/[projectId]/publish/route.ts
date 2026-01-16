@@ -1,44 +1,41 @@
+// src/app/api/projects/[projectId]/publish/route.ts
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-
-import { loadSiteSpec } from "@/app/lib/projectSpecStore";
 import { publishSiteSpec } from "@/app/lib/publishedSpecStore";
+import { loadSiteSpec } from "@/app/lib/projectSpecStore";
 
-type RouteParams = {
-  params: {
-    projectId: string;
-  };
-};
+export const runtime = "nodejs";
 
-export async function POST(
-  req: Request,
-  { params }: RouteParams
-) {
-  const { userId } = auth();
+type Ctx = { params: { projectId: string } };
 
-  if (!userId) {
+export async function POST(_req: Request, ctx: Ctx) {
+  try {
+    const projectId = ctx?.params?.projectId;
+
+    if (!projectId) {
+      return NextResponse.json({ ok: false, error: "Missing projectId" }, { status: 400 });
+    }
+
+    const draft = await loadSiteSpec(projectId);
+    if (!draft) {
+      return NextResponse.json(
+        { ok: false, error: "No draft spec found. Run seed-spec first." },
+        { status: 404 }
+      );
+    }
+
+    await publishSiteSpec(projectId, draft);
+
+    return NextResponse.json({
+      ok: true,
+      projectId,
+      publicUrl: `/p/${projectId}`,
+      publishedAtIso: new Date().toISOString(),
+      source: "src/app/api/projects/[projectId]/publish/route.ts",
+    });
+  } catch (e: any) {
     return NextResponse.json(
-      { ok: false, error: "Unauthorized" },
-      { status: 401 }
+      { ok: false, error: e?.message || "Publish failed" },
+      { status: 500 }
     );
   }
-
-  const projectId = params.projectId;
-
-  const spec = await loadSiteSpec(projectId);
-  if (!spec) {
-    return NextResponse.json(
-      { ok: false, error: "No site spec found to publish" },
-      { status: 400 }
-    );
-  }
-
-  await publishSiteSpec(projectId, spec);
-
-  return NextResponse.json({
-    ok: true,
-    projectId,
-    publicUrl: `/p/${projectId}`,
-    publishedAtIso: new Date().toISOString(),
-  });
 }
