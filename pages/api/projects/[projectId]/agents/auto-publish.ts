@@ -3,8 +3,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { json, methodNotAllowed, runStep } from "./_runtime";
 
 type Body = {
-  includeFinishForMe?: boolean; // default true
-  dryRun?: boolean; // default true (does not call real publish yet)
+  includeFinishForMe?: boolean;
+  dryRun?: boolean;
 };
 
 function safeJsonParse(input: any): any {
@@ -18,17 +18,10 @@ function safeJsonParse(input: any): any {
 }
 
 async function auditStep(projectId: string) {
-  // TODO: Replace stub with real audit logic (KV reads, spec validation, etc.)
-  return {
-    projectId,
-    summary: "Audit OK (stub)",
-    issues: [],
-    recommendations: [],
-  };
+  return { projectId, summary: "Audit OK (stub)", issues: [], recommendations: [] };
 }
 
 async function seoStep(projectId: string) {
-  // TODO: Replace stub with real SEO logic (generate SEO pages, metadata, sitemap, etc.)
   return {
     projectId,
     summary: "SEO OK (stub)",
@@ -38,16 +31,10 @@ async function seoStep(projectId: string) {
 }
 
 async function conversionStep(projectId: string) {
-  // TODO: Replace stub with real conversion logic (CTA copy, sections, pricing blocks, etc.)
-  return {
-    projectId,
-    summary: "Conversion OK (stub)",
-    ctas: ["Start Free", "Book a Call", "Get a Quote"],
-  };
+  return { projectId, summary: "Conversion OK (stub)", ctas: ["Start Free", "Book a Call", "Get a Quote"] };
 }
 
 async function finishForMeStep(projectId: string) {
-  // TODO: Replace stub with real finish-for-me logic (full site generation / sections)
   return {
     projectId,
     summary: "Finish-for-me OK (stub)",
@@ -56,17 +43,7 @@ async function finishForMeStep(projectId: string) {
 }
 
 async function publishStep(projectId: string, dryRun: boolean) {
-  if (dryRun) {
-    return {
-      projectId,
-      summary: "Publish skipped (dryRun=true)",
-      published: false,
-    };
-  }
-
-  // OPTIONAL FUTURE:
-  // When you confirm the real publish endpoint path, we’ll wire it here.
-  // For now we fail loudly so you don’t think you published when you didn’t.
+  if (dryRun) return { projectId, summary: "Publish skipped (dryRun=true)", published: false };
   throw new Error("Publish not wired yet. Set dryRun=true or wire real publish endpoint.");
 }
 
@@ -81,22 +58,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const steps: any[] = [];
 
-  const audit = await runStep("audit", async () => auditStep(projectId));
-  steps.push(audit);
-
-  const seo = await runStep("seo", async () => seoStep(projectId));
-  steps.push(seo);
-
-  const conversion = await runStep("conversion", async () => conversionStep(projectId));
-  steps.push(conversion);
+  steps.push(await runStep("audit", () => auditStep(projectId)));
+  steps.push(await runStep("seo", () => seoStep(projectId)));
+  steps.push(await runStep("conversion", () => conversionStep(projectId)));
 
   if (includeFinishForMe) {
-    const ffm = await runStep("finish-for-me", async () => finishForMeStep(projectId));
-    steps.push(ffm);
+    steps.push(await runStep("finish-for-me", () => finishForMeStep(projectId)));
   }
 
-  const publish = await runStep("publish", async () => publishStep(projectId, dryRun));
-  steps.push(publish);
+  steps.push(await runStep("publish", () => publishStep(projectId, dryRun)));
 
   const ok = steps.every((s) => s.ok);
 
