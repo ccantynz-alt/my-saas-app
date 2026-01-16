@@ -1,53 +1,53 @@
 // src/app/projects/[projectId]/page.tsx
+import Link from "next/link";
+import ProjectPublishPanel from "./ProjectPublishPanel";
 
-import type { Metadata } from "next";
-import EditorClient from "./EditorClient";
-import { getProjectTemplateId } from "@/app/lib/projectTemplateStore";
-import { getProjectScaffold, hasScaffoldApplied, setProjectScaffold } from "@/app/lib/projectScaffoldStore";
-import { buildScaffoldForTemplate } from "@/app/lib/templateScaffolds";
-import { getProjectContent } from "@/app/lib/projectContentStore";
-
-export const metadata: Metadata = {
-  title: "Project Builder",
-  description: "Project builder view (editable V1 content).",
+type PageProps = {
+  params: { projectId: string };
 };
 
-export default async function Page({ params }: { params: { projectId: string } }) {
-  const projectId = params.projectId;
-
-  const templateId = await getProjectTemplateId(projectId);
-
-  // Ensure scaffold exists (applies once)
-  const applied = await hasScaffoldApplied(projectId);
-  if (templateId && !applied) {
-    const scaffold = buildScaffoldForTemplate(templateId);
-    await setProjectScaffold(projectId, scaffold);
-  }
-
-  const scaffold = await getProjectScaffold(projectId);
-  const savedContent = await getProjectContent(projectId);
-
-  const initialSections =
-    savedContent?.sections ||
-    scaffold?.sections ||
-    [
-      {
-        id: "hero",
-        type: "hero",
-        heading: "Welcome",
-        subheading: "No scaffold found yet.",
-        items: ["Pick a template in /start"],
-      },
-    ];
-
-  const source: "saved-content" | "scaffold" = savedContent ? "saved-content" : "scaffold";
+export default async function ProjectBuilderPage({ params }: PageProps) {
+  const projectId = params?.projectId;
 
   return (
-    <EditorClient
-      projectId={projectId}
-      initialTemplateId={templateId ?? null}
-      initialSections={initialSections}
-      source={source}
-    />
+    <main className="min-h-screen bg-neutral-50">
+      <div className="mx-auto max-w-5xl px-6 py-10">
+        <div className="flex flex-col gap-6">
+          <header className="rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Project Builder</h1>
+                <p className="mt-1 text-sm text-neutral-600">
+                  Use the buttons below to seed a draft spec and publish a public page.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs font-mono text-neutral-700">
+                  {projectId}
+                </span>
+                <Link
+                  href="/projects"
+                  className="inline-flex items-center justify-center rounded-2xl border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-900 hover:bg-neutral-50"
+                >
+                  Back to Projects
+                </Link>
+              </div>
+            </div>
+          </header>
+
+          <ProjectPublishPanel projectId={projectId} />
+
+          <section className="rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm">
+            <h2 className="text-lg font-semibold text-neutral-900">Next upgrades</h2>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-neutral-700">
+              <li>Add a real “Generate/Edit Spec” UI (forms or AI agent).</li>
+              <li>Lock “Publish” behind Pro plan (Stripe).</li>
+              <li>Add custom domains and SEO pages.</li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </main>
   );
 }
