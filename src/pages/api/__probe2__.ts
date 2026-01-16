@@ -16,3 +16,4 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     region: process.env.VERCEL_REGION || null,
   });
 }
+
