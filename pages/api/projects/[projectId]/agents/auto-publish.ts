@@ -42,9 +42,76 @@ async function finishForMeStep(projectId: string) {
   };
 }
 
-async function publishStep(projectId: string, dryRun: boolean) {
+/**
+ * Calls the real publish handler at: pages/api/projects/[projectId]/publish.ts
+ * We do an internal HTTP call to the same deployment origin so it reuses the same runtime/env.
+ */
+async function callPublishEndpoint(req: NextApiRequest, projectId: string) {
+  const origin =
+    (req.headers["x-forwarded-proto"] ? String(req.headers["x-forwarded-proto"]) : "https") +
+    "://" +
+    String(req.headers["x-forwarded-host"] || req.headers.host);
+
+  const url = `${origin}/api/projects/${encodeURIComponent(projectId)}/publish?ts=${Date.now()}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      // Forward cookies so auth/session behaves the same as a browser call.
+      cookie: String(req.headers.cookie || ""),
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({}),
+  });
+
+  const ct = res.headers.get("content-type") || "";
+  const text = await res.text();
+
+  let parsed: any = null;
+  if (ct.includes("application/json")) {
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      parsed = null;
+    }
+  }
+
+  if (!res.ok) {
+    const msg = `Publish failed: status=${res.status} ct=${ct} body=${text.slice(0, 400)}`;
+    throw new Error(msg);
+  }
+
+  return {
+    status: res.status,
+    ct,
+    body: parsed ?? text,
+  };
+}
+
+async function publishStep(req: NextApiRequest, projectId: string, dryRun: boolean) {
   if (dryRun) return { projectId, summary: "Publish skipped (dryRun=true)", published: false };
-  throw new Error("Publish not wired yet. Set dryRun=true or wire real publish endpoint.");
+
+  const result = await callPublishEndpoint(req, projectId);
+
+  // Try to extract common fields if your publish handler returns them.
+  const publishedAtIso =
+    result && typeof result.body === "object"
+      ? result.body.publishedAtIso || result.body.publishedAt || result.body.publishedAtISO
+      : undefined;
+
+  const publicUrl =
+    result && typeof result.body === "object"
+      ? result.body.publicUrl || result.body.url || result.body.publicURL
+      : undefined;
+
+  return {
+    projectId,
+    summary: "Publish OK",
+    published: true,
+    publishedAtIso: publishedAtIso ?? null,
+    publicUrl: publicUrl ?? null,
+    publishResponse: result.body,
+  };
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -66,7 +133,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     steps.push(await runStep("finish-for-me", () => finishForMeStep(projectId)));
   }
 
-  steps.push(await runStep("publish", () => publishStep(projectId, dryRun)));
+  steps.push(await runStep("publish", () => publishStep(req, projectId, dryRun)));
 
   const ok = steps.every((s) => s.ok);
 
@@ -77,6 +144,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     includeFinishForMe,
     dryRun,
     steps,
+    publishedAtIso: steps.find((s) => s.step === "publish")?.result?.publishedAtIso ?? null,
+    publicUrl: steps.find((s) => s.step === "publish")?.result?.publicUrl ?? null,
   });
 }
-
