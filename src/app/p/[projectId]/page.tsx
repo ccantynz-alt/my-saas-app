@@ -1,7 +1,7 @@
 // src/app/p/[projectId]/page.tsx
 export const runtime = "nodejs";
 
-import { PublishedTemplate, type PublishedSpec } from "../../../../app/p/_components/PublishedTemplate";
+import PublishedTemplate, { type PublishedSpec } from "../../../../app/p/_components/PublishedTemplate";
 import { readPublishedSpec } from "../../../../app/p/_lib/readPublishedSpec";
 
 type PageProps = {
