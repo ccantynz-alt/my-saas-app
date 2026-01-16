@@ -1,15 +1,14 @@
 // pages/api/projects/[projectId]/debug/spec.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 
-// Prefer the same KV layer your app already uses.
-// If you use @vercel/kv, this will work automatically.
-// If your project has a custom kv helper, we attempt best-effort imports too.
 async function getKvClient(): Promise<any> {
+  // Preferred: Vercel KV client
   try {
     const mod = await import("@vercel/kv");
     if ((mod as any).kv) return (mod as any).kv;
   } catch {}
 
+  // Best-effort: common local helper paths (won't crash if missing)
   const candidates = [
     "../../../../../../src/app/lib/kv",
     "../../../../../../app/lib/kv",
@@ -108,8 +107,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     for (const key of candidates) {
       const v = await tryGet(key);
       if (v != null) {
-        const bytes =
-          typeof v === "string" ? v.length : JSON.stringify(v).length;
+        const bytes = typeof v === "string" ? v.length : JSON.stringify(v).length;
 
         return res.status(200).json({
           ok: true,
