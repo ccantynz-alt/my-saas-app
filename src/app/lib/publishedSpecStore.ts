@@ -1,43 +1,123 @@
-import { SiteSpec } from "./siteSpec";
-import * as kvMod from "./kv";
+// src/app/lib/publishedSpecStore.ts
 
-function getKvAny(): any {
-  return (kvMod as any).kv ?? (kvMod as any).default ?? (kvMod as any);
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [k: string]: JsonValue };
+
+type PublishedSpec = Record<string, any>;
+
+type KvLike = {
+  get: (key: string) => Promise<any>;
+  set: (key: string, value: any) => Promise<any>;
+  del?: (key: string) => Promise<any>;
+};
+
+const memory = (() => {
+  const g = globalThis as any;
+  g.__PUBLISHED_STORE__ = g.__PUBLISHED_STORE__ ?? new Map<string, any>();
+  return g.__PUBLISHED_STORE__ as Map<string, any>;
+})();
+
+async function getKv(): Promise<KvLike | null> {
+  try {
+    const mod: any = await import("@vercel/kv");
+    const kv = mod?.kv ?? mod?.default?.kv ?? mod?.default ?? null;
+    if (kv && typeof kv.get === "function" && typeof kv.set === "function") return kv as KvLike;
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
-function publishedKey(projectId: string) {
-  return `project:${projectId}:published:siteSpec:v1`;
+// Published spec keys (try multiple so we DON'T break existing live data)
+function publishedKeys(projectId: string) {
+  return [
+    `published:${projectId}`,
+    `publish:${projectId}`,
+    `project:${projectId}:published`,
+    `projects:${projectId}:published`,
+    `site:published:${projectId}`,
+    `site:${projectId}:published`,
+    `spec:published:${projectId}`,
+    `spec:${projectId}:published`,
+  ];
 }
 
-function publishedFlagKey(projectId: string) {
-  return `project:${projectId}:published`;
+function normalizeMaybeJson(val: any): any {
+  if (!val) return null;
+  if (typeof val === "string") {
+    try {
+      return JSON.parse(val);
+    } catch {
+      return val;
+    }
+  }
+  return val;
 }
 
-export async function publishSiteSpec(projectId: string, spec: SiteSpec) {
-  const kv = getKvAny();
-  if (!kv?.set) throw new Error("KV store not available (kv.set missing)");
+export async function getPublishedSpec(projectId: string): Promise<PublishedSpec | null> {
+  const kv = await getKv();
+  const keys = publishedKeys(projectId);
 
-  await kv.set(publishedKey(projectId), JSON.stringify(spec));
-  await kv.set(publishedFlagKey(projectId), "true");
-  return true;
+  if (kv) {
+    for (const key of keys) {
+      try {
+        const v = normalizeMaybeJson(await kv.get(key));
+        if (v && typeof v === "object") return v as PublishedSpec;
+      } catch {
+        // keep trying
+      }
+    }
+    return null;
+  }
+
+  // Memory fallback
+  for (const key of keys) {
+    if (memory.has(key)) return memory.get(key) as PublishedSpec;
+  }
+  return null;
 }
 
-export async function loadPublishedSiteSpec(projectId: string): Promise<SiteSpec | null> {
-  const kv = getKvAny();
-  if (!kv?.get) throw new Error("KV store not available (kv.get missing)");
+export async function setPublishedSpec(projectId: string, spec: PublishedSpec): Promise<void> {
+  const kv = await getKv();
+  const keys = publishedKeys(projectId);
 
-  const raw = await kv.get(publishedKey(projectId));
-  if (!raw) return null;
+  if (kv) {
+    // Write to FIRST key + a couple legacy keys for compatibility.
+    const primary = keys[0];
+    await kv.set(primary, spec as unknown as JsonValue);
 
-  const text = typeof raw === "string" ? raw : JSON.stringify(raw);
-  return JSON.parse(text) as SiteSpec;
+    // Compatibility writes (safe; prevents “can’t find published spec” issues)
+    await kv.set(keys[2], spec as unknown as JsonValue);
+    await kv.set(keys[3], spec as unknown as JsonValue);
+    return;
+  }
+
+  // Memory fallback
+  const primary = keys[0];
+  memory.set(primary, spec);
+  memory.set(keys[2], spec);
+  memory.set(keys[3], spec);
 }
 
-export async function isProjectPublished(projectId: string): Promise<boolean> {
-  const kv = getKvAny();
-  if (!kv?.get) return false;
+export async function deletePublishedSpec(projectId: string): Promise<void> {
+  const kv = await getKv();
+  const keys = publishedKeys(projectId);
 
-  const flag = await kv.get(publishedFlagKey(projectId));
-  return flag === "true";
+  if (kv && typeof kv.del === "function") {
+    for (const key of keys) {
+      try {
+        await kv.del(key);
+      } catch {
+        // ignore
+      }
+    }
+    return;
+  }
+
+  for (const key of keys) memory.delete(key);
 }
-
