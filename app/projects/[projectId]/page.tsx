@@ -6,7 +6,7 @@ type PageProps = {
   params: { projectId: string };
 };
 
-export default async function ProjectBuilderPage({ params }: PageProps) {
+export default async function ProjectPage({ params }: PageProps) {
   const projectId = params?.projectId;
 
   return (
@@ -16,9 +16,9 @@ export default async function ProjectBuilderPage({ params }: PageProps) {
           <header className="rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Project Builder</h1>
+                <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Project</h1>
                 <p className="mt-1 text-sm text-neutral-600">
-                  Use the buttons below to seed a draft spec and publish a public page.
+                  Seed a draft spec (optional), then publish to generate a public URL.
                 </p>
               </div>
 
@@ -37,15 +37,6 @@ export default async function ProjectBuilderPage({ params }: PageProps) {
           </header>
 
           <ProjectPublishPanel projectId={projectId} />
-
-          <section className="rounded-3xl border border-neutral-200 bg-white p-8 shadow-sm">
-            <h2 className="text-lg font-semibold text-neutral-900">Next upgrades</h2>
-            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-neutral-700">
-              <li>Add a real “Generate/Edit Spec” UI (forms or AI agent).</li>
-              <li>Lock “Publish” behind Pro plan (Stripe).</li>
-              <li>Add custom domains and SEO pages.</li>
-            </ul>
-          </section>
         </div>
       </div>
     </main>
