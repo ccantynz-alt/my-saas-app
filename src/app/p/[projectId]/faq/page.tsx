@@ -1,19 +1,10 @@
-import type { Metadata } from "next";
-import CatchAllPublishedPage from "../[...path]/page";
-import { getPublishedMetadata } from "../publishedSeo";
+// src/app/p/[projectId]/faq/page.tsx
+import { redirect } from "next/navigation";
 
-type Props = {
+export default function PublishedFaqPage({
+  params,
+}: {
   params: { projectId: string };
-};
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  return await getPublishedMetadata({ projectId: params.projectId, pageSlug: "faq" });
-}
-
-export default function PublishedFaqPage({ params }: Props) {
-  return (
-    <CatchAllPublishedPage
-      params={{ projectId: params.projectId, path: ["faq"] }}
-    />
-  );
+}) {
+  redirect(`/p/${params.projectId}`);
 }
