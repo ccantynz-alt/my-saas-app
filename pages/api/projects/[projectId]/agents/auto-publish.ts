@@ -10,6 +10,7 @@ type StepLog = {
   result?: any;
   error?: string | null;
   skipped?: boolean;
+  optional?: boolean;
 };
 
 function getBaseUrl(req: NextApiRequest) {
@@ -97,7 +98,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ||
     null;
 
-  const buildTag = "auto-publish-selfheal-20260117-002";
+  // Bump this every deploy so you can prove what’s live
+  const buildTag = "auto-publish-selfheal-20260117-003";
 
   let body: any = req.body;
   if (typeof body === "string") {
@@ -126,11 +128,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const steps: StepLog[] = [];
 
-  // ✅ FIX: audit is GET (your audit endpoint returns 405 on POST)
-  steps.push(await callJsonStep({ name: "audit", url: routes.audit, method: "GET" }));
-  if (!steps[steps.length - 1].ok) {
-    return res.status(500).json({
-      ok: false,
+  // ✅ OPTIONAL STEPS (never kill pipeline)
+  // Audit route may not exist in some deployments — we log and continue.
+  const audit = await callJsonStep({ name: "audit", url: routes.audit, method: "POST" });
+  steps.push({ ...audit, optional: true });
+
+  // SEO (optional)
+  const seo = await callJsonStep({ name: "seo", url: routes.seo, method: "POST" });
+  steps.push({ ...seo, optional: true });
+
+  // Conversion (optional)
+  const conversion = await callJsonStep({ name: "conversion", url: routes.conversion, method: "POST" });
+  steps.push({ ...conversion, optional: true });
+
+  // Finish-for-me (optional)
+  if (includeFinishForMe) {
+    const ffm = await callJsonStep({ name: "finish-for-me", url: routes.finishForMe, method: "POST" });
+    steps.push({ ...ffm, optional: true });
+  } else {
+    steps.push({
+      name: "finish-for-me",
+      ok: true,
+      ms: 0,
+      skipped: true,
+      optional: true,
+      error: null,
+      result: { skipped: true, reason: "includeFinishForMe=false" },
+    });
+  }
+
+  // Publish (dry-run support + self-heal)
+  if (dryRun) {
+    steps.push({
+      name: "publish",
+      ok: true,
+      ms: 0,
+      skipped: true,
+      error: null,
+      result: { skipped: true, reason: "dryRun=true" },
+    });
+
+    return res.status(200).json({
+      ok: true,
       projectId,
       agent: "auto-publish",
       dryRun,
@@ -141,39 +180,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 
-  steps.push(await callJsonStep({ name: "seo", url: routes.seo, method: "POST" }));
-  if (!steps[steps.length - 1].ok) {
-    return res.status(500).json({ ok: false, projectId, agent: "auto-publish", dryRun, includeFinishForMe, buildTag, gitSha, steps });
-  }
-
-  steps.push(await callJsonStep({ name: "conversion", url: routes.conversion, method: "POST" }));
-  if (!steps[steps.length - 1].ok) {
-    return res.status(500).json({ ok: false, projectId, agent: "auto-publish", dryRun, includeFinishForMe, buildTag, gitSha, steps });
-  }
-
-  if (includeFinishForMe) {
-    steps.push(await callJsonStep({ name: "finish-for-me", url: routes.finishForMe, method: "POST" }));
-    if (!steps[steps.length - 1].ok) {
-      return res.status(500).json({ ok: false, projectId, agent: "auto-publish", dryRun, includeFinishForMe, buildTag, gitSha, steps });
-    }
-  } else {
-    steps.push({ name: "finish-for-me", ok: true, ms: 0, skipped: true, error: null, result: { skipped: true, reason: "includeFinishForMe=false" } });
-  }
-
-  if (dryRun) {
-    steps.push({ name: "publish", ok: true, ms: 0, skipped: true, error: null, result: { skipped: true, reason: "dryRun=true" } });
-    return res.status(200).json({ ok: true, projectId, agent: "auto-publish", dryRun, includeFinishForMe, buildTag, gitSha, steps });
-  }
-
+  // Real publish attempt #1
   let publishStep = await callJsonStep({ name: "publish", url: routes.publish, method: "POST" });
 
   const publishErr = publishStep.error || "";
   const publishBody = publishStep.result;
+
   const publishMissingSpec =
     publishStep.status === 400 &&
     (publishErr.includes("No site spec found to publish") ||
       (publishBody && typeof publishBody === "object" && String(publishBody.error || "").includes("No site spec found")));
 
+  // Self-heal: seed-spec then retry ONCE
   if (!publishStep.ok && publishMissingSpec) {
     steps.push(publishStep);
 
@@ -181,14 +199,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     steps.push(seed);
 
     if (!seed.ok) {
-      return res.status(500).json({ ok: false, projectId, agent: "auto-publish", dryRun, includeFinishForMe, buildTag, gitSha, steps });
+      return res.status(500).json({
+        ok: false,
+        projectId,
+        agent: "auto-publish",
+        dryRun,
+        includeFinishForMe,
+        buildTag,
+        gitSha,
+        steps,
+      });
     }
 
     const retry = await callJsonStep({ name: "publish-retry", url: routes.publish, method: "POST" });
     steps.push(retry);
 
     if (!retry.ok) {
-      return res.status(500).json({ ok: false, projectId, agent: "auto-publish", dryRun, includeFinishForMe, buildTag, gitSha, steps });
+      return res.status(500).json({
+        ok: false,
+        projectId,
+        agent: "auto-publish",
+        dryRun,
+        includeFinishForMe,
+        buildTag,
+        gitSha,
+        steps,
+      });
     }
 
     return res.status(200).json({
@@ -205,10 +241,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 
+  // Normal path: record publish and return
   steps.push(publishStep);
 
   if (!publishStep.ok) {
-    return res.status(500).json({ ok: false, projectId, agent: "auto-publish", dryRun, includeFinishForMe, buildTag, gitSha, steps });
+    return res.status(500).json({
+      ok: false,
+      projectId,
+      agent: "auto-publish",
+      dryRun,
+      includeFinishForMe,
+      buildTag,
+      gitSha,
+      steps,
+    });
   }
 
   return res.status(200).json({
