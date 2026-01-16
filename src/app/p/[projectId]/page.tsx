@@ -9,7 +9,7 @@ export default function PublishedSitePage({ params }: PageProps) {
 
   return (
     <main className="min-h-screen bg-[#070B14] text-white">
-      <div className="mx-auto max-w-6xl px-6 py-16">
+      <div className="mx-auto max-w-5xl px-6 py-16">
         <div className="mb-10 flex items-center justify-between">
           <div className="text-sm text-white/70">
             Published Project: <span className="text-white">{projectId}</span>
@@ -32,9 +32,8 @@ export default function PublishedSitePage({ params }: PageProps) {
           </h1>
 
           <p className="mt-4 max-w-2xl text-white/75">
-            If you can see this page without being redirected, your public publish
-            route is working. Next we’ll replace this with a fully polished SaaS
-            landing template rendered from your site spec.
+            If you can see this page without redirects, /p/* is public and stable.
+            Next step: render a polished template from your site spec.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
