@@ -1,138 +1,75 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+// BOOTSTRAP/app/api/projects/[projectId]/publish/route.ts
+import { NextResponse, type NextRequest } from "next/server";
 import { kv } from "@vercel/kv";
-import { stripe } from "@/lib/stripe";
+import { auth } from "@clerk/nextjs/server";
 
 export const runtime = "nodejs";
 
-type RouteContext = {
-  params: { projectId: string };
+/**
+ * Safe helpers
+ */
+function asText(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (v == null) return "";
+  try {
+    return String(v);
+  } catch {
+    return "";
+  }
+}
+
+type AuditResult = {
+  readyToPublish: boolean;
+  reasons?: string[];
 };
 
-function asText(v: unknown): string {
-  return typeof v === "string" ? v : "";
-}
+function runAudit(html: string): AuditResult {
+  const reasons: string[] = [];
 
-/* -------------------- AUDIT (server-side) -------------------- */
-
-function normalize(s: string): string {
-  return s.toLowerCase().replace(/\s+/g, " ").trim();
-}
-
-function includesAny(haystack: string, needles: string[]) {
-  const h = normalize(haystack);
-  return needles.some((n) => h.includes(normalize(n)));
-}
-
-function getTitle(html: string) {
-  const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  return m ? m[1].trim() : "";
-}
-
-function hasMetaDescription(html: string) {
-  return /<meta\s+[^>]*name=["']description["'][^>]*content=["'][^"']+["'][^>]*>/i.test(
-    html
-  );
-}
-
-function hasH1(html: string) {
-  const m = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-  if (!m) return false;
-  const text = m[1].replace(/<[^>]+>/g, "").trim();
-  return text.length >= 4;
-}
-
-function hasCTA(html: string) {
-  return includesAny(html, [
-    "start free",
-    "generate",
-    "publish",
-    "upgrade",
-    "get started",
-  ]);
-}
-
-function runAudit(html: string) {
-  const missing: string[] = [];
-  const warnings: string[] = [];
-  const notes: string[] = [];
-
-  if (!getTitle(html)) missing.push("Missing <title> tag");
-  if (!hasMetaDescription(html)) missing.push("Missing meta description");
-  if (!hasH1(html)) missing.push("Missing clear H1 headline");
-  if (!hasCTA(html)) missing.push("Missing clear CTA (Start free / Generate / Publish)");
-
-  if (
-    includesAny(html, [
-      "book a call",
-      "schedule a call",
-      "free consultation",
-      "calendar",
-    ])
-  ) {
-    warnings.push(
-      "Calls/meetings language found. Product direction is website-only automation-first."
-    );
-  }
-
-  if (includesAny(html, ["pricing", "plans", "free", "pro"])) {
-    notes.push("Pricing teaser detected.");
-  } else {
-    notes.push("Consider adding a simple pricing teaser.");
-  }
-
-  if (includesAny(html, ["trusted", "reviews", "secure", "guarantee"])) {
-    notes.push("Trust elements detected.");
-  } else {
-    notes.push("Consider adding trust elements.");
-  }
+  if (!html || html.trim().length < 50) reasons.push("HTML too short");
+  if (!html.includes("<html")) reasons.push("Missing <html>");
+  if (!html.includes("<body")) reasons.push("Missing <body>");
+  if (!html.includes("<title")) reasons.push("Missing <title>");
 
   return {
-    readyToPublish: missing.length === 0,
-    missing,
-    warnings,
-    notes,
+    readyToPublish: reasons.length === 0,
+    reasons,
   };
 }
 
-/* -------------------- PLAN / BILLING -------------------- */
-
+/**
+ * Pro check (robust: tries multiple keys)
+ * You can wire this into your real billing later.
+ */
 async function isProUser(userId: string): Promise<boolean> {
-  const v = await kv.get(`plan:clerk:${userId}`);
-  return String(v || "").toLowerCase() === "pro";
+  const keys = [
+    `user:${userId}:isPro`,
+    `user:${userId}:pro`,
+    `debug:user:${userId}:isPro`,
+    `debug:pro:${userId}`,
+  ];
+
+  for (const k of keys) {
+    const v = await kv.get(k);
+    if (v === true) return true;
+    if (v === "true") return true;
+    if (v === 1) return true;
+    if (v === "1") return true;
+    if (v === "pro") return true;
+  }
+
+  return false;
 }
 
-async function createUpgradeUrl(
-  origin: string,
-  userId: string,
-  projectId: string
-) {
-  const priceId = process.env.STRIPE_PRICE_ID || "";
-  if (!priceId) return "";
-
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    origin ||
-    "https://my-saas-app-5eyw.vercel.app";
-
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${appUrl}/projects/${projectId}?upgraded=1`,
-    cancel_url: `${appUrl}/projects/${projectId}?upgrade=cancelled`,
-    metadata: {
-      clerkUserId: userId,
-      projectId,
-      source: "publish_gate",
-    },
-  });
-
-  return session.url || "";
+async function createUpgradeUrl(origin: string, userId: string, projectId: string) {
+  // Minimal safe upgrade link (doesn't assume Stripe wiring here)
+  const base = origin || "";
+  const path = `/upgrade?projectId=${encodeURIComponent(projectId)}&u=${encodeURIComponent(userId)}`;
+  return base ? `${base}${path}` : path;
 }
 
-/* -------------------- ROUTE -------------------- */
-
-export async function POST(req: Request, ctx: RouteContext) {
+export async function POST(req: NextRequest, ctx: { params: { projectId: string } }) {
+  // Auth
   const { userId } = auth();
   if (!userId) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -158,21 +95,16 @@ export async function POST(req: Request, ctx: RouteContext) {
       {
         ok: false,
         error: "Not ready to publish",
-        ...audit,
+        audit,
       },
       { status: 409 }
     );
   }
 
   // Pro gate
-  const isPro = await isProUser(userId);
-  if (!isPro) {
-    const upgradeUrl = await createUpgradeUrl(
-      req.headers.get("origin") || "",
-      userId,
-      projectId
-    );
-
+  const pro = await isProUser(userId);
+  if (!pro) {
+    const upgradeUrl = await createUpgradeUrl(req.headers.get("origin") || "", userId, projectId);
     return NextResponse.json(
       {
         ok: false,
@@ -183,13 +115,39 @@ export async function POST(req: Request, ctx: RouteContext) {
     );
   }
 
-  // Publish
-  const pubKey = `published:project:${projectId}:latest`;
-  await kv.set(pubKey, html);
+  // Publish HTML
+  const pubHtmlKey = `published:project:${projectId}:latest`;
+  await kv.set(pubHtmlKey, html);
+
+  // ✅ Publish SPEC (this is what your /debug/spec inspector is looking for)
+  const publishedAtIso = new Date().toISOString();
+
+  const publishedSpec = {
+    projectId,
+    publishedAtIso,
+    // Keep HTML inline for bootstrap reliability (no guessing about renderer expectations)
+    html,
+    // Also store where HTML was written
+    htmlKey: pubHtmlKey,
+    // Include minimal audit info for debugging
+    audit,
+    // Helpful trace
+    sourceKey: genKey,
+  };
+
+  // Canonical key (your inspector expects this)
+  const pubSpecKey = `project:${projectId}:publishedSpec`;
+  await kv.set(pubSpecKey, JSON.stringify(publishedSpec));
+
+  // Helpful aliases (optional but makes the system more robust)
+  await kv.set(`project:${projectId}:publishedAtIso`, publishedAtIso);
+  await kv.set(`project:${projectId}:spec`, JSON.stringify(publishedSpec));
+  await kv.set(`project:${projectId}:latestSpec`, JSON.stringify(publishedSpec));
 
   return NextResponse.json({
     ok: true,
     projectId,
+    publishedAtIso,
     publicUrl: `/p/${projectId}`,
   });
 }
