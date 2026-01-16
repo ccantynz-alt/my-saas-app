@@ -44,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const origin = baseUrl(req);
     const steps: StepResult[] = [];
 
-    // 1) Seed draft (safe to run even if draft exists)
+    // 1) Seed (safe to run even if draft exists)
     try {
       const { status, json } = await callJson(`${origin}/api/projects/${projectId}/seed-spec`, {
         method: "POST",
@@ -59,21 +59,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       const { status, json } = await callJson(
         `${origin}/api/projects/${projectId}/agents/finish-for-me`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-        }
+        { method: "POST", headers: { "content-type": "application/json" } }
       );
       steps.push({ step: "finish-for-me", ok: status >= 200 && status < 300, status, json });
     } catch (e: any) {
-      steps.push({
-        step: "finish-for-me",
-        ok: false,
-        error: e?.message ?? "finish-for-me failed",
-      });
+      steps.push({ step: "finish-for-me", ok: false, error: e?.message ?? "finish-for-me failed" });
     }
 
-    // 3) SEO agent (optional — if missing, we don’t hard fail the whole run)
+    // 3) SEO (optional)
     try {
       const { status, json } = await callJson(`${origin}/api/projects/${projectId}/agents/seo`, {
         method: "POST",
@@ -84,7 +77,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       steps.push({ step: "seo", ok: false, error: e?.message ?? "seo failed" });
     }
 
-    // 4) Publish (this is the important one)
+    // 4) Publish (required)
     try {
       const { status, json } = await callJson(`${origin}/api/projects/${projectId}/publish`, {
         method: "POST",
