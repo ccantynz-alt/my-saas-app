@@ -1,13 +1,15 @@
-import PublishedProjectPage from "../page";
-
 export const runtime = "nodejs";
 
-type Props = {
-  params: { projectId: string; path?: string[] };
+type PageProps = {
+  params: { projectId: string };
 };
 
-export default function PublishedCatchAll({ params }: Props) {
-  // IMPORTANT:
-  // Do NOT redirect. Just render the main published page.
-  return <PublishedProjectPage params={{ projectId: params.projectId }} />;
+export default function PublishedProjectPage({ params }: PageProps) {
+  return (
+    <main style={{ padding: 24, fontFamily: "ui-sans-serif, system-ui" }}>
+      <h1>Published Site ✅</h1>
+      <p>Project: {params.projectId}</p>
+      <p>If you can see this, the redirect loop is fixed.</p>
+    </main>
+  );
 }
