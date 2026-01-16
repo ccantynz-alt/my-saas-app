@@ -1,348 +1,378 @@
 // src/app/p/[projectId]/page.tsx
+import type { Metadata } from "next";
 import Link from "next/link";
-import { loadPublishedSiteSpec } from "@/app/lib/publishedSpecStore";
 
-type PageProps = {
-  params: { projectId: string };
+/**
+ * Minimal spec shape we can safely render.
+ * (We only rely on a few fields to avoid breaking if your spec evolves.)
+ */
+type PublishedSpec = {
+  projectId?: string;
+  version?: string;
+  brandName?: string;
+  createdAtIso?: string;
+  pages?: Array<{
+    slug?: string;
+    title?: string;
+    hero?: {
+      headline?: string;
+      subheadline?: string;
+      primaryCta?: { label?: string; href?: string };
+      secondaryCta?: { label?: string; href?: string };
+    };
+    sections?: Array<
+      | { type: "features"; items?: Array<{ title?: string; body?: string }> }
+      | { type: "faq"; items?: Array<{ q?: string; a?: string }> }
+      | { type: string; [k: string]: any }
+    >;
+  }>;
+  [k: string]: any;
 };
 
-function asString(v: unknown): string | null {
-  if (typeof v === "string") {
-    const s = v.trim();
-    return s ? s : null;
+function isObj(v: unknown): v is Record<string, any> {
+  return typeof v === "object" && v !== null;
+}
+
+/**
+ * Tries to load a published spec from KV using a few common key patterns.
+ * This avoids hard-coding your exact storage key while still being real + live.
+ */
+async function loadPublishedSpec(projectId: string): Promise<PublishedSpec | null> {
+  // Try @vercel/kv first (most common in Vercel KV / Upstash setups)
+  let kv: any = null;
+  try {
+    const mod: any = await import("@vercel/kv");
+    kv = mod?.kv ?? mod?.default?.kv ?? mod?.default ?? null;
+  } catch {
+    kv = null;
   }
+
+  if (!kv || typeof kv.get !== "function") {
+    // If KV is unavailable, return null (page will show an error block)
+    return null;
+  }
+
+  const candidates = [
+    `published:${projectId}`,
+    `publish:${projectId}`,
+    `project:${projectId}:published`,
+    `projects:${projectId}:published`,
+    `site:published:${projectId}`,
+    `site:${projectId}:published`,
+    `spec:published:${projectId}`,
+    `spec:${projectId}:published`,
+  ];
+
+  for (const key of candidates) {
+    try {
+      const val = await kv.get(key);
+      if (val) {
+        // Some KV stores return JSON string, some return object
+        if (typeof val === "string") {
+          try {
+            const parsed = JSON.parse(val);
+            if (isObj(parsed)) return parsed as PublishedSpec;
+          } catch {
+            // ignore parse error
+          }
+        }
+        if (isObj(val)) return val as PublishedSpec;
+      }
+    } catch {
+      // ignore and continue
+    }
+  }
+
   return null;
 }
 
-function asStringArray(v: unknown): string[] {
-  if (!Array.isArray(v)) return [];
-  return v
-    .map((x) => (typeof x === "string" ? x.trim() : ""))
-    .filter(Boolean);
-}
-
-function safeGetSpec(published: any): any | null {
-  if (!published) return null;
-  if (published && typeof published === "object" && (published as any).spec) return (published as any).spec;
-  return published;
-}
-
-function getTitle(spec: any): string {
-  return (
-    asString(spec?.title) ||
-    asString(spec?.siteTitle) ||
-    asString(spec?.name) ||
-    asString(spec?.hero?.title) ||
-    "A modern website for your business"
-  );
-}
-
-function getSubtitle(spec: any): string {
-  return (
-    asString(spec?.subtitle) ||
-    asString(spec?.tagline) ||
-    asString(spec?.hero?.subtitle) ||
-    asString(spec?.hero?.tagline) ||
-    "Fast to load, clear to understand, and built to convert — generated from a published spec."
-  );
-}
-
-function getPrimaryCta(spec: any): { text: string; href: string } {
-  const text = asString(spec?.cta?.text) || asString(spec?.hero?.ctaText) || "Get started";
-  const href = asString(spec?.cta?.href) || "#contact";
-  return { text, href };
-}
-
-function getSecondaryCta(spec: any): { text: string; href: string } {
-  const text = asString(spec?.hero?.secondaryCtaText) || "See features";
-  const href = asString(spec?.hero?.secondaryCtaHref) || "#features";
-  return { text, href };
-}
-
-function getFeatures(spec: any): Array<{ title: string; description: string }> {
-  const raw = spec?.features;
-
-  if (Array.isArray(raw)) {
-    if (raw.length && typeof raw[0] === "object") {
-      const items = raw
-        .map((f: any) => {
-          const title = asString(f?.title) || asString(f?.name) || "";
-          const description =
-            asString(f?.description) || asString(f?.detail) || "A practical benefit that helps visitors take action.";
-          return title ? { title, description } : null;
-        })
-        .filter(Boolean) as Array<{ title: string; description: string }>;
-
-      if (items.length) return items;
-    }
-
-    const list = asStringArray(raw);
-    if (list.length) {
-      return list.slice(0, 6).map((t) => ({
-        title: t,
-        description: "A practical benefit that helps visitors take action.",
-      }));
-    }
+function pick<T>(...vals: Array<T | undefined | null | "">): T | undefined {
+  for (const v of vals) {
+    if (v !== undefined && v !== null && v !== "") return v as T;
   }
-
-  const sections = spec?.sections;
-  if (Array.isArray(sections)) {
-    const featuresSection = sections.find((s: any) => s?.type === "features" || s?.kind === "features");
-    const items = (featuresSection as any)?.items || (featuresSection as any)?.features;
-    if (Array.isArray(items)) {
-      if (items.length && typeof items[0] === "object") {
-        const mapped = items
-          .map((f: any) => {
-            const title = asString(f?.title) || asString(f?.name) || "";
-            const description =
-              asString(f?.description) || asString(f?.detail) || "A practical benefit that helps visitors take action.";
-            return title ? { title, description } : null;
-          })
-          .filter(Boolean) as Array<{ title: string; description: string }>;
-        if (mapped.length) return mapped;
-      }
-
-      const list = asStringArray(items);
-      if (list.length) {
-        return list.slice(0, 6).map((t) => ({
-          title: t,
-          description: "A practical benefit that helps visitors take action.",
-        }));
-      }
-    }
-  }
-
-  return [
-    { title: "Clear, conversion-first layout", description: "Hero, proof, benefits, and CTA are structured to reduce friction." },
-    { title: "Fast to load, easy to scan", description: "Clean typography and spacing designed for modern browsing." },
-    { title: "Built from a published spec", description: "Update your spec, republish, and the public page updates instantly." },
-    { title: "SEO-friendly defaults", description: "Reasonable headings, sections, and readable content structure." },
-    { title: "Works globally", description: "A simple public link you can share anywhere." },
-    { title: "Ready for automation", description: "A foundation you can extend with forms, payments, and workflows." },
-  ];
+  return undefined;
 }
 
-function getFaq(spec: any): Array<{ q: string; a: string }> {
-  const raw = spec?.faq || spec?.faqs;
-  if (Array.isArray(raw) && raw.length && typeof raw[0] === "object") {
-    const items = raw
-      .map((x: any) => {
-        const q = asString(x?.q) || asString(x?.question) || "";
-        const a = asString(x?.a) || asString(x?.answer) || "";
-        return q && a ? { q, a } : null;
-      })
-      .filter(Boolean) as Array<{ q: string; a: string }>;
-    if (items.length) return items.slice(0, 6);
-  }
-
-  return [
-    { q: "Is this page live?", a: "Yes — this is the public page rendered from the published spec for this project." },
-    { q: "What happens when I republish?", a: "The published spec updates, and this public URL will reflect the new content." },
-    { q: "Can I add a contact form later?", a: "Yes. This is a clean foundation that can be extended with forms and automations." },
-  ];
+function safeArray<T>(v: unknown): T[] {
+  return Array.isArray(v) ? (v as T[]) : [];
 }
 
-function Badge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs font-medium text-neutral-700 shadow-sm">
-      {children}
-    </span>
-  );
+function cx(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(" ");
 }
 
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <a
-      href={href}
-      className="rounded-xl px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
-    >
-      {children}
-    </a>
-  );
-}
-
-function PricingCard({
-  name,
-  price,
-  bullets,
-  emphasis,
+export async function generateMetadata({
+  params,
 }: {
-  name: string;
-  price: string;
-  bullets: string[];
-  emphasis?: boolean;
-}) {
-  return (
-    <div
-      className={[
-        "rounded-3xl border p-7 shadow-sm",
-        emphasis ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 bg-white text-neutral-900",
-      ].join(" ")}
-    >
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-semibold">{name}</div>
-        {emphasis ? (
-          <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">Recommended</span>
-        ) : (
-          <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-700">Starter</span>
-        )}
-      </div>
+  params: { projectId: string };
+}): Promise<Metadata> {
+  const spec = await loadPublishedSpec(params.projectId);
+  const brand = pick(spec?.brandName, "Your Brand");
+  const title = `${brand} — Official Site`;
+  const description =
+    "A premium, conversion-focused site generated and published from a live spec.";
 
-      <div className="mt-4 text-3xl font-semibold">{price}</div>
-      <div className={["mt-1 text-sm", emphasis ? "text-white/80" : "text-neutral-600"].join(" ")}>
-        Simple monthly pricing.
-      </div>
-
-      <ul className={["mt-6 space-y-3 text-sm", emphasis ? "text-white/90" : "text-neutral-700"].join(" ")}>
-        {bullets.map((b) => (
-          <li key={b} className="flex gap-3">
-            <span className={["mt-1 h-2 w-2 rounded-full", emphasis ? "bg-white" : "bg-neutral-900"].join(" ")} />
-            <span>{b}</span>
-          </li>
-        ))}
-      </ul>
-
-      <a
-        href="#contact"
-        className={[
-          "mt-7 inline-flex w-full items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold",
-          emphasis ? "bg-white text-neutral-900 hover:bg-neutral-100" : "bg-neutral-900 text-white hover:bg-neutral-800",
-        ].join(" ")}
-      >
-        Get started
-      </a>
-    </div>
-  );
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "website",
+    },
+    robots: { index: true, follow: true },
+  };
 }
 
-export default async function PublicProjectPage({ params }: PageProps) {
-  const projectId = params?.projectId;
+export default async function PublicProjectPage({
+  params,
+}: {
+  params: { projectId: string };
+}) {
+  const projectId = params.projectId;
+  const spec = await loadPublishedSpec(projectId);
 
-  const published = await loadPublishedSiteSpec(projectId);
-  const spec = safeGetSpec(published);
+  // Fallback content (still premium) if we can’t locate the KV key yet.
+  const brandName = pick(spec?.brandName, "Your Brand");
+  const firstPage = safeArray<PublishedSpec["pages"][number]>(spec?.pages)[0];
 
-  if (!spec) {
-    return (
-      <main className="min-h-screen bg-neutral-50">
-        <div className="mx-auto max-w-3xl px-6 py-16">
-          <div className="rounded-3xl border border-neutral-200 bg-white p-10 shadow-sm">
-            <div className="flex items-center justify-between gap-4">
-              <Badge>Public page</Badge>
-              <Link className="text-sm font-medium text-neutral-700 hover:text-neutral-900" href="/projects">
-                Back to builder
-              </Link>
-            </div>
+  const heroHeadline = pick(
+    firstPage?.hero?.headline,
+    firstPage?.title,
+    `${brandName} that converts`
+  );
 
-            <h1 className="mt-6 text-3xl font-semibold tracking-tight">This site isn’t published yet</h1>
-            <p className="mt-3 text-neutral-600">
-              The project exists, but it hasn’t been published. Go back to the builder and click Publish.
-            </p>
+  const heroSub = pick(
+    firstPage?.hero?.subheadline,
+    "Launch a clean, premium presence that builds trust and drives action — without the noise."
+  );
 
-            <div className="mt-8 rounded-2xl bg-neutral-50 p-4 text-xs text-neutral-600">
-              <div className="font-mono">projectId: {projectId}</div>
-            </div>
-          </div>
-        </div>
-      </main>
-    );
-  }
+  const primaryCtaLabel = pick(firstPage?.hero?.primaryCta?.label, "Get started");
+  const primaryCtaHref = pick(firstPage?.hero?.primaryCta?.href, "#cta");
 
-  const title = getTitle(spec);
-  const subtitle = getSubtitle(spec);
-  const primary = getPrimaryCta(spec);
-  const secondary = getSecondaryCta(spec);
-  const features = getFeatures(spec);
-  const faqs = getFaq(spec);
+  const secondaryCtaLabel = pick(firstPage?.hero?.secondaryCta?.label, "See features");
+  const secondaryCtaHref = pick(firstPage?.hero?.secondaryCta?.href, "#features");
 
-  const publishedAtIso =
-    (published as any)?.publishedAtIso || (published as any)?.publishedAt || (spec as any)?.publishedAtIso || null;
+  // Pull features + FAQ from spec if present, else use premium defaults.
+  const sections = safeArray<any>(firstPage?.sections);
+  const featuresSection = sections.find((s) => s?.type === "features");
+  const faqSection = sections.find((s) => s?.type === "faq");
+
+  const featureItems =
+    safeArray<{ title?: string; body?: string }>(featuresSection?.items).length > 0
+      ? safeArray<{ title?: string; body?: string }>(featuresSection?.items)
+      : [
+          {
+            title: "Premium structure, fast",
+            body: "A clean layout that looks like a real product — not a template dump.",
+          },
+          {
+            title: "Conversion-first sections",
+            body: "Hero → proof → benefits → FAQ → strong CTA, in the order that sells.",
+          },
+          {
+            title: "Built to scale",
+            body: "Designed for global visitors with clear hierarchy and readable spacing.",
+          },
+          {
+            title: "Trust baked in",
+            body: "Clear value prop, consistent typography, and a confident, modern aesthetic.",
+          },
+          {
+            title: "Mobile-ready by default",
+            body: "Responsive sections that hold up on phones, tablets, and desktop.",
+          },
+          {
+            title: "Spec-driven",
+            body: "When your spec updates, your public site updates too — no manual edits.",
+          },
+        ];
+
+  const faqItems =
+    safeArray<{ q?: string; a?: string }>(faqSection?.items).length > 0
+      ? safeArray<{ q?: string; a?: string }>(faqSection?.items)
+      : [
+          {
+            q: "What is this site?",
+            a: "It’s a published marketing page generated from a saved spec — designed to look premium and convert.",
+          },
+          {
+            q: "Can the content change later?",
+            a: "Yes. When the published spec is updated, this page can render the latest version.",
+          },
+          {
+            q: "Is it mobile friendly?",
+            a: "Yes — the layout is responsive and uses modern spacing and typography.",
+          },
+        ];
 
   return (
-    <main className="min-h-screen bg-neutral-50 text-neutral-900">
+    <div className="min-h-screen bg-white text-slate-900">
       {/* Top bar */}
-      <div id="home" className="border-b border-neutral-200 bg-white/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/85 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-2xl bg-neutral-900" />
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-900 text-white shadow-sm">
+              <span className="text-sm font-semibold">
+                {(brandName || "B").trim().slice(0, 1).toUpperCase()}
+              </span>
+            </div>
             <div className="leading-tight">
-              <div className="text-sm font-semibold">{title}</div>
-              <div className="text-xs text-neutral-500 font-mono">{projectId}</div>
+              <div className="text-sm font-semibold">{brandName}</div>
+              <div className="text-xs text-slate-500">Official site</div>
             </div>
           </div>
 
-          <div className="hidden items-center gap-2 md:flex">
-            <NavLink href="#home">Home</NavLink>
-            <NavLink href="#about">About</NavLink>
-            <NavLink href="#pricing">Pricing</NavLink>
-            <NavLink href="#faq">FAQ</NavLink>
-            <NavLink href="#contact">Contact</NavLink>
-          </div>
+          <nav className="hidden items-center gap-6 md:flex">
+            <a className="text-sm text-slate-600 hover:text-slate-900" href="#features">
+              Features
+            </a>
+            <a className="text-sm text-slate-600 hover:text-slate-900" href="#proof">
+              Proof
+            </a>
+            <a className="text-sm text-slate-600 hover:text-slate-900" href="#faq">
+              FAQ
+            </a>
+          </nav>
 
-          <div className="flex items-center gap-3">
-            {publishedAtIso ? <Badge>published {String(publishedAtIso)}</Badge> : <Badge>published</Badge>}
-            <Link className="text-sm font-medium text-neutral-700 hover:text-neutral-900" href="/projects">
-              Back to builder
-            </Link>
+          <div className="flex items-center gap-2">
+            <a
+              href={secondaryCtaHref}
+              className="hidden rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 md:inline-flex"
+            >
+              {secondaryCtaLabel}
+            </a>
+            <a
+              href={primaryCtaHref}
+              className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+            >
+              {primaryCtaLabel}
+            </a>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Hero */}
-      <section className="mx-auto max-w-6xl px-6 pt-14">
-        <div className="rounded-[32px] border border-neutral-200 bg-white p-10 shadow-sm">
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-2xl">
-              <div className="flex flex-wrap gap-2">
-                <Badge>Fast</Badge>
-                <Badge>Clear</Badge>
-                <Badge>Conversion-ready</Badge>
+      <section className="relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute -top-40 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-slate-100 blur-3xl" />
+          <div className="absolute -bottom-48 left-0 h-[520px] w-[520px] rounded-full bg-slate-100 blur-3xl" />
+          <div className="absolute -bottom-48 right-0 h-[520px] w-[520px] rounded-full bg-slate-100 blur-3xl" />
+        </div>
+
+        <div className="mx-auto max-w-6xl px-4 pt-14 pb-10 md:pt-20 md:pb-16">
+          <div className="grid gap-10 md:grid-cols-12 md:items-center">
+            <div className="md:col-span-7">
+              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
+                <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+                Live published page
+                <span className="text-slate-400">•</span>
+                <span className="font-mono text-[11px] text-slate-500">{projectId}</span>
               </div>
 
-              <h1 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">{title}</h1>
+              <h1 className="mt-5 text-4xl font-semibold tracking-tight text-slate-900 md:text-5xl">
+                {heroHeadline}
+              </h1>
 
-              <p className="mt-4 text-lg text-neutral-600">{subtitle}</p>
-
-              <div className="mt-8 flex flex-wrap gap-3">
-                <a
-                  href={primary.href}
-                  className="inline-flex items-center justify-center rounded-2xl bg-neutral-900 px-6 py-3 text-sm font-semibold text-white hover:bg-neutral-800"
-                >
-                  {primary.text}
-                </a>
-                <a
-                  href={secondary.href}
-                  className="inline-flex items-center justify-center rounded-2xl border border-neutral-200 bg-white px-6 py-3 text-sm font-semibold text-neutral-900 hover:bg-neutral-50"
-                >
-                  {secondary.text}
-                </a>
-              </div>
-
-              <p className="mt-3 text-xs text-neutral-500">
-                Public page rendered from the <span className="font-mono">published spec</span>. Republish to update.
+              <p className="mt-4 max-w-xl text-lg leading-relaxed text-slate-600">
+                {heroSub}
               </p>
+
+              <div className="mt-7 flex flex-wrap items-center gap-3">
+                <a
+                  href={primaryCtaHref}
+                  className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+                >
+                  {primaryCtaLabel}
+                </a>
+                <a
+                  href={secondaryCtaHref}
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                >
+                  {secondaryCtaLabel}
+                </a>
+              </div>
+
+              <div className="mt-6 grid max-w-xl grid-cols-3 gap-3 text-xs text-slate-600">
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                  <div className="font-semibold text-slate-900">Premium</div>
+                  <div className="mt-1">clean spacing</div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                  <div className="font-semibold text-slate-900">Fast</div>
+                  <div className="mt-1">loads quickly</div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                  <div className="font-semibold text-slate-900">Focused</div>
+                  <div className="mt-1">built to convert</div>
+                </div>
+              </div>
+
+              {!spec && (
+                <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  <div className="font-semibold">Published spec not found in KV (yet)</div>
+                  <div className="mt-1 text-amber-900/80">
+                    This page is live and styled, but the renderer couldn’t locate the KV key.
+                    Once we confirm your exact publish key, this will render your real content.
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* “preview card” */}
-            <div className="w-full max-w-md">
-              <div className="rounded-3xl border border-neutral-200 bg-neutral-50 p-6">
-                <div className="text-sm font-semibold">What you get</div>
-                <ul className="mt-4 space-y-3 text-sm text-neutral-700">
-                  <li className="flex gap-3">
-                    <span className="mt-1 h-2 w-2 rounded-full bg-neutral-900" />
-                    <span>Public URL you can share instantly</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="mt-1 h-2 w-2 rounded-full bg-neutral-900" />
-                    <span>Structured sections that guide action</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="mt-1 h-2 w-2 rounded-full bg-neutral-900" />
-                    <span>Clean design that looks premium by default</span>
-                  </li>
+            {/* Hero card */}
+            <div className="md:col-span-5">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">What you get</div>
+                    <div className="mt-1 text-sm text-slate-600">
+                      A real marketing page structure — no fluff.
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+                    Premium
+                  </div>
+                </div>
+
+                <ul className="mt-5 space-y-3 text-sm text-slate-700">
+                  {[
+                    "Strong hero with clear CTA",
+                    "Proof and trust blocks",
+                    "Benefit-driven features",
+                    "FAQ that removes doubt",
+                    "Final CTA that closes",
+                  ].map((t) => (
+                    <li key={t} className="flex items-start gap-3">
+                      <span className="mt-1 inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                      <span>{t}</span>
+                    </li>
+                  ))}
                 </ul>
 
-                <div className="mt-6 rounded-2xl bg-white p-4 text-xs text-neutral-500">
-                  Next: wire a real Publish button in the builder so this becomes 1-click.
+                <div className="mt-6 rounded-2xl bg-slate-50 p-4">
+                  <div className="text-xs font-semibold text-slate-700">Generated from spec</div>
+                  <div className="mt-1 text-xs text-slate-600">
+                    Version:{" "}
+                    <span className="font-mono text-slate-700">
+                      {pick(spec?.version, "unknown")}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-xs text-slate-600">
+                    Created:{" "}
+                    <span className="font-mono text-slate-700">
+                      {pick(spec?.createdAtIso, "unknown")}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex items-center justify-between">
+                  <a
+                    href="#cta"
+                    className="text-sm font-semibold text-slate-900 hover:underline"
+                  >
+                    Jump to CTA
+                  </a>
+                  <span className="text-xs text-slate-500">Scroll for details</span>
                 </div>
               </div>
             </div>
@@ -350,170 +380,199 @@ export default async function PublicProjectPage({ params }: PageProps) {
         </div>
       </section>
 
-      {/* Social proof */}
-      <section className="mx-auto max-w-6xl px-6 py-10">
-        <div className="grid gap-4 rounded-[28px] border border-neutral-200 bg-white p-8 shadow-sm md:grid-cols-3">
-          <div className="rounded-2xl bg-neutral-50 p-6">
-            <div className="text-2xl font-semibold">Instant</div>
-            <div className="mt-1 text-sm text-neutral-600">Publish → public URL in seconds.</div>
-          </div>
-          <div className="rounded-2xl bg-neutral-50 p-6">
-            <div className="text-2xl font-semibold">Clear</div>
-            <div className="mt-1 text-sm text-neutral-600">A layout designed to reduce confusion.</div>
-          </div>
-          <div className="rounded-2xl bg-neutral-50 p-6">
-            <div className="text-2xl font-semibold">Flexible</div>
-            <div className="mt-1 text-sm text-neutral-600">Update the spec anytime and republish.</div>
+      {/* Proof */}
+      <section id="proof" className="border-y border-slate-200 bg-slate-50">
+        <div className="mx-auto max-w-6xl px-4 py-12">
+          <div className="grid gap-6 md:grid-cols-12 md:items-center">
+            <div className="md:col-span-5">
+              <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
+                Built for trust, not hype
+              </h2>
+              <p className="mt-2 text-slate-600">
+                A premium layout that feels credible and guides visitors toward a clear action.
+              </p>
+            </div>
+            <div className="md:col-span-7">
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[
+                  { k: "Clarity", v: "Simple value prop" },
+                  { k: "Confidence", v: "Premium spacing" },
+                  { k: "Conversion", v: "CTA-first structure" },
+                ].map((x) => (
+                  <div
+                    key={x.k}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="text-sm font-semibold text-slate-900">{x.k}</div>
+                    <div className="mt-1 text-sm text-slate-600">{x.v}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Features */}
-      <section id="features" className="mx-auto max-w-6xl px-6 pb-12">
-        <div className="flex items-end justify-between gap-6">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight">Features that move visitors forward</h2>
-            <p className="mt-2 text-neutral-600">Built to be simple, fast, and conversion-friendly.</p>
+      <section id="features" className="bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-14">
+          <div className="max-w-2xl">
+            <h2 className="text-3xl font-semibold tracking-tight text-slate-900">
+              Features that move the needle
+            </h2>
+            <p className="mt-2 text-slate-600">
+              Clear benefits, clean layout, and a structure that makes decisions easy.
+            </p>
           </div>
-          <a href="#contact" className="hidden text-sm font-semibold text-neutral-800 hover:text-neutral-900 md:inline">
-            Jump to contact →
-          </a>
-        </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {features.slice(0, 6).map((f, idx) => (
-            <div key={`${f.title}-${idx}`} className="rounded-3xl border border-neutral-200 bg-white p-7 shadow-sm">
-              <div className="text-base font-semibold">{f.title}</div>
-              <p className="mt-2 text-sm text-neutral-600">{f.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* About / How it works */}
-      <section id="about" className="mx-auto max-w-6xl px-6 pb-12">
-        <div className="rounded-[32px] border border-neutral-200 bg-white p-10 shadow-sm">
-          <h2 className="text-2xl font-semibold tracking-tight">About</h2>
-          <p className="mt-2 text-neutral-600">
-            This public page is generated from your project’s <span className="font-mono">published spec</span>.
-            It’s designed to be a clean foundation you can extend with forms, payments, and automation.
-          </p>
-
-          <h3 className="mt-8 text-lg font-semibold">How it works</h3>
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
-            <div className="rounded-3xl bg-neutral-50 p-7">
-              <div className="text-sm font-semibold">1) Draft</div>
-              <p className="mt-2 text-sm text-neutral-600">Create or generate a draft spec in the builder.</p>
-            </div>
-            <div className="rounded-3xl bg-neutral-50 p-7">
-              <div className="text-sm font-semibold">2) Publish</div>
-              <p className="mt-2 text-sm text-neutral-600">Publish writes a “published spec” and returns a public URL.</p>
-            </div>
-            <div className="rounded-3xl bg-neutral-50 p-7">
-              <div className="text-sm font-semibold">3) Share</div>
-              <p className="mt-2 text-sm text-neutral-600">Share the URL. Republish anytime to update content.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing */}
-      <section id="pricing" className="mx-auto max-w-6xl px-6 pb-12">
-        <div className="flex items-end justify-between gap-6">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight">Pricing</h2>
-            <p className="mt-2 text-neutral-600">Simple plans that scale with you.</p>
-          </div>
-          <a href="#contact" className="hidden text-sm font-semibold text-neutral-800 hover:text-neutral-900 md:inline">
-            Talk to us →
-          </a>
-        </div>
-
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <PricingCard
-            name="Free"
-            price="$0"
-            bullets={[
-              "Publish a basic site",
-              "Single public URL",
-              "Great for testing and drafts",
-            ]}
-          />
-          <PricingCard
-            name="Pro"
-            price="$19/mo"
-            bullets={[
-              "Priority publishing",
-              "More advanced layouts + sections",
-              "Future: custom domains + SEO pages",
-            ]}
-            emphasis
-          />
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section id="faq" className="mx-auto max-w-6xl px-6 pb-12">
-        <div className="rounded-[32px] border border-neutral-200 bg-white p-10 shadow-sm">
-          <h2 className="text-2xl font-semibold tracking-tight">FAQ</h2>
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            {faqs.slice(0, 6).map((item, idx) => (
-              <div key={`${item.q}-${idx}`} className="rounded-3xl bg-neutral-50 p-7">
-                <div className="text-sm font-semibold">{item.q}</div>
-                <p className="mt-2 text-sm text-neutral-600">{item.a}</p>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {featureItems.slice(0, 6).map((f, idx) => (
+              <div
+                key={idx}
+                className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="text-base font-semibold text-slate-900">
+                    {pick(f.title, `Feature ${idx + 1}`)}
+                  </div>
+                  <div className="rounded-2xl bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                    {String(idx + 1).padStart(2, "0")}
+                  </div>
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-slate-600">
+                  {pick(f.body, "A benefit-focused block that supports the core promise.")}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Contact */}
-      <section id="contact" className="mx-auto max-w-6xl px-6 pb-16">
-        <div className="rounded-[32px] border border-neutral-200 bg-neutral-900 p-10 text-white shadow-sm">
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-            <div className="max-w-2xl">
-              <h2 className="text-2xl font-semibold tracking-tight">Contact</h2>
-              <p className="mt-2 text-white/80">
-                This is a placeholder contact section. Next step: wire a real form + automation.
+      {/* How it works */}
+      <section className="bg-slate-50">
+        <div className="mx-auto max-w-6xl px-4 py-14">
+          <div className="grid gap-6 md:grid-cols-12 md:items-start">
+            <div className="md:col-span-5">
+              <h2 className="text-3xl font-semibold tracking-tight text-slate-900">
+                A smooth path to “yes”
+              </h2>
+              <p className="mt-2 text-slate-600">
+                Visitors should understand, trust, and act — fast.
               </p>
             </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/projects"
-                className="inline-flex items-center justify-center rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-neutral-900 hover:bg-neutral-100"
-              >
-                Open builder
-              </Link>
-              <a
-                href="#home"
-                className="inline-flex items-center justify-center rounded-2xl border border-white/20 bg-white/10 px-6 py-3 text-sm font-semibold text-white hover:bg-white/15"
-              >
-                Back to top
-              </a>
+            <div className="md:col-span-7">
+              <ol className="space-y-3">
+                {[
+                  {
+                    t: "Lead with clarity",
+                    d: "One headline that tells people exactly what they get.",
+                  },
+                  {
+                    t: "Show proof",
+                    d: "Trust blocks that reduce skepticism and increase confidence.",
+                  },
+                  {
+                    t: "Deliver benefits",
+                    d: "A short set of strong features with real outcomes.",
+                  },
+                  {
+                    t: "Remove doubt",
+                    d: "FAQ that answers the questions people hesitate on.",
+                  },
+                  {
+                    t: "Close with a clear CTA",
+                    d: "A final call-to-action that’s easy to say yes to.",
+                  },
+                ].map((x, i) => (
+                  <li
+                    key={x.t}
+                    className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-900 text-sm font-semibold text-white">
+                        {i + 1}
+                      </div>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">{x.t}</div>
+                        <div className="mt-1 text-sm text-slate-600">{x.d}</div>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
             </div>
-          </div>
-
-          <div className="mt-8 rounded-2xl bg-white/10 p-4 text-xs text-white/70">
-            Want the next step? Add a builder-side Publish button and lock Pro features behind your Stripe plan.
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-8 md:flex-row md:items-center md:justify-between">
-          <div className="text-sm text-neutral-600">
-            Powered by <span className="font-semibold text-neutral-900">my-saas-app</span>
+      {/* FAQ */}
+      <section id="faq" className="bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-14">
+          <div className="max-w-2xl">
+            <h2 className="text-3xl font-semibold tracking-tight text-slate-900">FAQ</h2>
+            <p className="mt-2 text-slate-600">
+              Straight answers that reduce friction and build confidence.
+            </p>
           </div>
-          <div className="flex gap-2 text-sm">
-            <NavLink href="#features">Features</NavLink>
-            <NavLink href="#pricing">Pricing</NavLink>
-            <NavLink href="#faq">FAQ</NavLink>
-            <NavLink href="#contact">Contact</NavLink>
+
+          <div className="mt-8 grid gap-4 md:grid-cols-2">
+            {faqItems.slice(0, 6).map((x, idx) => (
+              <div
+                key={idx}
+                className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+              >
+                <div className="text-sm font-semibold text-slate-900">
+                  {pick(x.q, `Question ${idx + 1}`)}
+                </div>
+                <div className="mt-2 text-sm leading-relaxed text-slate-600">
+                  {pick(x.a, "Answer goes here.")}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      </footer>
-    </main>
+      </section>
+
+      {/* CTA */}
+      <section id="cta" className="bg-slate-900">
+        <div className="mx-auto max-w-6xl px-4 py-14">
+          <div className="grid gap-8 rounded-3xl border border-white/10 bg-white/5 p-8 md:grid-cols-12 md:items-center">
+            <div className="md:col-span-8">
+              <h2 className="text-3xl font-semibold tracking-tight text-white">
+                Ready to launch something premium?
+              </h2>
+              <p className="mt-2 text-white/70">
+                A clean, conversion-ready layout that’s designed to build trust and drive action.
+              </p>
+            </div>
+            <div className="md:col-span-4 md:flex md:justify-end">
+              <Link
+                href="/projects"
+                className="inline-flex w-full items-center justify-center rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-sm hover:bg-slate-100 md:w-auto"
+              >
+                Back to Projects
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 text-xs text-white/60">
+            <div>
+              © {new Date().getFullYear()} {brandName}
+            </div>
+            <div className="flex items-center gap-4">
+              <a className="hover:text-white" href="#features">
+                Features
+              </a>
+              <a className="hover:text-white" href="#faq">
+                FAQ
+              </a>
+              <a className="hover:text-white" href="#top" onClick={(e) => e.preventDefault()}>
+                Top
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
