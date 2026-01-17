@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import kv from "../../../../../src/app/lib/kv";
+import { kv } from "../../../../../src/app/lib/kv";
 import publishHandler from "../publish";
 
 type Step = { at: string; name: string; ok: boolean; detail?: any };
