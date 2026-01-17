@@ -1,6 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// Public routes (add to this list as needed)
 const isPublicRoute = createRouteMatcher([
   "/",
   "/sign-in(.*)",
@@ -9,7 +8,7 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware((auth, req) => {
-  // IMPORTANT: Never run middleware auth on /api routes (agents live here)
+  // CRITICAL: never run auth middleware on /api routes (agents live here)
   if (req.nextUrl.pathname.startsWith("/api")) return;
 
   if (isPublicRoute(req)) return;
@@ -18,6 +17,6 @@ export default clerkMiddleware((auth, req) => {
 });
 
 export const config = {
-  // IMPORTANT: Exclude /api from middleware matching.
+  // CRITICAL: exclude /api from matcher completely
   matcher: ["/((?!api|_next|.*\\..*).*)"],
 };
