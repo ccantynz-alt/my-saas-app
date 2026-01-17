@@ -1,6 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { kv } from "@/lib/kv";
 
+/**
+ * PLATFORM SEO AGENT
+ * - Authoritative SEO source for the AI Website Builder platform
+ * - MUST accept POST
+ * - MUST always return JSON
+ * - MUST serialize before KV write
+ */
+
 type SeoPlan = {
   version: 1;
   generatedAtIso: string;
@@ -31,16 +39,24 @@ type SeoPlan = {
   };
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Always JSON (prevents the empty HTML 405 you’re currently seeing)
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // ALWAYS respond as JSON (prevents empty HTML 405 responses)
   res.setHeader("Content-Type", "application/json; charset=utf-8");
 
   const { projectId } = req.query;
+
   if (!projectId || typeof projectId !== "string") {
-    return res.status(400).json({ ok: false, error: "Missing projectId" });
+    return res.status(400).json({
+      ok: false,
+      error: "Missing projectId",
+      source: "pages/api/projects/[projectId]/agents/seo.ts",
+    });
   }
 
-  // ✅ Allow POST (real run) and GET (optional probe)
+  // ✅ ALLOW POST (real execution) + GET (probe)
   if (req.method !== "POST" && req.method !== "GET") {
     return res.status(405).json({
       ok: false,
@@ -158,6 +174,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   };
 
   const key = `project:${projectId}:seoPlan`;
+
+  // ✅ MUST serialize before KV write
   await kv.set(key, JSON.stringify(plan));
 
   return res.status(200).json({
