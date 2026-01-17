@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import { kvJsonSet } from "@/src/app/lib/kv";
 
 type SeoPlanV2 = {
   version: 2;
@@ -46,6 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const nowIso = new Date().toISOString();
 
+  // GET is diagnostics-only (no KV)
   if (req.method === "GET") {
     return res.status(200).json({
       ok: true,
@@ -92,22 +94,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const key = `project:${projectId}:seoPlan`;
 
   try {
-    const mod = await import("@/lib/kv");
-    const kv = (mod as any).kv;
-
-    if (!kv || typeof kv.set !== "function") {
-      return res.status(500).json({
-        ok: false,
-        agent: "seo-v2",
-        projectId,
-        error: "KV module loaded but kv.set is not available",
-        detail: { exportedKeys: Object.keys(mod || {}) },
-        source: "pages/api/projects/[projectId]/agents/seo-v2.ts",
-        method: req.method,
-      });
-    }
-
-    await kv.set(key, JSON.stringify(plan));
+    await kvJsonSet(key, plan);
 
     return res.status(200).json({
       ok: true,
@@ -124,7 +111,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       agent: "seo-v2",
       projectId,
       artifactKey: key,
-      error: "KV write failed (or KV import failed)",
+      error: "KV write failed",
       detail: errToJson(e),
       source: "pages/api/projects/[projectId]/agents/seo-v2.ts",
       method: req.method,
