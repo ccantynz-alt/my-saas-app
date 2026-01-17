@@ -1,12 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { kv } from "@/lib/kv";
-
-/**
- * SEO-V2 AGENT
- * - POST-capable
- * - Always JSON
- * - Writes canonical key: project:<projectId>:seoPlan
- */
 
 type SeoPlanV2 = {
   version: 2;
@@ -24,15 +16,49 @@ type SeoPlanV2 = {
   sitemap: { include: string[]; exclude: string[] };
 };
 
+function errToJson(e: unknown) {
+  if (e && typeof e === "object") {
+    const anyE = e as any;
+    return {
+      name: anyE?.name,
+      message: anyE?.message,
+      stack:
+        typeof anyE?.stack === "string"
+          ? anyE.stack.split("\n").slice(0, 12).join("\n")
+          : undefined,
+    };
+  }
+  return { message: String(e) };
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
 
   const { projectId } = req.query;
   if (!projectId || typeof projectId !== "string") {
-    return res.status(400).json({ ok: false, agent: "seo-v2", error: "Missing projectId" });
+    return res.status(400).json({
+      ok: false,
+      agent: "seo-v2",
+      error: "Missing projectId",
+      source: "pages/api/projects/[projectId]/agents/seo-v2.ts",
+    });
   }
 
-  if (req.method !== "POST" && req.method !== "GET") {
+  const nowIso = new Date().toISOString();
+
+  if (req.method === "GET") {
+    return res.status(200).json({
+      ok: true,
+      agent: "seo-v2",
+      projectId,
+      nowIso,
+      note: "GET is diagnostics-only. Use POST to write project:<id>:seoPlan.",
+      source: "pages/api/projects/[projectId]/agents/seo-v2.ts",
+      method: req.method,
+    });
+  }
+
+  if (req.method !== "POST") {
     return res.status(405).json({
       ok: false,
       agent: "seo-v2",
@@ -40,10 +66,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       error: "Method not allowed",
       allowed: ["GET", "POST"],
       source: "pages/api/projects/[projectId]/agents/seo-v2.ts",
+      method: req.method,
     });
   }
-
-  const nowIso = new Date().toISOString();
 
   const plan: SeoPlanV2 = {
     version: 2,
@@ -60,34 +85,49 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         intent: "transactional",
         canonical: null,
       },
-      {
-        slug: "/programmatic-seo",
-        title: "Programmatic SEO — Generate SEO Pages With AI",
-        description:
-          "Scale search traffic with AI-driven programmatic SEO pages and automated sitemap generation.",
-        h1: "Programmatic SEO With AI",
-        keywords: ["programmatic seo", "ai seo automation"],
-        intent: "informational",
-        canonical: null,
-      },
     ],
-    sitemap: {
-      include: ["/", "/programmatic-seo"],
-      exclude: [],
-    },
+    sitemap: { include: ["/"], exclude: [] },
   };
 
   const key = `project:${projectId}:seoPlan`;
-  await kv.set(key, JSON.stringify(plan));
 
-  return res.status(200).json({
-    ok: true,
-    agent: "seo-v2",
-    projectId,
-    artifactKey: key,
-    generatedAtIso: nowIso,
-    pages: plan.pages.length,
-    source: "pages/api/projects/[projectId]/agents/seo-v2.ts",
-    method: req.method,
-  });
+  try {
+    const mod = await import("@/lib/kv");
+    const kv = (mod as any).kv;
+
+    if (!kv || typeof kv.set !== "function") {
+      return res.status(500).json({
+        ok: false,
+        agent: "seo-v2",
+        projectId,
+        error: "KV module loaded but kv.set is not available",
+        detail: { exportedKeys: Object.keys(mod || {}) },
+        source: "pages/api/projects/[projectId]/agents/seo-v2.ts",
+        method: req.method,
+      });
+    }
+
+    await kv.set(key, JSON.stringify(plan));
+
+    return res.status(200).json({
+      ok: true,
+      agent: "seo-v2",
+      projectId,
+      artifactKey: key,
+      generatedAtIso: nowIso,
+      source: "pages/api/projects/[projectId]/agents/seo-v2.ts",
+      method: req.method,
+    });
+  } catch (e) {
+    return res.status(500).json({
+      ok: false,
+      agent: "seo-v2",
+      projectId,
+      artifactKey: key,
+      error: "KV write failed (or KV import failed)",
+      detail: errToJson(e),
+      source: "pages/api/projects/[projectId]/agents/seo-v2.ts",
+      method: req.method,
+    });
+  }
 }
