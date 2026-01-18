@@ -1,140 +1,164 @@
 // pages/api/projects/[projectId]/agents/sitemap.ts
 import type { NextApiRequest, NextApiResponse } from "next";
-import { kv, kvJsonGet } from "@/src/app/lib/kv";
+import { kvJsonGet, kv } from "@/src/app/lib/kv";
 
-type SeoPlanPage = {
+type Changefreq = "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
+
+type SeoPage = {
   path: string;
-  canonical: string;
-  changefreq?: string;
   priority?: number;
+  changefreq?: Changefreq;
 };
 
-type SeoPlan = {
+type SeoPlanIndex = {
+  ok: true;
+  version: string;
   projectId: string;
+  generatedAtIso: string;
   baseUrl: string;
-  pages: SeoPlanPage[];
-  createdAtIso?: string;
+  totals: { pages: number; chunks: number; chunkSize: number };
+  chunkKeys?: string[];
 };
 
-function xmlEscape(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
+function getProto(req: NextApiRequest): string {
+  const proto = (req.headers["x-forwarded-proto"] as string) || "https";
+  return proto.split(",")[0].trim();
 }
 
-function normalizeBaseUrl(input: string | null | undefined): string | null {
-  if (!input) return null;
-  const raw = String(input).trim();
-  if (!raw) return null;
-
-  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw.replace(/\/+$/, "");
-  if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(raw)) return `https://${raw}`.replace(/\/+$/, "");
-
-  return null;
+function getHost(req: NextApiRequest): string {
+  const host = (req.headers["x-forwarded-host"] as string) || (req.headers.host as string) || "";
+  return String(host).split(",")[0].trim().toLowerCase();
 }
 
-function ensureCanonical(baseUrl: string, page: SeoPlanPage): string {
-  const normalized = normalizeBaseUrl(baseUrl) || "https://example.com";
-  const base = normalized.replace(/\/+$/, "");
-  const path = page.path?.startsWith("/") ? page.path : `/${page.path || ""}`;
-  return page.canonical && page.canonical.startsWith("http") ? page.canonical : `${base}${path}`;
+function safeBaseUrl(req: NextApiRequest): string {
+  const host = getHost(req);
+  const proto = getProto(req);
+  if (!host) return "https://example.com";
+  return `${proto}://${host}`;
 }
 
-function buildSitemapXml(pages: Array<{ loc: string; lastmod?: string; changefreq?: string; priority?: number }>): string {
-  const urlset = pages
-    .map((u) => {
-      const parts: string[] = [];
-      parts.push(`<loc>${xmlEscape(u.loc)}</loc>`);
-      if (u.lastmod) parts.push(`<lastmod>${xmlEscape(u.lastmod)}</lastmod>`);
-      if (u.changefreq) parts.push(`<changefreq>${xmlEscape(u.changefreq)}</changefreq>`);
-      if (typeof u.priority === "number") parts.push(`<priority>${u.priority.toFixed(1)}</priority>`);
-      return `<url>${parts.join("")}</url>`;
-    })
-    .join("");
+function escapeXml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
 
-  return `<?xml version="1.0" encoding="UTF-8"?>` +
-    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` +
-    urlset +
-    `</urlset>`;
+function clampPriority(p: unknown): string | null {
+  const n = Number(p);
+  if (!Number.isFinite(n)) return null;
+  const clamped = Math.min(Math.max(n, 0), 1);
+  return clamped.toFixed(1);
+}
+
+function buildSitemapXml(baseUrl: string, urls: { loc: string; lastmod: string; changefreq?: string; priority?: string }[]): string {
+  const lines: string[] = [];
+  lines.push(`<?xml version="1.0" encoding="UTF-8"?>`);
+  lines.push(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`);
+
+  for (const u of urls) {
+    lines.push(`<url>`);
+    lines.push(`<loc>${escapeXml(u.loc)}</loc>`);
+    lines.push(`<lastmod>${escapeXml(u.lastmod)}</lastmod>`);
+    if (u.changefreq) lines.push(`<changefreq>${escapeXml(u.changefreq)}</changefreq>`);
+    if (u.priority) lines.push(`<priority>${escapeXml(u.priority)}</priority>`);
+    lines.push(`</url>`);
+  }
+
+  lines.push(`</urlset>`);
+  void baseUrl;
+  return lines.join("");
+}
+
+async function loadChunkedPages(index: SeoPlanIndex): Promise<SeoPage[]> {
+  const keys = Array.isArray(index.chunkKeys) ? index.chunkKeys : [];
+  if (keys.length === 0) return [];
+
+  const pages: SeoPage[] = [];
+  for (const key of keys) {
+    const chunk = await kvJsonGet<any>(key).catch(() => null);
+    const arr = Array.isArray(chunk?.pages) ? chunk.pages : [];
+    for (const p of arr) {
+      const path = String(p?.path || "").trim();
+      if (!path.startsWith("/")) continue;
+      pages.push({ path, priority: p?.priority, changefreq: p?.changefreq });
+    }
+  }
+  return pages;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const projectId = String(req.query.projectId || "").trim();
   if (!projectId) return res.status(400).json({ ok: false, error: "Missing projectId" });
 
-  if (req.method !== "POST" && req.method !== "GET") {
+  const indexKey = `project:${projectId}:seoPlan`;
+  const sitemapKey = `project:${projectId}:sitemapXml`;
+
+  if (req.method === "GET") {
+    const hasSeoPlan = !!(await kv.get(indexKey).catch(() => null));
+    const hasSitemap = !!(await kv.get(sitemapKey).catch(() => null));
+    return res.status(200).json({ ok: true, projectId, hasSeoPlan, hasSitemap, indexKey, sitemapKey });
+  }
+
+  if (req.method !== "POST") {
     res.setHeader("Allow", "GET, POST");
     return res.status(405).json({ ok: false, error: "Method Not Allowed" });
   }
 
-  const seoPlanKey = `project:${projectId}:seoPlan`;
-  const sitemapKey = `project:${projectId}:sitemapXml`;
+  const index = await kvJsonGet<SeoPlanIndex>(indexKey).catch(() => null);
 
-  // GET = diagnostics
-  if (req.method === "GET") {
-    const seoPlan = await kvJsonGet<SeoPlan>(seoPlanKey).catch(() => null);
-    const sitemapXml = await kv.get(sitemapKey).catch(() => null);
-
-    return res.status(200).json({
-      ok: true,
-      projectId,
-      seoPlanKey,
-      sitemapKey,
-      hasSeoPlan: !!seoPlan,
-      seoPlanPagesCount: seoPlan?.pages?.length || 0,
-      seoPlanBaseUrl: seoPlan?.baseUrl || null,
-      hasSitemapXml: !!sitemapXml,
-      sitemapXmlBytes: sitemapXml ? String(sitemapXml).length : 0,
-      nowIso: new Date().toISOString(),
-    });
+  if (!index?.ok) {
+    return res.status(409).json({ ok: false, error: "Missing seoPlan", indexKey });
   }
 
-  // POST = generate sitemap
-  const seoPlan = await kvJsonGet<SeoPlan>(seoPlanKey).catch(() => null);
-  if (!seoPlan) {
-    return res.status(409).json({
-      ok: false,
-      projectId,
-      error: "Missing seoPlan",
-      key: seoPlanKey,
-      hint: "Run POST /agents/seo-v2 first",
-      nowIso: new Date().toISOString(),
-    });
+  // Prefer the plan’s baseUrl if present, otherwise derive from current request host
+  const baseUrl = String(index.baseUrl || "").trim() || safeBaseUrl(req);
+  const lastmod = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+  let pages: SeoPage[] = [];
+
+  // v3 chunked
+  if (String(index.version || "").includes("chunk")) {
+    pages = await loadChunkedPages(index);
+  } else {
+    // fallback: older formats where index contained pages directly
+    const legacy: any = index as any;
+    const arr = Array.isArray(legacy?.pages) ? legacy.pages : [];
+    pages = arr
+      .map((p: any) => ({ path: String(p?.path || ""), priority: p?.priority, changefreq: p?.changefreq }))
+      .filter((p: any) => typeof p.path === "string" && p.path.startsWith("/"));
   }
 
-  const baseUrl = normalizeBaseUrl(seoPlan.baseUrl) || "https://example.com";
-  const pages = Array.isArray(seoPlan.pages) ? seoPlan.pages : [];
+  // Hard safety caps (sitemap spec limit is 50,000 URLs; keep below)
+  const MAX_URLS = 45000;
+  const dedup = new Map<string, SeoPage>();
+  for (const p of pages) {
+    const path = String(p.path || "").trim();
+    if (!path.startsWith("/")) continue;
+    dedup.set(path, p);
+    if (dedup.size >= MAX_URLS) break;
+  }
 
-  // Always include homepage at minimum
-  const enriched = pages.length
-    ? pages
-    : [{ path: "/", canonical: `${baseUrl}/`, changefreq: "weekly", priority: 1.0 }];
+  const ordered = Array.from(dedup.values()).sort((a, b) => a.path.localeCompare(b.path));
 
-  const nowIso = new Date().toISOString();
+  const urls = ordered.map((p) => {
+    const loc = `${baseUrl}${p.path}`;
+    const priority = clampPriority(p.priority) || undefined;
+    const changefreq = p.changefreq || undefined;
+    return { loc, lastmod, priority, changefreq };
+  });
 
-  const items = enriched.map((p) => ({
-    loc: ensureCanonical(baseUrl, p),
-    lastmod: nowIso.slice(0, 10), // YYYY-MM-DD
-    changefreq: p.changefreq || "weekly",
-    priority: typeof p.priority === "number" ? p.priority : 0.7,
-  }));
+  const xml = buildSitemapXml(baseUrl, urls);
 
-  const xml = buildSitemapXml(items);
-
-  // Write sitemap XML using REST kv wrapper (string)
   await kv.set(sitemapKey, xml);
 
   return res.status(200).json({
     ok: true,
+    agent: "sitemap",
     projectId,
-    seoPlanKey,
-    sitemapKey,
+    message: "sitemap generated",
     baseUrl,
-    urls: items.length,
-    message: "Sitemap generated from seoPlan.pages and saved to KV",
-    nowIso,
+    indexKey,
+    sitemapKey,
+    urls: urls.length,
+    cappedAt: MAX_URLS,
+    sample: urls.slice(0, 5),
   });
 }
