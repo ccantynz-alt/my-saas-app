@@ -1,9 +1,0 @@
-{
-  "/_not-found/page": "app/_not-found/page.js",
-  "/p/[projectId]/[[...path]]/page": "app/p/[projectId]/[[...path]]/page.js",
-  "/page": "app/page.js",
-  "/projects/[projectId]/agents/finish-for-me/page": "app/projects/[projectId]/agents/finish-for-me/page.js",
-  "/projects/[projectId]/agents/page": "app/projects/[projectId]/agents/page.js",
-  "/projects/[projectId]/page": "app/projects/[projectId]/page.js",
-  "/projects/page": "app/projects/page.js"
-}
