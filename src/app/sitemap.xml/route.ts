@@ -2,15 +2,14 @@
 import { NextResponse } from "next/server";
 import { kv } from "@/src/app/lib/kv";
 
+export const dynamic = "force-dynamic";
+
 function getHost(req: Request): string {
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "";
   return host.split(",")[0].trim().toLowerCase();
 }
 
 export async function GET(req: Request) {
-  // Resolution order:
-  // 1) ?projectId=...
-  // 2) KV mapping: domain:<host>:projectId
   const url = new URL(req.url);
   const explicit = (url.searchParams.get("projectId") || "").trim();
   const host = getHost(req);
@@ -38,10 +37,7 @@ export async function GET(req: Request) {
 
     return new NextResponse(body, {
       status: 404,
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
     });
   }
 
@@ -63,10 +59,7 @@ export async function GET(req: Request) {
 
     return new NextResponse(body, {
       status: 404,
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
     });
   }
 
