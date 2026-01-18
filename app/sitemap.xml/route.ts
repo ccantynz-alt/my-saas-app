@@ -12,11 +12,9 @@ function getHost(req: Request): string {
 export async function GET(req: Request) {
   const url = new URL(req.url);
 
-  // 1) explicit projectId still supported
   const explicit = (url.searchParams.get("projectId") || "").trim();
-
-  // 2) fallback: host mapping
   const host = getHost(req);
+
   let projectId = explicit;
 
   if (!projectId && host) {
@@ -35,33 +33,31 @@ export async function GET(req: Request) {
       "  B) Map this host to a projectId (recommended):",
       `     domain:${host || "<host>"}:projectId => <yourProjectId>`,
       "",
-      "Admin endpoint (requires ADMIN_API_KEY):",
-      "  POST /api/debug/map-domain",
-      '  Headers: x-admin-key: <ADMIN_API_KEY>',
-      `  Body: {"host":"${host || "<your-host>"}","projectId":"<yourProjectId>"}`,
-      "",
       `Detected host: ${host || "(none)"}`,
       "",
     ].join("\n");
 
     return new NextResponse(body, {
       status: 404,
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
     });
   }
 
-  const sitemapKey = `project:${projectId}:sitemapXml`;
-  const xml = await kv.get(sitemapKey).catch(() => null);
+  const indexKey = `project:${projectId}:sitemapIndexXml`;
+  const legacyKey = `project:${projectId}:sitemapXml`;
+
+  const indexXml = await kv.get(indexKey).catch(() => null);
+  const legacyXml = await kv.get(legacyKey).catch(() => null);
+
+  const xml = (indexXml && String(indexXml).trim()) ? String(indexXml) : (legacyXml ? String(legacyXml) : "");
 
   if (!xml) {
     const body = [
       "Sitemap not found for project.",
       "",
       `projectId: ${projectId}`,
-      `key: ${sitemapKey}`,
+      `indexKey: ${indexKey}`,
+      `legacyKey: ${legacyKey}`,
       "",
       "Fix:",
       "  1) POST /api/projects/<projectId>/agents/seo-v2",
@@ -71,14 +67,11 @@ export async function GET(req: Request) {
 
     return new NextResponse(body, {
       status: 404,
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-store",
-      },
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
     });
   }
 
-  return new NextResponse(String(xml), {
+  return new NextResponse(xml, {
     status: 200,
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
