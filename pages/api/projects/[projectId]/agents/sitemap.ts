@@ -16,7 +16,7 @@ type SeoPlanIndex = {
   projectId: string;
   generatedAtIso: string;
   baseUrl: string;
-  totals: { pages: number; chunks: number; chunkSize: number };
+  totals?: { pages: number; chunks: number; chunkSize: number };
   chunkKeys?: string[];
 };
 
@@ -38,7 +38,12 @@ function safeBaseUrl(req: NextApiRequest): string {
 }
 
 function escapeXml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 function clampPriority(p: unknown): string | null {
@@ -48,7 +53,13 @@ function clampPriority(p: unknown): string | null {
   return clamped.toFixed(1);
 }
 
-function buildSitemapXml(baseUrl: string, urls: { loc: string; lastmod: string; changefreq?: string; priority?: string }[]): string {
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+function buildSitemapXml(urls: { loc: string; lastmod: string; changefreq?: string; priority?: string }[]): string {
   const lines: string[] = [];
   lines.push(`<?xml version="1.0" encoding="UTF-8"?>`);
   lines.push(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`);
@@ -63,6 +74,22 @@ function buildSitemapXml(baseUrl: string, urls: { loc: string; lastmod: string; 
   }
 
   lines.push(`</urlset>`);
+  return lines.join("");
+}
+
+function buildSitemapIndexXml(baseUrl: string, parts: { loc: string; lastmod: string }[]): string {
+  const lines: string[] = [];
+  lines.push(`<?xml version="1.0" encoding="UTF-8"?>`);
+  lines.push(`<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`);
+
+  for (const p of parts) {
+    lines.push(`<sitemap>`);
+    lines.push(`<loc>${escapeXml(p.loc)}</loc>`);
+    lines.push(`<lastmod>${escapeXml(p.lastmod)}</lastmod>`);
+    lines.push(`</sitemap>`);
+  }
+
+  lines.push(`</sitemapindex>`);
   void baseUrl;
   return lines.join("");
 }
@@ -73,8 +100,8 @@ async function loadChunkedPages(index: SeoPlanIndex): Promise<SeoPage[]> {
 
   const pages: SeoPage[] = [];
   for (const key of keys) {
-    const chunk = await kvJsonGet<any>(key).catch(() => null);
-    const arr = Array.isArray(chunk?.pages) ? chunk.pages : [];
+    const chunkObj = await kvJsonGet<any>(key).catch(() => null);
+    const arr = Array.isArray(chunkObj?.pages) ? chunkObj.pages : [];
     for (const p of arr) {
       const path = String(p?.path || "").trim();
       if (!path.startsWith("/")) continue;
@@ -90,11 +117,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const indexKey = `project:${projectId}:seoPlan`;
   const sitemapKey = `project:${projectId}:sitemapXml`;
+  const sitemapIndexKey = `project:${projectId}:sitemapIndexXml`;
 
   if (req.method === "GET") {
     const hasSeoPlan = !!(await kv.get(indexKey).catch(() => null));
     const hasSitemap = !!(await kv.get(sitemapKey).catch(() => null));
-    return res.status(200).json({ ok: true, projectId, hasSeoPlan, hasSitemap, indexKey, sitemapKey });
+    const hasIndex = !!(await kv.get(sitemapIndexKey).catch(() => null));
+    return res.status(200).json({
+      ok: true,
+      projectId,
+      hasSeoPlan,
+      hasSitemap,
+      hasSitemapIndex: hasIndex,
+      indexKey,
+      sitemapKey,
+      sitemapIndexKey,
+    });
   }
 
   if (req.method !== "POST") {
@@ -108,17 +146,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(409).json({ ok: false, error: "Missing seoPlan", indexKey });
   }
 
-  // Prefer the plan’s baseUrl if present, otherwise derive from current request host
   const baseUrl = String(index.baseUrl || "").trim() || safeBaseUrl(req);
   const lastmod = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
+  // Load pages from chunked seoPlan if present
   let pages: SeoPage[] = [];
-
-  // v3 chunked
   if (String(index.version || "").includes("chunk")) {
     pages = await loadChunkedPages(index);
   } else {
-    // fallback: older formats where index contained pages directly
+    // Legacy fallback: index might contain pages directly
     const legacy: any = index as any;
     const arr = Array.isArray(legacy?.pages) ? legacy.pages : [];
     pages = arr
@@ -126,39 +162,88 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .filter((p: any) => typeof p.path === "string" && p.path.startsWith("/"));
   }
 
-  // Hard safety caps (sitemap spec limit is 50,000 URLs; keep below)
-  const MAX_URLS = 45000;
+  // Dedup + stable order
   const dedup = new Map<string, SeoPage>();
   for (const p of pages) {
     const path = String(p.path || "").trim();
     if (!path.startsWith("/")) continue;
     dedup.set(path, p);
-    if (dedup.size >= MAX_URLS) break;
   }
-
   const ordered = Array.from(dedup.values()).sort((a, b) => a.path.localeCompare(b.path));
 
-  const urls = ordered.map((p) => {
-    const loc = `${baseUrl}${p.path}`;
-    const priority = clampPriority(p.priority) || undefined;
-    const changefreq = p.changefreq || undefined;
-    return { loc, lastmod, priority, changefreq };
-  });
+  // Sitemap limits: 50,000 URLs per sitemap. We'll use a buffer.
+  const PART_SIZE = 45000;
+  const parts = chunk(ordered, PART_SIZE);
 
-  const xml = buildSitemapXml(baseUrl, urls);
+  // If it fits in one file, write the legacy single sitemap, and remove index if present.
+  if (parts.length <= 1) {
+    const urls = ordered.map((p) => {
+      const loc = `${baseUrl}${p.path}`;
+      const priority = clampPriority(p.priority) || undefined;
+      const changefreq = p.changefreq || undefined;
+      return { loc, lastmod, priority, changefreq };
+    });
 
-  await kv.set(sitemapKey, xml);
+    const xml = buildSitemapXml(urls);
+
+    await kv.set(sitemapKey, xml);
+    await kv.set(sitemapIndexKey, ""); // blank it (acts like "not present" for our readers)
+
+    return res.status(200).json({
+      ok: true,
+      agent: "sitemap",
+      mode: "single",
+      projectId,
+      baseUrl,
+      sitemapKey,
+      urls: urls.length,
+      parts: 1,
+      partSize: PART_SIZE,
+      sample: urls.slice(0, 5),
+    });
+  }
+
+  // Otherwise: write parts + index
+  const partInfos: { n: number; key: string; loc: string }[] = [];
+
+  for (let i = 0; i < parts.length; i++) {
+    const n = i + 1;
+    const partKey = `project:${projectId}:sitemapPartXml:${n}`;
+    const partLoc = `${baseUrl}/sitemap-${n}.xml`;
+
+    const urls = parts[i].map((p) => {
+      const loc = `${baseUrl}${p.path}`;
+      const priority = clampPriority(p.priority) || undefined;
+      const changefreq = p.changefreq || undefined;
+      return { loc, lastmod, priority, changefreq };
+    });
+
+    const xml = buildSitemapXml(urls);
+    await kv.set(partKey, xml);
+
+    partInfos.push({ n, key: partKey, loc: partLoc });
+  }
+
+  const indexXml = buildSitemapIndexXml(
+    baseUrl,
+    partInfos.map((p) => ({ loc: p.loc, lastmod }))
+  );
+
+  await kv.set(sitemapIndexKey, indexXml);
+
+  // Also keep legacy key present (optional: store the index there too)
+  await kv.set(sitemapKey, indexXml);
 
   return res.status(200).json({
     ok: true,
     agent: "sitemap",
+    mode: "index",
     projectId,
-    message: "sitemap generated",
     baseUrl,
-    indexKey,
-    sitemapKey,
-    urls: urls.length,
-    cappedAt: MAX_URLS,
-    sample: urls.slice(0, 5),
+    sitemapIndexKey,
+    parts: partInfos.length,
+    partSize: PART_SIZE,
+    partLocSample: partInfos.slice(0, 5).map((p) => p.loc),
+    partKeySample: partInfos.slice(0, 5).map((p) => p.key),
   });
 }
