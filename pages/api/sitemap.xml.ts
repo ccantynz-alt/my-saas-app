@@ -1,37 +1,64 @@
+// pages/sitemap.xml.ts
 import type { NextApiRequest, NextApiResponse } from "next";
+import { kv } from "@/src/app/lib/kv";
 
-function xmlEscape(s: string) {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
+function getHost(req: NextApiRequest): string {
+  const xfHost = (req.headers["x-forwarded-host"] as string) || "";
+  const host = xfHost || (req.headers.host as string) || "";
+  return String(host).split(",")[0].trim().toLowerCase();
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const host =
-    (req.headers["x-forwarded-host"] as string) ||
-    (req.headers.host as string) ||
-    "my-saas-app-5eyw.vercel.app";
+  // Resolution order:
+  // 1) ?projectId=... (explicit)
+  // 2) domain:<host>:projectId mapping in KV (for real custom domains)
+  const explicit = String(req.query.projectId || "").trim();
+  const host = getHost(req);
 
-  const proto = ((req.headers["x-forwarded-proto"] as string) || "https").split(",")[0].trim();
-  const base = `${proto}://${host}`;
+  let projectId = explicit;
 
-  const urls = [
-    `${base}/`,
-    `${base}/projects`,
-  ];
+  if (!projectId && host) {
+    const mapped = await kv.get(`domain:${host}:projectId`).catch(() => null);
+    if (mapped) projectId = String(mapped).trim();
+  }
 
-  const body =
-    `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-    urls
-      .map((u) => `  <url><loc>${xmlEscape(u)}</loc></url>`)
-      .join("\n") +
-    `\n</urlset>\n`;
+  if (!projectId) {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    return res.status(404).send(
+      [
+        "Missing projectId for sitemap.",
+        "",
+        "Use:",
+        "  /sitemap.xml?projectId=<yourProjectId>",
+        "",
+        "Or set a domain mapping key in KV:",
+        "  domain:<host>:projectId => <yourProjectId>",
+        "",
+        `Detected host: ${host || "(none)"}`,
+      ].join("\n")
+    );
+  }
 
-  res.status(200);
+  const sitemapKey = `project:${projectId}:sitemapXml`;
+  const xml = await kv.get(sitemapKey).catch(() => null);
+
+  if (!xml) {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    return res.status(404).send(
+      [
+        "Sitemap not found for project.",
+        "",
+        `projectId: ${projectId}`,
+        `key: ${sitemapKey}`,
+        "",
+        "Fix:",
+        "  1) POST /api/projects/<projectId>/agents/seo-v2",
+        "  2) POST /api/projects/<projectId>/agents/sitemap",
+      ].join("\n")
+    );
+  }
+
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
-  res.send(body);
+  res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=86400");
+  return res.status(200).send(String(xml));
 }
