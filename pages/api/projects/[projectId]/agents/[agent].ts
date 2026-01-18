@@ -7,7 +7,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
  *
  * IMPORTANT:
  * - If a dedicated file exists (seo.ts, sitemap.ts, seo-v2.ts, pipeline.ts, launch-run.ts),
- *   Next *should* route there first.
+ *   Next should route there first.
  * - If this catch-all is intercepting, we explicitly dispatch here.
  */
 
@@ -36,7 +36,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 
-  // Dispatch known agents
   try {
     if (agent === "seo") {
       const mod = await import("./seo");
@@ -53,40 +52,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return mod.default(req, res);
     }
 
-    // ✅ Add pipeline
     if (agent === "pipeline") {
-      try {
-        const mod = await import("./pipeline");
-        return mod.default(req, res);
-      } catch (e: any) {
-        return res.status(500).json({
-          ok: false,
-          error: "pipeline agent file missing or failed to load",
-          agent,
-          projectId,
-          details: String(e?.message || e),
-          expectedFile: "pages/api/projects/[projectId]/agents/pipeline.ts",
-          source: "pages/api/projects/[projectId]/agents/[agent].ts",
-        });
-      }
+      const mod = await import("./pipeline");
+      return mod.default(req, res);
     }
 
-    // ✅ Add launch-run
     if (agent === "launch-run") {
-      try {
-        const mod = await import("./launch-run");
-        return mod.default(req, res);
-      } catch (e: any) {
-        return res.status(500).json({
-          ok: false,
-          error: "launch-run agent file missing or failed to load",
-          agent,
-          projectId,
-          details: String(e?.message || e),
-          expectedFile: "pages/api/projects/[projectId]/agents/launch-run.ts",
-          source: "pages/api/projects/[projectId]/agents/[agent].ts",
-        });
-      }
+      const mod = await import("./launch-run");
+      return mod.default(req, res);
     }
 
     return res.status(404).json({
