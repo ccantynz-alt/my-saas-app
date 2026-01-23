@@ -1,124 +1,199 @@
-﻿export type UseCase = {
-  slug: string;
-  title: string;
-  summary: string;
-  whoItsFor: string[];
-  outcomes: string[];
-  pagesYouGet: string[];
-  keywords: string[];
-};
-
-export type Template = {
+export type MarketingTemplate = {
   slug: string;
   name: string;
   description: string;
-  tags: string[];
+  includes: string[];
 };
 
-export const TEMPLATES: Template[] = [
-  { slug: "local-services", name: "Local Services", description: "Perfect for tradies, shuttles, cleaning, repairs.", tags: ["Local", "Lead-gen"] },
-  { slug: "saas-launch", name: "SaaS Launch", description: "Ship a clean product landing page with pricing + FAQs.", tags: ["SaaS", "Conversion"] },
-  { slug: "real-estate", name: "Real Estate Agent", description: "Listings, credibility, contact capture, and FAQs.", tags: ["Local", "Trust"] },
-  { slug: "restaurant", name: "Restaurant", description: "Menu, booking, location, and promo blocks.", tags: ["Hospitality", "Bookings"] },
-  { slug: "portfolio", name: "Portfolio", description: "A sharp personal site with work, about, and contact.", tags: ["Personal", "Showcase"] },
-  { slug: "gym", name: "Gym / Fitness", description: "Programs, testimonials, pricing, and call booking.", tags: ["Fitness", "Conversion"] },
-  { slug: "agency", name: "Agency", description: "Services, case studies, process, and contact.", tags: ["B2B", "Credibility"] },
-  { slug: "ecommerce-lite", name: "Ecommerce Lite", description: "Product highlights + buy links + SEO pages.", tags: ["Commerce", "SEO"] },
-  { slug: "events", name: "Events", description: "Event info, schedule, tickets, FAQs, and updates.", tags: ["Events", "Info"] },
-  { slug: "coaching", name: "Coaching", description: "Offer, proof, booking CTA, and content.", tags: ["Creator", "Bookings"] },
-  { slug: "builder", name: "Construction", description: "Projects, testimonials, service areas, contact.", tags: ["Local", "Trust"] },
-  { slug: "medical", name: "Clinic", description: "Services, booking, pricing, and trust blocks.", tags: ["Health", "Trust"] },
-];
+export type MarketingUseCase = {
+  slug: string;
+  title: string;
+  summary: string;
+  bullets: string[];
+};
 
-export const USE_CASES: UseCase[] = [
+export const templates: MarketingTemplate[] = [
   {
-    slug: "airport-shuttle",
-    title: "Airport shuttle & transport",
-    summary: "Convert searches into bookings with clear routes, pricing, and trust proof.",
-    whoItsFor: ["Airport shuttle operators", "Taxi/ride services", "Tour transport"],
-    outcomes: ["More booking inquiries", "Better SEO for route keywords", "Higher trust conversion"],
-    pagesYouGet: ["Home", "Pricing", "FAQ", "Contact", "Service areas"],
-    keywords: ["airport shuttle", "private transfer", "book airport ride", "fixed price shuttle"],
+    slug: "local-service",
+    name: "Local Service",
+    description:
+      "Perfect for trades, home services, and local providers who want leads fast.",
+    includes: ["Home", "Services", "Service Areas", "Reviews", "Pricing", "Contact"],
   },
   {
-    slug: "local-tradie",
-    title: "Local tradie / services",
-    summary: "Rank for suburb + service keywords and capture leads fast.",
-    whoItsFor: ["Plumbers", "Electricians", "Builders", "Cleaners"],
-    outcomes: ["More inbound leads", "Higher call rate", "Better local SEO coverage"],
-    pagesYouGet: ["Home", "Services", "Pricing", "FAQ", "Contact"],
-    keywords: ["plumber near me", "electrician [suburb]", "emergency service", "same day repair"],
+    slug: "saas-startup",
+    name: "SaaS Startup",
+    description:
+      "Launch a product site with clear value props, pricing, FAQs, and conversion CTAs.",
+    includes: ["Home", "Features", "Pricing", "FAQs", "Changelog", "Contact"],
   },
   {
-    slug: "saas-launch",
-    title: "SaaS product launch",
-    summary: "Ship a crisp landing page with pricing, FAQs, and a conversion-first layout.",
-    whoItsFor: ["Indie hackers", "Startups", "Founders"],
-    outcomes: ["More signups", "Cleaner positioning", "Faster iteration"],
-    pagesYouGet: ["Home", "Pricing", "Use cases", "FAQ", "Contact"],
-    keywords: ["best [category] software", "pricing comparison", "alternatives", "how it works"],
+    slug: "consulting",
+    name: "Consulting",
+    description:
+      "High-trust positioning for consultants, coaches, and agencies.",
+    includes: ["Home", "Services", "Case Studies", "About", "Pricing", "Contact"],
+  },
+  {
+    slug: "ecommerce-lite",
+    name: "Ecommerce Lite",
+    description:
+      "Showcase products, collections, and trust signals — even without a full store build.",
+    includes: ["Home", "Collections", "Product Highlights", "Shipping", "FAQs", "Contact"],
   },
   {
     slug: "restaurant",
-    title: "Restaurant / cafe",
-    summary: "Make it easy to find you, view the menu, and book a table.",
-    whoItsFor: ["Restaurants", "Cafes", "Bars"],
-    outcomes: ["More bookings", "Better Google/SEO signals", "Clearer brand presentation"],
-    pagesYouGet: ["Home", "Menu", "Booking", "Location", "FAQ"],
-    keywords: ["restaurant near me", "best brunch", "book table", "menu"],
-  },
-  {
-    slug: "coach",
-    title: "Coaching / consulting",
-    summary: "Turn authority into booked calls with proof, offer clarity, and CTAs.",
-    whoItsFor: ["Coaches", "Consultants", "Service founders"],
-    outcomes: ["More call bookings", "Higher trust", "Cleaner offer packaging"],
-    pagesYouGet: ["Home", "Offer", "Testimonials", "Pricing", "Book a call"],
-    keywords: ["business coach", "consultant", "strategy session", "book a call"],
-  },
-  {
-    slug: "real-estate",
-    title: "Real estate agent",
-    summary: "Show listings, social proof, and win vendor leads with a tight funnel.",
-    whoItsFor: ["Agents", "Brokers", "Property managers"],
-    outcomes: ["More appraisal leads", "Higher trust", "Stronger local visibility"],
-    pagesYouGet: ["Home", "Listings", "About", "Testimonials", "Contact"],
-    keywords: ["real estate agent [suburb]", "property appraisal", "sell my house"],
-  },
-  {
-    slug: "fitness",
-    title: "Gym / fitness studio",
-    summary: "Package programs, pricing and social proof to drive signups.",
-    whoItsFor: ["Gyms", "Pilates", "PTs", "Studios"],
-    outcomes: ["More trials", "Higher membership conversion", "Clearer offer"],
-    pagesYouGet: ["Home", "Programs", "Pricing", "Timetable", "FAQ"],
-    keywords: ["gym near me", "fitness classes", "pilates studio", "personal training"],
-  },
-  {
-    slug: "agency",
-    title: "Agency / studio",
-    summary: "Make services crystal clear and close higher-quality inbound leads.",
-    whoItsFor: ["Web agencies", "Design studios", "Marketing agencies"],
-    outcomes: ["Better inbound", "Higher close rate", "Clearer positioning"],
-    pagesYouGet: ["Home", "Services", "Case studies", "Process", "Contact"],
-    keywords: ["web agency", "design studio", "marketing agency", "case studies"],
-  },
-  {
-    slug: "events",
-    title: "Events / tickets",
-    summary: "Centralize event info, schedule, FAQs and ticket CTAs.",
-    whoItsFor: ["Event organizers", "Meetups", "Conferences"],
-    outcomes: ["More ticket clicks", "Fewer questions", "Cleaner event comms"],
-    pagesYouGet: ["Home", "Schedule", "Tickets", "FAQ", "Contact"],
-    keywords: ["event tickets", "conference schedule", "what to expect", "venue"],
+    name: "Restaurant",
+    description:
+      "Menus, bookings, location SEO, and strong mobile-first design.",
+    includes: ["Home", "Menu", "Bookings", "Events", "Location", "Contact"],
   },
   {
     slug: "portfolio",
-    title: "Portfolio / personal brand",
-    summary: "Show your work, your story, and make hiring you easy.",
-    whoItsFor: ["Freelancers", "Creators", "Job seekers"],
-    outcomes: ["More inbound", "Cleaner presence", "Better credibility"],
-    pagesYouGet: ["Home", "Work", "About", "Contact", "Testimonials"],
-    keywords: ["portfolio", "hire [role]", "freelance [role]", "case studies"],
+    name: "Portfolio",
+    description:
+      "A clean personal or studio portfolio with projects and lead capture.",
+    includes: ["Home", "Work", "About", "Services", "Testimonials", "Contact"],
+  },
+  {
+    slug: "real-estate",
+    name: "Real Estate",
+    description:
+      "Listings focus + local SEO + lead capture for agents and brokerages.",
+    includes: ["Home", "Listings", "Buy", "Sell", "About", "Contact"],
+  },
+  {
+    slug: "events",
+    name: "Events",
+    description:
+      "Sell tickets, show schedules, and publish SEO-safe event pages.",
+    includes: ["Home", "Upcoming", "Speakers", "Venue", "FAQs", "Contact"],
+  },
+  {
+    slug: "clinic",
+    name: "Clinic",
+    description:
+      "Medical/health-style layout with trust, services, and location SEO.",
+    includes: ["Home", "Services", "Team", "Pricing", "FAQs", "Contact"],
+  },
+  {
+    slug: "construction",
+    name: "Construction",
+    description:
+      "Project galleries, capability statements, and quote capture.",
+    includes: ["Home", "Projects", "Capabilities", "About", "Reviews", "Contact"],
+  },
+];
+
+export const useCases: MarketingUseCase[] = [
+  {
+    slug: "rank-local",
+    title: "Rank locally and capture leads",
+    summary:
+      "Generate location-targeted service pages, FAQs, and CTAs designed to convert.",
+    bullets: [
+      "SEO-safe service + location pages",
+      "Conversion CTAs above the fold",
+      "Trust blocks: reviews, guarantees, logos",
+    ],
+  },
+  {
+    slug: "launch-fast",
+    title: "Launch a product site in minutes",
+    summary:
+      "Start with a clean template, then let the agents refine copy, pricing, and metadata.",
+    bullets: [
+      "Instant multi-page site spec",
+      "Pricing + FAQ generation",
+      "Metadata + sitemap included",
+    ],
+  },
+  {
+    slug: "programmatic-seo",
+    title: "Programmatic SEO without chaos",
+    summary:
+      "Scale pages while keeping canonical rules, internal linking, and sitemap hygiene.",
+    bullets: [
+      "Structured page generation",
+      "Canonical + metadata rules",
+      "Sitemap/robots defaults included",
+    ],
+  },
+  {
+    slug: "conversion-upgrade",
+    title: "Turn traffic into customers",
+    summary:
+      "Add conversion sections, pricing clarity, and objection-handling FAQs.",
+    bullets: [
+      "Conversion pass across key pages",
+      "Pricing clarity + packaging",
+      "FAQs for objections + trust signals",
+    ],
+  },
+  {
+    slug: "agency-delivery",
+    title: "Agency-ready delivery",
+    summary:
+      "Ship client sites faster with repeatable templates and automated publishing.",
+    bullets: [
+      "Template-driven consistent builds",
+      "Faster iteration loops",
+      "Publish + domain connection workflows",
+    ],
+  },
+  {
+    slug: "niche-authority",
+    title: "Own a niche with authority pages",
+    summary:
+      "Create structured pages for specific intents, services, and audiences.",
+    bullets: [
+      "Intent-led page planning",
+      "Clean internal linking structure",
+      "SEO hygiene from day one",
+    ],
+  },
+  {
+    slug: "service-bundles",
+    title: "Bundle services into profitable packages",
+    summary:
+      "Generate package pages that sell outcomes, not hours.",
+    bullets: [
+      "Package naming + positioning",
+      "Pricing tiers + comparison blocks",
+      "CTA and trust sections",
+    ],
+  },
+  {
+    slug: "seasonal-campaigns",
+    title: "Spin up seasonal campaigns quickly",
+    summary:
+      "Create landing pages for promotions and events without breaking your main site.",
+    bullets: [
+      "Campaign landing pages",
+      "Fast updates + publishing",
+      "SEO-safe structure",
+    ],
+  },
+  {
+    slug: "multi-location",
+    title: "Multi-location businesses",
+    summary:
+      "Create consistent location pages with unique content and clean sitemap coverage.",
+    bullets: [
+      "Location page templates",
+      "Unique content per page",
+      "Sitemap visibility",
+    ],
+  },
+  {
+    slug: "trust-first",
+    title: "Trust-first pages for high-value services",
+    summary:
+      "Position expertise with case studies, proof, and clear CTAs.",
+    bullets: [
+      "Proof blocks: results + logos",
+      "Case studies structure",
+      "Strong conversion CTA placement",
+    ],
   },
 ];
