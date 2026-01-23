@@ -5,9 +5,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   return res.status(200).json({
     ok: true,
     nowIso: new Date().toISOString(),
+    method: req.method,
+    url: req.url || null,
     vercelEnv: process.env.VERCEL_ENV || process.env.NODE_ENV || null,
-    vercelUrl: process.env.VERCEL_URL || null,
-    gitRef: process.env.VERCEL_GIT_COMMIT_REF || null,
-    gitSha: process.env.VERCEL_GIT_COMMIT_SHA || null,
   });
 }
