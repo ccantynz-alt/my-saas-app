@@ -83,12 +83,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-white">
-      {/* === TEMP STAMP (REMOVE LATER) === */}
-      <div style={{ position: "fixed", top: 12, left: 12, zIndex: 999999, background: "rgba(0,0,0,0.75)", color: "white", padding: "8px 10px", borderRadius: 12, fontSize: 12, fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
-        <div>LIVE_STAMP_OK</div>
-        <div>HOME_STAMP_20260124_235233</div>
-      </div>
-
       {/* PROBE OVERLAY */}
       <div className="fixed left-4 top-4 z-[9999] rounded-2xl border border-white/15 bg-black/70 px-4 py-3 text-left shadow-sm backdrop-blur">
         <div className="text-xs uppercase tracking-[0.28em] text-white/70">LIVE_OK</div>
@@ -243,4 +237,3 @@ export default function Home() {
     </main>
   );
 }
-
