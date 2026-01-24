@@ -6,13 +6,13 @@ const __BUILD_SHA_SHORT = __BUILD_SHA ? String(__BUILD_SHA).slice(0, 8) : "local
 const __VERCEL_ENV = process.env.VERCEL_ENV || "local";import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Dominat8 Ã¢â‚¬â€ AI Website Builder",
+  title: "Dominat8 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â AI Website Builder",
   description:
     "Generate and publish a complete website in minutes. Built for speed, clarity, and SEO-ready fundamentals.",
   metadataBase: new URL("https://www.dominat8.com"),
   alternates: { canonical: "/" },
   openGraph: {
-    title: "Dominat8 Ã¢â‚¬â€ AI Website Builder",
+    title: "Dominat8 ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â AI Website Builder",
     description: "Generate and publish a complete website in minutes.",
     url: "https://www.dominat8.com/",
     siteName: "Dominat8",
@@ -64,7 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="mx-auto max-w-6xl px-4 py-8">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm font-medium">Dominat8</div>
-              <div className="text-xs opacity-70">Ã‚Â© {new Date().getFullYear()} Dominat8.com Ã¢â‚¬â€ Built on Vercel</div>
+              <div className="text-xs opacity-70">Ãƒâ€šÃ‚© {new Date().getFullYear()} Dominat8.com ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â Built on Vercel</div>
             </div>
             <div className="mt-4 flex flex-wrap gap-3 text-xs opacity-80">
               <Link className="underline-offset-4 hover:underline" href="/pricing">
@@ -79,10 +79,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
                       <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] opacity-80">
               <span data-x-dominat8-build-badge>
-                Build: <span className="font-mono">{__BUILD_SHA_SHORT}</span> Ã‚Â· Env: <span className="font-mono">{__VERCEL_ENV}</span>
+                Build: <span className="font-mono">{__BUILD_SHA_SHORT}</span> Ãƒâ€šÃ‚Â· Env: <span className="font-mono">{__VERCEL_ENV}</span>
               </span>
               <a className="underline-offset-4 hover:underline" href={"/api/__site_status__?ts=" + Date.now()}>
-                Live status Ã¢â€ â€™
+                Live status ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢
               </a>
             </div>
 </div></footer>

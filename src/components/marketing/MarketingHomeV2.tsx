@@ -136,7 +136,7 @@ export default function MarketingHomeV2(props: {
           {(valueProps.length ? valueProps : [
             { title: "Layout + copy separation", body: "Agents write specs. Renderer decides structure." },
             { title: "SEO baked in", body: "Plans, sitemaps, canonicals, intent pages." },
-            { title: "Publish pipeline", body: "From spec → deployed site with one action." },
+            { title: "Publish pipeline", body: "From spec â†’ deployed site with one action." },
           ]).slice(0, 6).map((it: any, idx: number) => (
             <div key={idx} className="rounded-3xl border p-6">
               <div className="text-lg font-semibold">{S(it.title || it.label, "Value")}</div>
