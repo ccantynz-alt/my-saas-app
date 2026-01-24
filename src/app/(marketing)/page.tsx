@@ -4,6 +4,9 @@ export const runtime = "nodejs";
 import LuxuryShell from "@/src/components/marketing/LuxuryShell";
 import LuxuryNav from "@/src/components/marketing/LuxuryNav";
 import LuxuryHero from "@/src/components/marketing/LuxuryHero";
+import AudienceQualificationStrip from "@/src/components/marketing/AudienceQualificationStrip";
+import ValuePropositionCyclone from "@/src/components/marketing/ValuePropositionCyclone";
+import HowItWorksCalm from "@/src/components/marketing/HowItWorksCalm";
 import RuralTrustStrip from "@/src/components/marketing/RuralTrustStrip";
 import ServicesGrid from "@/src/components/marketing/ServicesGrid";
 import ProofTestimonials from "@/src/components/marketing/ProofTestimonials";
@@ -59,6 +62,9 @@ export default function MarketingHomePage() {
       <JsonLd />
       <LuxuryNav />
       <LuxuryHero />
+      <AudienceQualificationStrip />
+      <ValuePropositionCyclone />
+      <HowItWorksCalm />
       <RuralTrustStrip />
       <ServicesGrid />
       <ProofTestimonials />
@@ -68,3 +74,4 @@ export default function MarketingHomePage() {
     </LuxuryShell>
   );
 }
+
