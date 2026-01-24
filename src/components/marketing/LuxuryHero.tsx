@@ -6,22 +6,17 @@ export default function LuxuryHero() {
   return (
     <section className="mx-auto w-full max-w-6xl px-6 pt-10">
       <div className="min-h-[calc(100vh-140px)] pb-10 md:pb-14">
-        {/* Top rail */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          {/* Quiet marker for verification (do not remove) */}
           <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.14] bg-white/[0.04] px-3 py-1 text-xs text-white/70">
             <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
             <span>HOME_OK • / → src/app/(marketing)/page.tsx • 2026-01-24</span>
           </div>
-
           <div className="text-xs text-white/50">
-            <span className="text-white/70">{BRAND.domain}</span> • rural-pro premium homepage
+            <span className="text-white/70">{BRAND.domain}</span> • flagship homepage
           </div>
         </div>
 
-        {/* Main hero grid */}
         <div className="mt-8 grid gap-8 md:grid-cols-12 md:items-end">
-          {/* Left: headline */}
           <div className="md:col-span-7">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.12] bg-white/[0.03] px-3 py-1 text-xs text-white/70">
               <span className="text-white/60">Built for</span>
@@ -31,12 +26,13 @@ export default function LuxuryHero() {
             </div>
 
             <h1 className="mt-5 text-balance text-5xl font-semibold tracking-tight text-white md:text-7xl">
-              A full-screen homepage
-              <span className="text-white/70"> that feels grounded, premium, and real.</span>
+              Rural-professional.
+              <span className="text-white/70"> Premium output.</span>
+              <span className="text-white/70"> Generated from your brief.</span>
             </h1>
 
             <p className="mt-6 max-w-2xl text-pretty text-base leading-relaxed text-white/70 md:text-lg">
-              Dominat8 turns your brief into a professional site that reads like a premium brochure:
+              Dominat8 turns your brief into a site that reads like a premium brochure:
               calm layout, clear services, proof, pricing clarity, and an easy path to contact.
             </p>
 
@@ -55,20 +51,14 @@ export default function LuxuryHero() {
                 {CTA.secondary.label}
               </Link>
 
-              <Link
-                href={CTA.tertiary.href}
-                className="px-2 py-2 text-sm text-white/60 hover:text-white transition"
-              >
+              <Link href={CTA.tertiary.href} className="px-2 py-2 text-sm text-white/60 hover:text-white transition">
                 {CTA.tertiary.label} →
               </Link>
             </div>
 
             <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {PROOF.map((p) => (
-                <div
-                  key={p.k}
-                  className="rounded-2xl border border-white/[0.10] bg-white/[0.03] px-4 py-3"
-                >
+                <div key={p.k} className="rounded-2xl border border-white/[0.10] bg-white/[0.03] px-4 py-3">
                   <div className="text-xs text-white/60">{p.k}</div>
                   <div className="mt-1 text-sm font-semibold">{p.v}</div>
                 </div>
@@ -76,11 +66,10 @@ export default function LuxuryHero() {
             </div>
 
             <div className="mt-6 text-xs text-white/45">
-              Designed to look right for trades, rural services, local businesses, and premium operators.
+              This homepage sets the quality bar for every generated site.
             </div>
           </div>
 
-          {/* Right: "field notebook" brief → output */}
           <div className="md:col-span-5">
             <div className="rounded-3xl border border-white/[0.12] bg-white/[0.03] p-5 backdrop-blur">
               <div className="rounded-2xl border border-white/[0.10] bg-black/40 p-5">
@@ -104,29 +93,29 @@ export default function LuxuryHero() {
                 <ul className="mt-2 space-y-2 text-sm text-white/80">
                   <li className="flex items-start gap-2">
                     <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-white/70" />
-                    Full-screen homepage hero + proof + CTA
+                    Full-screen hero + trust strip + services
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-white/70" />
-                    Services section + pricing page + FAQ + contact
+                    Pricing + FAQ + contact pages
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-white/70" />
-                    Professional metadata + sitemap-ready structure
+                    Metadata + sitemap-ready structure
                   </li>
                 </ul>
 
                 <div className="mt-5 rounded-2xl border border-white/[0.10] bg-white/[0.02] p-3">
                   <div className="text-xs text-white/60">Why this works</div>
                   <div className="mt-1 text-sm text-white/80">
-                    It reads like a premium brochure: calm spacing, clear hierarchy, and trust signals up front.
+                    Calm spacing, clear hierarchy, and trust signals up front.
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="mt-4 text-xs text-white/45">
-              Next upgrade (after this deploy): we’ll add a “Services / Coverage / Proof” strip under the hero.
+              Next: wire the brief panel to real generated spec once the pipeline is ready.
             </div>
           </div>
         </div>

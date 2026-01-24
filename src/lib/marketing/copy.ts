@@ -13,38 +13,60 @@ export const CTA = {
 };
 
 export const PROOF = [
-  { k: "Trust", v: "clear, professional output" },
+  { k: "Trust", v: "professional, grounded output" },
   { k: "Speed", v: "minutes from brief to draft" },
-  { k: "Pages", v: "homepage + pricing + FAQ + contact" },
-  { k: "SEO", v: "metadata + sitemap-ready structure" },
+  { k: "Pages", v: "multi-page generation" },
+  { k: "SEO", v: "metadata + sitemap-ready" },
 ] as const;
 
-export const STEPS = [
+export const TRUST = [
+  { title: "Coverage", body: "Clear regions, service areas, and availability. No ambiguity." },
+  { title: "Credibility", body: "Proof-first layout: experience, outcomes, and reassurance." },
+  { title: "Responsiveness", body: "Calls-to-action where they matter. Easy contact." },
+  { title: "Professional tone", body: "Calm typography and spacing. Premium brochure feel." },
+] as const;
+
+export const SERVICES = [
+  { title: "Homepage (flagship)", body: "Full-screen hero, services, proof, and strong CTA — calm and premium." },
+  { title: "Pricing page", body: "Clear options and guidance. Built to reduce hesitation." },
+  { title: "FAQ page", body: "Objection handling that feels natural, not salesy." },
+  { title: "Contact page", body: "Fast conversion: phone, email, form — clean and simple." },
+  { title: "SEO basics", body: "Metadata, canonical, structure, and sitemap-ready layout." },
+  { title: "Publish-ready output", body: "Clean routing and consistent structure, built for confidence." },
+] as const;
+
+export const TESTIMONIALS = [
   {
-    title: "Bring a real-world brief",
-    body: "Tell us what you do, where you operate, and what ‘professional’ looks like in your industry.",
+    quote:
+      "This feels like a real premium site — not a template. The structure and clarity are exactly what we needed.",
+    name: "Local operator",
+    detail: "Service business",
   },
   {
-    title: "Agents assemble the site",
-    body: "Structure, copy, pages, and SEO basics — built like a premium brochure, not a template dump.",
+    quote:
+      "It reads like a brochure we’d pay a studio for — calm, trustworthy, and easy to understand.",
+    name: "Owner",
+    detail: "Trade & rural services",
   },
   {
-    title: "Publish with confidence",
-    body: "Review, adjust, then ship. Clean routing, consistent output, and no mystery behavior.",
+    quote:
+      "The best part is the flow: brief → draft → publish. No mystery, no mess.",
+    name: "Founder",
+    detail: "Small business",
   },
 ] as const;
 
 export const FAQ = [
   {
-    q: "Will this work for trade & local service businesses?",
-    a: "Yes. The whole point is clean trust: clear services, proof, pricing clarity, and easy contact.",
+    q: "Is this only for ‘tech’ companies?",
+    a: "No. It’s designed for real-world businesses: trades, rural services, local operators, and premium providers.",
   },
   {
-    q: "Does it feel professional or ‘AI-ish’?",
-    a: "Professional first. Calm layouts, clean typography, and a premium tone — then AI under the hood.",
+    q: "Will the site feel ‘AI generated’?",
+    a: "The output is professional first — calm layout, clear hierarchy, and a premium tone. AI is the engine, not the aesthetic.",
   },
   {
-    q: "Can I use my own domain?",
-    a: "Yes — Dominat8 is designed to map and verify custom domains cleanly.",
+    q: "What do I get after generation?",
+    a: "A multi-page site structure with homepage, pricing, FAQ, and contact — plus SEO basics and publish-ready output.",
   },
 ] as const;

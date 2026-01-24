@@ -12,7 +12,6 @@ export default function LuxuryFooter() {
             <span className="font-semibold text-white">{BRAND.name}</span>{" "}
             <span className="text-white/50">©</span> {year}
           </div>
-
           <div className="flex flex-wrap items-center gap-4 text-sm text-white/60">
             <Link className="hover:text-white transition" href="/pricing">Pricing</Link>
             <Link className="hover:text-white transition" href="/templates">Templates</Link>

@@ -10,24 +10,18 @@ export default function LuxuryCTA() {
           <div className="max-w-2xl">
             <div className="text-xs uppercase tracking-[0.16em] text-white/55">Ready</div>
             <h3 className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">
-              Make the homepage the standard.
+              Make this the standard.
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-white/70 md:text-base">
-              Generate, refine, publish — and keep it clean. This is the quality bar for every site Dominat8 produces.
+              Generate → refine → publish. Calm process. Serious output.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href={CTA.primary.href}
-              className="rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-black hover:bg-white/90 transition"
-            >
+            <Link href={CTA.primary.href} className="rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-black hover:bg-white/90 transition">
               {CTA.primary.label}
             </Link>
-            <Link
-              href={CTA.secondary.href}
-              className="rounded-2xl border border-white/[0.16] bg-black/30 px-5 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.05] transition"
-            >
+            <Link href={CTA.secondary.href} className="rounded-2xl border border-white/[0.16] bg-black/30 px-6 py-3 text-sm font-semibold text-white/85 hover:bg-white/[0.05] transition">
               {CTA.secondary.label}
             </Link>
           </div>
