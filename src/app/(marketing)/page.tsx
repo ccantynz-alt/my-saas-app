@@ -1,56 +1,69 @@
 ﻿// src/app/(marketing)/page.tsx
 export const runtime = "nodejs";
 
+import LuxuryShell from "@/src/components/marketing/LuxuryShell";
+import LuxuryNav from "@/src/components/marketing/LuxuryNav";
+import LuxuryHero from "@/src/components/marketing/LuxuryHero";
+import LuxurySteps from "@/src/components/marketing/LuxurySteps";
+import LuxuryFAQ from "@/src/components/marketing/LuxuryFAQ";
+import LuxuryCTA from "@/src/components/marketing/LuxuryCTA";
+import LuxuryFooter from "@/src/components/marketing/LuxuryFooter";
+import { BRAND } from "@/src/lib/marketing/copy";
+
 export const metadata = {
   title: "Dominat8 — AI Website Automation Builder",
-  description: "Dominat8 builds and launches high-converting websites automatically.",
+  description:
+    "Dominat8 generates a premium multi-page website from your brief. Calm UX. Serious output. Publish fast.",
+  alternates: {
+    canonical: BRAND.url,
+  },
+  openGraph: {
+    title: "Dominat8 — AI Website Automation Builder",
+    description:
+      "Generate a premium multi-page website from your brief. Calm UX. Serious output. Publish fast.",
+    url: BRAND.url,
+    siteName: "Dominat8",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Dominat8 — AI Website Automation Builder",
+    description:
+      "Generate a premium multi-page website from your brief. Calm UX. Serious output. Publish fast.",
+  },
 };
+
+function JsonLd() {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Dominat8",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    description:
+      "Dominat8 generates a premium multi-page website from your brief and helps you publish fast.",
+    url: BRAND.url,
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      // eslint-disable-next-line react/no-danger
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }}
+    />
+  );
+}
 
 export default function MarketingHomePage() {
   return (
-    <main style={{ minHeight: "100vh", padding: "48px 24px", fontFamily: "ui-sans-serif, system-ui" }}>
-      {/* =========================================
-          HOME_OK MARKER (do not remove)
-          This is used to verify routing + deploy.
-          ========================================= */}
-      <div
-        style={{
-          display: "inline-block",
-          padding: "10px 14px",
-          borderRadius: 12,
-          border: "1px solid rgba(0,0,0,0.15)",
-          background: "rgba(0,0,0,0.04)",
-          fontWeight: 700,
-          letterSpacing: 0.2,
-          marginBottom: 18,
-        }}
-      >
-        ✅ HOME_OK — / is served by <code>src/app/(marketing)/page.tsx</code> — 2026-01-24
-      </div>
-
-      <h1 style={{ fontSize: 42, lineHeight: 1.1, margin: "8px 0 10px" }}>
-        Dominat8
-      </h1>
-
-      <p style={{ fontSize: 18, lineHeight: 1.6, maxWidth: 820, opacity: 0.85, margin: "0 0 26px" }}>
-        Your homepage routing is restored. Next step is the ultra-luxury hero.
-      </p>
-
-      <div style={{ display: "grid", gap: 12, maxWidth: 900 }}>
-        <div style={{ padding: 16, borderRadius: 16, border: "1px solid rgba(0,0,0,0.12)" }}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Phase 1 — Stability</div>
-          <div style={{ opacity: 0.85 }}>
-            Confirm this page renders on both the Vercel deploy URL and https://www.dominat8.com
-          </div>
-        </div>
-
-        <div style={{ padding: 16, borderRadius: 16, border: "1px solid rgba(0,0,0,0.12)" }}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Phase 2 — Ultra-Luxury Hero</div>
-          <div style={{ opacity: 0.85 }}>
-            We’ll replace this placeholder with the pedestal-level hero once routing is 100% confirmed.
-          </div>
-        </div>
-      </div>
-    </main>
+    <LuxuryShell>
+      <JsonLd />
+      <LuxuryNav />
+      <LuxuryHero />
+      <LuxurySteps />
+      <LuxuryFAQ />
+      <LuxuryCTA />
+      <LuxuryFooter />
+    </LuxuryShell>
   );
 }
