@@ -1,4 +1,9 @@
-﻿export const runtime = "nodejs";
+﻿{/* ==========================================================
+   DISABLED FILE
+   Reason: src/app/(marketing)/page.tsx shadows '/' and breaks Vercel trace.
+   Keep this for history only. Do NOT restore unless you remove src/app/page.tsx.
+   ========================================================== */}
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const BUILD_STAMP = "BUILD_20260124_213310";
@@ -61,3 +66,4 @@ export default function Home() {
     </main>
   );
 }
+
