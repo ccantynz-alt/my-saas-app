@@ -1,0 +1,27 @@
+/* Dominat8 CSS PIPELINE PROBE
+   If this loads, you WILL see the site change dramatically. */
+
+html, body {
+  background: #f6f1ff !important;
+}
+
+body {
+  outline: 8px solid rgba(111, 66, 193, 0.35) !important;
+  outline-offset: -8px !important;
+}
+
+/* A fixed pill to prove CSS is active */
+#d8-probe-pill {
+  display: block !important;
+  position: fixed !important;
+  right: 16px !important;
+  bottom: 16px !important;
+  z-index: 2147483647 !important;
+  padding: 10px 12px !important;
+  border-radius: 9999px !important;
+  font: 700 12px/1.0 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial !important;
+  letter-spacing: 0.02em !important;
+  background: rgba(111, 66, 193, 0.95) !important;
+  color: white !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25) !important;
+}
