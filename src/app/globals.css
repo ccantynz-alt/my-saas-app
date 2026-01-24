@@ -4,3 +4,15 @@
 html, body { height: 100%; }
 body { background: white; color: black; }
 a { text-underline-offset: 3px; }
+
+
+
+/* === Dominat8 Flagship Homepage helpers (safe append) === */
+.d8-grid{
+  background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.08) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+.d8-vignette{
+  background: radial-gradient(1200px 700px at 50% 45%, rgba(255,255,255,0.10), transparent 60%);
+  mix-blend-mode: screen;
+}
