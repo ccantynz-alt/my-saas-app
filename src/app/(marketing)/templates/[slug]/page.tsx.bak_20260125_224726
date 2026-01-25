@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-// IMPORTANT: do not assume named exports from the catalog module while it evolves
-import * as Catalog from "@/lib/marketing/catalog";
+import { marketingCatalog } from "@/lib/marketing/catalog";
 
 type PageProps = {
   params: { slug: string };
@@ -14,30 +13,20 @@ function slugToTitle(slug: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function resolveCatalogRoot(): any {
-  const mod: any = Catalog as any;
-  // Try common patterns:
-  // - export default ...
-  // - export const catalog = ...
-  // - export const marketing = ...
-  // - export const marketingCatalog = ... (if it exists later)
-  // - fallback to the module object itself
-  return mod?.marketingCatalog ?? mod?.marketing ?? mod?.catalog ?? mod?.default ?? mod;
-}
+function pickTemplateBySlug(slug: string) {
+  // catalog shape may evolve; we tolerate both:
+  // - marketingCatalog.templates
+  // - marketingCatalog.templateCards
+  // - marketingCatalog.items
+  const root: any = marketingCatalog as any;
 
-function listTemplates(root: any): any[] {
-  return (
+  const list: any[] =
     (Array.isArray(root?.templates) && root.templates) ||
     (Array.isArray(root?.templateCards) && root.templateCards) ||
     (Array.isArray(root?.items) && root.items) ||
-    []
-  );
-}
+    [];
 
-function pickTemplateBySlug(slug: string) {
-  const root = resolveCatalogRoot();
-  const list = listTemplates(root);
-
+  // Match by known fields (without assuming exact type)
   const hit =
     list.find((t) => t?.slug === slug) ||
     list.find((t) => t?.id === slug) ||
@@ -49,27 +38,39 @@ function pickTemplateBySlug(slug: string) {
 }
 
 export function generateStaticParams() {
-  const root = resolveCatalogRoot();
-  const list = listTemplates(root);
+  const root: any = marketingCatalog as any;
+  const list: any[] =
+    (Array.isArray(root?.templates) && root.templates) ||
+    (Array.isArray(root?.templateCards) && root.templateCards) ||
+    (Array.isArray(root?.items) && root.items) ||
+    [];
 
+  // Only include entries that have a usable slug-like field
   const slugs = list
     .map((t) => t?.slug ?? t?.id ?? t?.key ?? t?.routeSlug)
     .filter((v) => typeof v === "string" && v.length > 0);
 
-  return Array.from(new Set(slugs)).map((slug) => ({ slug }));
+  // De-dup
+  const uniq = Array.from(new Set(slugs));
+  return uniq.map((slug) => ({ slug }));
 }
 
 export function generateMetadata({ params }: PageProps): Metadata {
-  const { hit } = pickTemplateBySlug(params.slug);
-  if (!hit) return { title: "Template Not Found" };
+  const slug = params.slug;
+  const { hit } = pickTemplateBySlug(slug);
 
+  if (!hit) {
+    return { title: "Template Not Found" };
+  }
+
+  // Display-only fields are intentionally loose while catalog types evolve
   const anyT = hit as unknown as Record<string, any>;
 
   const displayTitle =
     (typeof anyT.title === "string" && anyT.title) ||
     (typeof anyT.name === "string" && anyT.name) ||
     (typeof anyT.label === "string" && anyT.label) ||
-    slugToTitle(params.slug);
+    slugToTitle(slug);
 
   const displayDescription =
     (typeof anyT.description === "string" && anyT.description) ||
@@ -84,16 +85,19 @@ export function generateMetadata({ params }: PageProps): Metadata {
 }
 
 export default function TemplateSlugPage({ params }: PageProps) {
-  const { hit } = pickTemplateBySlug(params.slug);
+  const slug = params.slug;
+  const { hit } = pickTemplateBySlug(slug);
+
   if (!hit) notFound();
 
+  // Display-only fields are intentionally loose while catalog types evolve
   const anyT = hit as unknown as Record<string, any>;
 
   const displayTitle =
     (typeof anyT.title === "string" && anyT.title) ||
     (typeof anyT.name === "string" && anyT.name) ||
     (typeof anyT.label === "string" && anyT.label) ||
-    slugToTitle(params.slug);
+    slugToTitle(slug);
 
   const displayDescription =
     (typeof anyT.description === "string" && anyT.description) ||
@@ -102,7 +106,8 @@ export default function TemplateSlugPage({ params }: PageProps) {
     `A polished template designed to help you ship faster.`;
 
   const primaryCtaText =
-    (typeof anyT.ctaText === "string" && anyT.ctaText) || "Use this template";
+    (typeof anyT.ctaText === "string" && anyT.ctaText) ||
+    "Use this template";
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -122,7 +127,7 @@ export default function TemplateSlugPage({ params }: PageProps) {
 
           <div className="mt-8 flex flex-wrap gap-3">
             <a
-              href={`/gallery?template=${encodeURIComponent(params.slug)}`}
+              href={`/gallery?template=${encodeURIComponent(slug)}`}
               className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black shadow hover:opacity-90"
             >
               {primaryCtaText}
@@ -160,7 +165,7 @@ export default function TemplateSlugPage({ params }: PageProps) {
         <div className="mt-10 rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="text-sm font-semibold">Debug</div>
           <div className="mt-2 text-xs text-white/60">
-            slug: <span className="text-white/80">{params.slug}</span>
+            slug: <span className="text-white/80">{slug}</span>
           </div>
         </div>
       </section>

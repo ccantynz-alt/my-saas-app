@@ -1,11 +1,9 @@
-import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import Link from "next/link";
 
-// IMPORTANT: do not assume named exports from the catalog module while it evolves
-import * as Catalog from "@/lib/marketing/catalog";
-
-import MarketingCTA from "@/components/marketing/MarketingCTA";
+import MarketingCTA from "@/src/components/marketing/MarketingCTA";
+import { marketingCatalog } from "@/src/lib/marketing/catalog";
 
 type Props = {
   params: { slug: string };
@@ -17,23 +15,14 @@ function slugToTitle(slug: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function resolveCatalogRoot(): any {
-  const mod: any = Catalog as any;
-  return mod?.marketingCatalog ?? mod?.marketing ?? mod?.catalog ?? mod?.default ?? mod;
-}
+function pickUseCase(slug: string) {
+  const root: any = marketingCatalog as any;
 
-function listUseCases(root: any): any[] {
-  return (
+  const list: any[] =
     (Array.isArray(root?.useCases) && root.useCases) ||
     (Array.isArray(root?.useCaseCards) && root.useCaseCards) ||
     (Array.isArray(root?.items) && root.items) ||
-    []
-  );
-}
-
-function pickUseCase(slug: string) {
-  const root = resolveCatalogRoot();
-  const list = listUseCases(root);
+    [];
 
   const hit =
     list.find((u) => u?.slug === slug) ||
@@ -45,34 +34,42 @@ function pickUseCase(slug: string) {
 }
 
 export function generateStaticParams() {
-  const root = resolveCatalogRoot();
-  const list = listUseCases(root);
+  const root: any = marketingCatalog as any;
+  const list: any[] =
+    (Array.isArray(root?.useCases) && root.useCases) ||
+    (Array.isArray(root?.useCaseCards) && root.useCaseCards) ||
+    (Array.isArray(root?.items) && root.items) ||
+    [];
 
   const slugs = list
     .map((u) => u?.slug ?? u?.id ?? u?.key)
-    .filter((v) => typeof v === "string" && v.length > 0);
+    .filter((v) => typeof v === "string");
 
   return Array.from(new Set(slugs)).map((slug) => ({ slug }));
 }
 
 export function generateMetadata({ params }: Props): Metadata {
   const { hit } = pickUseCase(params.slug);
+
   if (!hit) return { title: "Use Case Not Found" };
 
   const anyU = hit as Record<string, any>;
 
   const title =
-    (typeof anyU.title === "string" && anyU.title) ||
-    (typeof anyU.name === "string" && anyU.name) ||
-    (typeof anyU.label === "string" && anyU.label) ||
+    anyU.title ||
+    anyU.name ||
+    anyU.label ||
     slugToTitle(params.slug);
 
   const description =
-    (typeof anyU.description === "string" && anyU.description) ||
-    (typeof anyU.summary === "string" && anyU.summary) ||
+    anyU.description ||
+    anyU.summary ||
     `Explore how Dominat8 helps with ${title}.`;
 
-  return { title: `${title} — Use Case`, description };
+  return {
+    title: `${title} — Use Case`,
+    description,
+  };
 }
 
 export default function UseCasePage({ params }: Props) {
@@ -82,14 +79,14 @@ export default function UseCasePage({ params }: Props) {
   const anyU = hit as Record<string, any>;
 
   const title =
-    (typeof anyU.title === "string" && anyU.title) ||
-    (typeof anyU.name === "string" && anyU.name) ||
-    (typeof anyU.label === "string" && anyU.label) ||
+    anyU.title ||
+    anyU.name ||
+    anyU.label ||
     slugToTitle(params.slug);
 
   const description =
-    (typeof anyU.description === "string" && anyU.description) ||
-    (typeof anyU.summary === "string" && anyU.summary) ||
+    anyU.description ||
+    anyU.summary ||
     `See how this use case works with Dominat8.`;
 
   return (
@@ -100,11 +97,15 @@ export default function UseCasePage({ params }: Props) {
             Use Cases
           </div>
 
-          <h1 className="mt-4 text-4xl font-semibold sm:text-5xl">{title}</h1>
+          <h1 className="mt-4 text-4xl font-semibold sm:text-5xl">
+            {title}
+          </h1>
 
-          <p className="mt-4 max-w-2xl text-white/70">{description}</p>
+          <p className="mt-4 max-w-2xl text-white/70">
+            {description}
+          </p>
 
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-8 flex gap-3">
             <MarketingCTA />
 
             <Link
