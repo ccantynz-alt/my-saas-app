@@ -3,30 +3,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
-const LIVE_MARKER = "LIVE_20260126_BUNDLE2_PRICING_LEADS_TRACKING";
-const ROUTE_BANNER = "✅ ROUTE OK — HOME_BUNDLE2_NAV_PRICING_LEADS";
+const LIVE_MARKER = "LIVE_20260126_MONEY_WOW_01";
+const ROUTE_BANNER = "✅ ROUTE OK — HOME_MONEY_WOW_V1";
 
 type Step = { label: string; detail: string };
 
-function clsx(...v: Array<string | false | null | undefined>) {
-  return v.filter(Boolean).join(" ");
-}
-
-async function track(event: string, meta?: Record<string, any>) {
-  try {
-    await fetch("/api/track", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ event, meta: meta ?? {}, ts: Date.now() }),
-      keepalive: true,
-    });
-  } catch {}
-}
-
 export default function HomeClient() {
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const [scrolled, setScrolled] = useState(false);
 
+  // Premium-feeling "system" animation on the right panel
   const steps: Step[] = useMemo(
     () => [
       { label: "Analyzing your business", detail: "Turning description into a structured spec…" },
@@ -39,18 +24,8 @@ export default function HomeClient() {
   );
 
   const [stepIndex, setStepIndex] = useState(0);
-  const [progress, setProgress] = useState(22);
+  const [progress, setProgress] = useState(18);
   const [faqOpen, setFaqOpen] = useState<number | null>(0);
-
-  const [email, setEmail] = useState("");
-  const [leadStatus, setLeadStatus] = useState<"idle" | "sending" | "ok" | "err">("idle");
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 6);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll as any);
-  }, []);
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -87,78 +62,9 @@ export default function HomeClient() {
 
   const current = steps[stepIndex];
 
-  async function submitLead(ev: React.FormEvent) {
-    ev.preventDefault();
-    if (!email.trim()) return;
-
-    setLeadStatus("sending");
-    await track("lead_submit_clicked", { placement: "home_hero", emailLen: email.trim().length });
-
-    try {
-      const res = await fetch("/api/lead", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          email: email.trim(),
-          source: "home_hero",
-          page: typeof window !== "undefined" ? window.location.href : "",
-          ts: Date.now(),
-        }),
-      });
-
-      if (!res.ok) throw new Error("bad");
-      setLeadStatus("ok");
-      setEmail("");
-      await track("lead_submit_success", { placement: "home_hero" });
-    } catch {
-      setLeadStatus("err");
-      await track("lead_submit_error", { placement: "home_hero" });
-    }
-  }
-
   return (
     <div ref={rootRef} className="min-h-screen bg-black text-white">
-      {/* Premium sticky navbar */}
-      <div className={clsx(
-        "sticky top-0 z-50 w-full border-b border-white/10 transition",
-        scrolled ? "bg-black/60 backdrop-blur-xl" : "bg-black/20"
-      )}>
-        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2" onClick={() => track("nav_logo_click")}>
-            <span className="h-8 w-8 rounded-xl border border-white/15 bg-white/5 grid place-items-center">
-              <span className="text-sm font-semibold">D8</span>
-            </span>
-            <span className="text-sm font-semibold tracking-[-0.02em]">Dominat8</span>
-            <span className="hidden sm:inline text-xs text-white/50 ml-2">{LIVE_MARKER}</span>
-          </Link>
-
-          <div className="hidden md:flex items-center gap-6 text-sm text-white/70">
-            <Link href="/pricing" className="hover:text-white transition" onClick={() => track("nav_pricing_click")}>Pricing</Link>
-            <a href="#features" className="hover:text-white transition" onClick={() => track("nav_features_click")}>Features</a>
-            <a href="#faq" className="hover:text-white transition" onClick={() => track("nav_faq_click")}>FAQ</a>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Link
-              href="/pricing"
-              className="hidden sm:inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold border border-white/15 bg-white/5 hover:bg-white/10 transition"
-              onClick={() => track("nav_view_pricing_cta")}
-            >
-              View pricing
-            </Link>
-            <Link
-              href="/pricing"
-              className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold bg-white text-black hover:opacity-95 transition active:scale-[0.99] relative overflow-hidden"
-              onClick={() => track("nav_start_cta")}
-            >
-              Start
-              <span className="sheen" aria-hidden="true" />
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Top debug banner (safe to keep for now) */}
+      {/* Top debug banner (safe to keep for now; remove later once calm) */}
       <div className="w-full border-b border-white/10 bg-black/70 backdrop-blur-md">
         <div className="mx-auto max-w-6xl px-4 py-2 text-xs text-white/80 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
@@ -186,7 +92,7 @@ export default function HomeClient() {
           <div className="absolute inset-0 noise" />
         </div>
 
-        <div className="mx-auto max-w-6xl px-4 py-14 sm:py-18 lg:py-22">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:py-20 lg:py-24">
           <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
             {/* Left column */}
             <div>
@@ -207,9 +113,8 @@ export default function HomeClient() {
 
               <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center">
                 <Link
-                  href="/pricing"
+                  href="/"
                   className="group inline-flex items-center justify-center rounded-xl px-6 py-3 font-semibold bg-white text-black shadow-[0_10px_40px_rgba(255,255,255,0.10)] hover:shadow-[0_14px_60px_rgba(255,255,255,0.18)] transition-all active:scale-[0.99] relative overflow-hidden"
-                  onClick={() => track("hero_primary_cta_click", { to: "/pricing" })}
                 >
                   <span className="relative z-10">Build my site</span>
                   <span className="sheen" aria-hidden="true" />
@@ -225,43 +130,13 @@ export default function HomeClient() {
                 </div>
               </div>
 
-              {/* Lead capture (real endpoint) */}
-              <form onSubmit={submitLead} className="mt-7 max-w-xl">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-[0.22em] text-white/60">Get early access updates</div>
-                  <div className="mt-2 flex flex-col sm:flex-row gap-2">
-                    <input
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@domain.com"
-                      className="w-full rounded-xl border border-white/10 bg-black/50 px-4 py-3 text-sm text-white placeholder:text-white/35 outline-none focus:border-white/25"
-                      type="email"
-                      required
-                    />
-                    <button
-                      type="submit"
-                      className="rounded-xl px-5 py-3 text-sm font-semibold bg-white text-black hover:opacity-95 transition active:scale-[0.99] disabled:opacity-60"
-                      disabled={leadStatus === "sending"}
-                      onClick={() => track("lead_button_click")}
-                    >
-                      {leadStatus === "sending" ? "Sending…" : "Notify me"}
-                    </button>
-                  </div>
-                  <div className="mt-2 text-xs text-white/45">
-                    {leadStatus === "ok" && <span className="text-emerald-300">Saved. You’re on the list.</span>}
-                    {leadStatus === "err" && <span className="text-rose-300">Couldn’t save — try again.</span>}
-                    {leadStatus === "idle" && "No spam. Just build updates + launch access."}
-                  </div>
-                </div>
-              </form>
-
-              <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-xl" id="features">
+              <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-xl">
                 <TrustChip title="Conversion-first" desc="Designed to sell, not just look nice." />
                 <TrustChip title="SEO pack" desc="Metadata, sitemap, structured data." />
-                <TrustChip title="Fast deploy" desc="Publish-ready output + clean URLs." />
+                <TrustChip title="Fast deploy" desc="Optimized output + publish flow." />
               </div>
 
-              <div className="mt-7 text-xs text-white/45">
+              <div className="mt-8 text-xs text-white/45">
                 Live marker: <span className="text-white/70 font-medium">{LIVE_MARKER}</span>
               </div>
             </div>
@@ -291,7 +166,10 @@ export default function HomeClient() {
                   </div>
 
                   <div className="mt-4 h-2 rounded-full bg-white/10 overflow-hidden">
-                    <div className="h-full rounded-full bg-white/80 progressGlow" style={{ width: `${progress}%` }} />
+                    <div
+                      className="h-full rounded-full bg-white/80 progressGlow"
+                      style={{ width: `${progress}%` }}
+                    />
                   </div>
 
                   <div className="mt-5 rounded-xl border border-white/10 bg-black/40 p-4">
@@ -314,7 +192,8 @@ export default function HomeClient() {
                   <div className="mt-5 rounded-xl border border-white/10 bg-white/5 p-4">
                     <div className="text-xs tracking-[0.24em] uppercase text-white/60">PROOF PANEL</div>
                     <div className="mt-2 text-sm text-white/70 leading-relaxed">
-                      This isn’t a template editor. It’s a pipeline that builds like a production system.
+                      This is the feeling: you describe the business, the system builds the site like a pipeline —
+                      not a template editor.
                     </div>
                   </div>
                 </div>
@@ -325,26 +204,157 @@ export default function HomeClient() {
             </div>
           </div>
 
-          {/* CTA strip */}
-          <div className="mt-14 rounded-2xl border border-white/10 bg-white/5 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <div className="text-lg font-semibold">Ready to publish a premium site?</div>
-              <div className="mt-1 text-white/65">See plans → choose → ship. No fiddling.</div>
+          {/* Logos / Social proof strip */}
+          <div className="mt-14 sm:mt-16 rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+            <div className="px-5 py-4 flex items-center justify-between">
+              <div className="text-xs uppercase tracking-[0.22em] text-white/60">Built for money sites</div>
+              <div className="text-xs text-white/45">Premium look • Fast feel • Conversion-first</div>
             </div>
-            <Link
-              href="/pricing"
-              className="inline-flex items-center justify-center rounded-xl px-6 py-3 font-semibold bg-white text-black hover:opacity-95 transition active:scale-[0.99] relative overflow-hidden"
-              onClick={() => track("mid_cta_pricing_click")}
-            >
-              View pricing
-              <span className="sheen" aria-hidden="true" />
-            </Link>
+            <div className="border-t border-white/10">
+              <Marquee />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Feature grid */}
+      <section className="mx-auto max-w-6xl px-4 pb-16 sm:pb-20">
+        <div className="grid gap-10 lg:grid-cols-12 lg:items-end">
+          <div className="lg:col-span-7">
+            <h2 className="text-2xl sm:text-3xl font-semibold tracking-[-0.03em]">
+              A builder that behaves like a team.
+            </h2>
+            <p className="mt-3 text-white/65 leading-relaxed max-w-2xl">
+              Instead of “drag blocks,” Dominat8 runs a pipeline: strategy → structure → pages → SEO → publish.
+              Your result feels intentional and expensive.
+            </p>
+          </div>
+          <div className="lg:col-span-5">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <div className="text-xs uppercase tracking-[0.22em] text-white/60">Outcome</div>
+              <div className="mt-2 text-white/80">
+                A homepage that looks like it costs money — because it’s built to make money.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <FeatureCard
+            title="Authority-first layout"
+            desc="Hero hierarchy, trust chips, proof surfaces, and a persuasive flow."
+          />
+          <FeatureCard
+            title="Instant SEO kit"
+            desc="Sitemap + metadata + structured data patterns (pipeline-ready)."
+          />
+          <FeatureCard
+            title="Publish-ready output"
+            desc="Optimized assets + deploy-friendly markup and structure."
+          />
+          <FeatureCard
+            title="Conversion micro-interactions"
+            desc="Hover depth, sheen, soft motion, and premium tactility."
+          />
+          <FeatureCard
+            title="Fast by default"
+            desc="No heavy libraries required. Motion stays lightweight."
+          />
+          <FeatureCard
+            title="Looks premium on day one"
+            desc="Modern dark luxury + controlled contrast + deliberate spacing."
+          />
+        </div>
+      </section>
+
+      {/* Pipeline section */}
+      <section className="border-t border-white/10 bg-black/40">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:py-20">
+          <h3 className="text-2xl sm:text-3xl font-semibold tracking-[-0.03em]">
+            The pipeline (why this feels different)
+          </h3>
+          <p className="mt-3 max-w-2xl text-white/65 leading-relaxed">
+            Templates feel like “editing.” Pipelines feel like “production.” Dominat8 is built for production.
+          </p>
+
+          <div className="mt-10 grid gap-4 lg:grid-cols-5">
+            <PipelineStep i="01" title="Describe" desc="Tell us your niche, offer, and audience." />
+            <PipelineStep i="02" title="Assemble" desc="Pages, sections, hierarchy, and copy structure." />
+            <PipelineStep i="03" title="Enhance" desc="SEO plan, sitemap, schema, internal linking." />
+            <PipelineStep i="04" title="Publish" desc="Deploy-ready output and clean URLs." />
+            <PipelineStep i="05" title="Iterate" desc="Refine messaging and ship improvements fast." />
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials + Pricing teaser */}
+      <section className="mx-auto max-w-6xl px-4 py-16 sm:py-20">
+        <div className="grid gap-10 lg:grid-cols-12">
+          <div className="lg:col-span-7">
+            <h3 className="text-2xl sm:text-3xl font-semibold tracking-[-0.03em]">
+              Built to convert, not just exist.
+            </h3>
+            <div className="mt-6 grid gap-4">
+              <Quote
+                text="This feels like a premium agency build — but it’s generated. The flow is persuasive and clean."
+                who="Founder"
+              />
+              <Quote
+                text="The right panel ‘pipeline’ proof is genius. It makes the product feel real and serious."
+                who="Marketing lead"
+              />
+              <Quote
+                text="Finally: a builder that doesn’t look like a starter template."
+                who="Operator"
+              />
+            </div>
+          </div>
+
+          <div className="lg:col-span-5">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <div className="text-xs uppercase tracking-[0.22em] text-white/60">Pricing (teaser)</div>
+              <div className="mt-3 text-xl font-semibold">Free to start.</div>
+              <p className="mt-2 text-white/65 leading-relaxed">
+                Upgrade when you’re ready to publish to a custom domain and unlock advanced SEO + automation.
+              </p>
+
+              <div className="mt-5 rounded-xl border border-white/10 bg-black/40 p-4">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <div className="text-sm font-semibold">Pro</div>
+                    <div className="text-sm text-white/60">For builders who want revenue.</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-semibold">$29</div>
+                    <div className="text-xs text-white/50">/mo (example)</div>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Badge text="Custom domain" />
+                  <Badge text="SEO automation" />
+                  <Badge text="Publish workflow" />
+                  <Badge text="Priority generation" />
+                </div>
+              </div>
+
+              <div className="mt-5 flex flex-col gap-3">
+                <Link
+                  href="/"
+                  className="inline-flex items-center justify-center rounded-xl px-5 py-3 font-semibold bg-white text-black hover:opacity-95 transition active:scale-[0.99]"
+                >
+                  Start building
+                </Link>
+                <div className="text-xs text-white/45">
+                  We’ll wire real billing + gating next — this is conversion scaffolding.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* FAQ */}
-      <section className="border-t border-white/10 bg-black/40" id="faq">
+      <section className="border-t border-white/10 bg-black/40">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:py-20">
           <div className="grid gap-10 lg:grid-cols-12">
             <div className="lg:col-span-5">
@@ -352,7 +362,7 @@ export default function HomeClient() {
                 Questions (that buyers ask)
               </h3>
               <p className="mt-3 text-white/65 leading-relaxed">
-                Short answers. High confidence. Less friction.
+                Keep the answers short, confident, and specific. This reduces friction and increases conversion.
               </p>
             </div>
 
@@ -362,43 +372,42 @@ export default function HomeClient() {
                 open={faqOpen === 0}
                 setOpen={setFaqOpen}
                 q="Is this just templates?"
-                a="No. Dominat8 assembles a site from your business description—structure, persuasive copy scaffolding, and SEO patterns—then outputs publish-ready pages."
+                a="No. Dominat8 runs a pipeline that assembles a site from your business description—structure, copy, and SEO patterns—then outputs publish-ready pages."
               />
               <FAQItem
                 i={1}
                 open={faqOpen === 1}
                 setOpen={setFaqOpen}
-                q="Can I edit the result?"
+                q="Can I still edit things?"
                 a="Yes. You keep control. The system gives you a premium baseline, then you iterate."
               />
               <FAQItem
                 i={2}
                 open={faqOpen === 2}
                 setOpen={setFaqOpen}
-                q="What’s the fastest path to revenue?"
-                a="Hero + proof → pricing page → checkout → ship weekly conversion improvements."
+                q="Does it include SEO?"
+                a="Yes. The workflow is designed around modern SEO fundamentals: sitemap, metadata patterns, and structured data scaffolding."
               />
               <FAQItem
                 i={3}
                 open={faqOpen === 3}
                 setOpen={setFaqOpen}
-                q="How do I publish to my domain?"
-                a="That’s the pipeline. Next we wire the upgrade flow to domain + publish gating."
+                q="What’s the fastest path to revenue?"
+                a="Start with a strong hero + proof, add a pricing page, add a lead capture / checkout, then iterate weekly on conversion."
               />
             </div>
           </div>
 
           <div className="mt-12 rounded-2xl border border-white/10 bg-white/5 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <div className="text-lg font-semibold">See pricing → then build.</div>
-              <div className="mt-1 text-white/65">This turns the site into a product.</div>
+              <div className="text-lg font-semibold">Ready to make this a money machine?</div>
+              <div className="mt-1 text-white/65">Next: pricing page + lead capture + Pro gating.</div>
             </div>
             <Link
-              href="/pricing"
+              href="/"
               className="inline-flex items-center justify-center rounded-xl px-6 py-3 font-semibold bg-white text-black hover:opacity-95 transition active:scale-[0.99]"
-              onClick={() => track("footer_pricing_click")}
             >
-              Pricing
+              Build my site
             </Link>
           </div>
 
@@ -408,7 +417,7 @@ export default function HomeClient() {
         </div>
       </section>
 
-      {/* Global styles */}
+      {/* Global styles for luxury motion (no new deps) */}
       <style jsx global>{`
         .mesh {
           background:
@@ -448,7 +457,7 @@ export default function HomeClient() {
           opacity: 0;
           transition: opacity 240ms ease, transform 520ms ease;
         }
-        a:hover .sheen, button:hover .sheen { opacity: 1; transform: translateX(42%); }
+        .group:hover .sheen { opacity: 1; transform: translateX(42%); }
 
         .progressGlow {
           box-shadow: 0 0 24px rgba(255,255,255,0.22);
@@ -518,6 +527,36 @@ function TrustChip({ title, desc }: { title: string; desc: string }) {
   );
 }
 
+function FeatureCard({ title, desc }: { title: string; desc: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5 hover:bg-white/[0.07] transition hover:-translate-y-[1px]">
+      <div className="text-sm font-semibold text-white/90">{title}</div>
+      <div className="mt-2 text-sm text-white/65 leading-relaxed">{desc}</div>
+      <div className="mt-4 h-px w-full bg-white/10" />
+      <div className="mt-4 text-xs text-white/45 uppercase tracking-[0.22em]">Premium baseline</div>
+    </div>
+  );
+}
+
+function PipelineStep({ i, title, desc }: { i: string; title: string; desc: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+      <div className="text-xs uppercase tracking-[0.22em] text-white/55">{i}</div>
+      <div className="mt-2 text-sm font-semibold text-white/90">{title}</div>
+      <div className="mt-2 text-sm text-white/65 leading-relaxed">{desc}</div>
+    </div>
+  );
+}
+
+function Quote({ text, who }: { text: string; who: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+      <div className="text-white/80 leading-relaxed">“{text}”</div>
+      <div className="mt-3 text-xs uppercase tracking-[0.22em] text-white/50">{who}</div>
+    </div>
+  );
+}
+
 function FAQItem({
   i,
   q,
@@ -544,5 +583,34 @@ function FAQItem({
       </div>
       {open && <div className="mt-3 text-sm text-white/65 leading-relaxed">{a}</div>}
     </button>
+  );
+}
+
+function Marquee() {
+  const items = ["AGENCY-LEVEL LOOK", "PIPELINE FEEL", "SEO READY", "PUBLISH FLOW", "CONVERSION FIRST", "FAST BY DEFAULT", "PREMIUM UI"];
+  return (
+    <div className="relative overflow-hidden">
+      <div className="flex gap-6 py-4 whitespace-nowrap animate-[marquee_18s_linear_infinite]">
+        {items.concat(items).map((t, idx) => (
+          <span
+            key={idx}
+            className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-4 py-2 text-xs uppercase tracking-[0.22em] text-white/65"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-white/50" />
+            {t}
+          </span>
+        ))}
+      </div>
+
+      <style jsx global>{`
+        @keyframes marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-[marquee_18s_linear_infinite] { animation: none !important; }
+        }
+      `}</style>
+    </div>
   );
 }
