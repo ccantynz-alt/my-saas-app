@@ -1,392 +1,215 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
-
-type Phase =
-  | "idle"
-  | "frameIn"
-  | "typing"
-  | "heroIn"
-  | "sectionsIn"
-  | "pricingIn"
-  | "badgesIn"
-  | "done";
-
-type Badge = { label: string; done: boolean };
+import React, { useEffect, useMemo, useState } from "react";
 
 const SESSION_KEY = "d8_home_demo_v1_played";
 
-function cn(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
-}
-
-function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
+function useOncePerSession(): [boolean, () => void] {
+  const [shouldPlay, setShouldPlay] = useState(false);
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(!!mq.matches);
-    update();
-    if (typeof mq.addEventListener === "function") mq.addEventListener("change", update);
-    else mq.addListener(update);
-    return () => {
-      if (typeof mq.removeEventListener === "function") mq.removeEventListener("change", update);
-      else mq.removeListener(update);
-    };
+    try {
+      const played = window.sessionStorage.getItem(SESSION_KEY);
+      setShouldPlay(played !== "1");
+    } catch {
+      setShouldPlay(true);
+    }
   }, []);
-  return reduced;
+  const mark = () => {
+    try { window.sessionStorage.setItem(SESSION_KEY, "1"); } catch {}
+    setShouldPlay(false);
+  };
+  return [shouldPlay, mark];
 }
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function BrowserDot({ className }: { className?: string }) {
-  return <span className={cn("inline-block h-2.5 w-2.5 rounded-full", className)} />;
-}
-
-function MiniProgress({ value }: { value: number }) {
-  const v = clamp(value, 0, 100);
-  return (
-    <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
-      <div
-        className="h-full rounded-full bg-white/35 transition-all duration-300"
-        style={{ width: `${v}%` }}
-      />
-    </div>
-  );
-}
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 20 20" className={cn("h-4 w-4", className)} aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M7.667 13.2 4.4 9.933 3.333 11l4.334 4.334L16.667 6.334 15.6 5.267z"
-      />
-    </svg>
-  );
-}
-
-function Sparkle({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={cn("h-4 w-4", className)} aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M12 2l1.6 6.1L20 10l-6.4 1.9L12 18l-1.6-6.1L4 10l6.4-1.9L12 2z"
-        opacity="0.9"
-      />
-    </svg>
-  );
-}
-
-function useOncePerSession(): [boolean, () => void] {
-  const [shouldPlay, setShouldPlay] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const played = window.sessionStorage.getItem(SESSION_KEY);
-      setShouldPlay(played !== "1");
-    } catch {
-      // If sessionStorage is blocked, default to playing once.
-      setShouldPlay(true);
-    }
-  }, []);
-
-  const markPlayed = () => {
-    try {
-      window.sessionStorage.setItem(SESSION_KEY, "1");
-    } catch {
-      // ignore
-    }
-    setShouldPlay(false);
-  };
-
-  return [shouldPlay, markPlayed];
-}
-
-function useTyping(text: string, active: boolean, speedMs: number) {
-  const [out, setOut] = useState("");
-  useEffect(() => {
-    if (!active) return;
-    let i = 0;
-    setOut("");
-    const t = setInterval(() => {
-      i += 1;
-      setOut(text.slice(0, i));
-      if (i >= text.length) clearInterval(t);
-    }, speedMs);
-    return () => clearInterval(t);
-  }, [text, active, speedMs]);
-  return out;
-}
-
-function DemoBrowser({
-  play,
-  onDone,
-}: {
-  play: boolean;
-  onDone: () => void;
-}) {
-  const reducedMotion = usePrefersReducedMotion();
-
-  const [phase, setPhase] = useState<Phase>("idle");
+function Demo({ play, onDone }: { play: boolean; onDone: () => void }) {
   const [progress, setProgress] = useState(0);
-
-  const headlineFull = "Grow your business with a website that converts.";
-  const typed = useTyping(headlineFull, phase === "typing" && !reducedMotion, 22);
-
-  const badgesBase: Badge[] = useMemo(
-    () => [
-      { label: "SEO Ready", done: false },
-      { label: "Sitemap Generated", done: false },
-      { label: "Published", done: false },
-    ],
-    []
-  );
-  const [badges, setBadges] = useState<Badge[]>(badgesBase);
-
-  const timeouts = useRef<number[]>([]);
-  const clearAll = () => {
-    timeouts.current.forEach((id) => window.clearTimeout(id));
-    timeouts.current = [];
-  };
-
-  const schedule = (fn: () => void, ms: number) => {
-    const id = window.setTimeout(fn, ms);
-    timeouts.current.push(id);
-  };
+  const [headline, setHeadline] = useState("");
+  const full = "Grow your business with a website that converts.";
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    clearAll();
+    let timers: number[] = [];
+    const add = (fn: () => void, ms: number) => {
+      const id = window.setTimeout(fn, ms);
+      timers.push(id);
+    };
 
-    // Reset state whenever play toggles on/off
-    setPhase("idle");
-    setProgress(0);
-    setBadges(badgesBase);
+    // Reset
+    setProgress(play ? 0 : 100);
+    setHeadline(play ? "" : full);
 
-    if (!play) {
-      // Calm state: show final, no animation
-      setPhase("done");
-      setProgress(100);
-      setBadges(badgesBase.map((b) => ({ ...b, done: true })));
-      return;
-    }
+    if (!play) return;
 
-    if (reducedMotion) {
-      // Reduced motion: skip animation but still communicate the value
-      setPhase("done");
-      setProgress(100);
-      setBadges(badgesBase.map((b) => ({ ...b, done: true })));
-      schedule(() => onDone(), 350);
-      return;
-    }
+    // Type
+    add(() => setHeadline(full.slice(0, 6)), 250);
+    add(() => setHeadline(full.slice(0, 14)), 450);
+    add(() => setHeadline(full.slice(0, 22)), 650);
+    add(() => setHeadline(full.slice(0, 30)), 900);
+    add(() => setHeadline(full), 1200);
 
-    // Timeline (~5 seconds total)
-    schedule(() => setPhase("frameIn"), 150);
-    schedule(() => setPhase("typing"), 520);
-    schedule(() => setPhase("heroIn"), 1500);
-    schedule(() => setPhase("sectionsIn"), 2300);
-    schedule(() => setPhase("pricingIn"), 3100);
-    schedule(() => setPhase("badgesIn"), 3700);
-    schedule(() => setPhase("done"), 5000);
-    schedule(() => onDone(), 5200);
-
-    // Smooth progress
-    const progTimers: Array<[number, number]> = [
-      [650, 18],
-      [1150, 32],
-      [1750, 46],
-      [2400, 62],
-      [3150, 78],
-      [3850, 92],
-      [5000, 100],
+    // Progress (finish ~4.5s)
+    const steps: Array<[number, number]> = [
+      [300, 18], [800, 35], [1400, 55], [2200, 72], [3100, 86], [4200, 100]
     ];
-    progTimers.forEach(([ms, val]) => schedule(() => setProgress(val), ms));
+    steps.forEach(([ms, v]) => add(() => setProgress(v), ms));
 
-    // Badges tick
-    schedule(
-      () => setBadges((prev) => prev.map((b, i) => (i === 0 ? { ...b, done: true } : b))),
-      3950
-    );
-    schedule(
-      () => setBadges((prev) => prev.map((b, i) => (i === 1 ? { ...b, done: true } : b))),
-      4350
-    );
-    schedule(
-      () => setBadges((prev) => prev.map((b, i) => (i === 2 ? { ...b, done: true } : b))),
-      4750
-    );
+    add(() => onDone(), 4700);
 
-    return () => clearAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [play, reducedMotion]); // badgesBase is stable via useMemo
+    return () => { timers.forEach((id) => window.clearTimeout(id)); };
+  }, [play, onDone]);
 
-  const showCursor = phase === "typing" && typed.length < headlineFull.length;
+  const p = clamp(progress, 0, 100);
 
-  const finalHeadline = reducedMotion || phase === "done" ? headlineFull : typed;
+  const card: React.CSSProperties = {
+    borderRadius: 18,
+    border: "1px solid rgba(255,255,255,0.14)",
+    background: "rgba(0,0,0,0.35)",
+    boxShadow: "0 25px 60px rgba(0,0,0,0.45)",
+    overflow: "hidden",
+    backdropFilter: "blur(14px)",
+  };
+
+  const bar: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "12px 14px",
+    borderBottom: "1px solid rgba(255,255,255,0.10)",
+    background: "rgba(0,0,0,0.35)",
+  };
+
+  const dot = (c: string): React.CSSProperties => ({
+    width: 10, height: 10, borderRadius: 999, background: c, opacity: 0.85
+  });
+
+  const pill: React.CSSProperties = {
+    marginLeft: "auto",
+    marginRight: "auto",
+    padding: "6px 12px",
+    borderRadius: 999,
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "rgba(255,255,255,0.06)",
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 11,
+    letterSpacing: 0.6,
+  };
+
+  const body: React.CSSProperties = { padding: 16 };
+
+  const block: React.CSSProperties = {
+    borderRadius: 14,
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "rgba(255,255,255,0.06)",
+    padding: 14,
+    marginBottom: 10,
+  };
+
+  const label: React.CSSProperties = {
+    fontSize: 11,
+    letterSpacing: 2.6,
+    textTransform: "uppercase",
+    color: "rgba(255,255,255,0.62)",
+  };
+
+  const line: React.CSSProperties = {
+    height: 6,
+    borderRadius: 999,
+    background: "rgba(255,255,255,0.16)",
+    marginTop: 10,
+  };
+
+  const progressWrap: React.CSSProperties = {
+    height: 8,
+    borderRadius: 999,
+    background: "rgba(255,255,255,0.10)",
+    overflow: "hidden",
+    marginTop: 10,
+  };
+
+  const progressFill: React.CSSProperties = {
+    height: "100%",
+    width: p + "%",
+    background: "rgba(255,255,255,0.35)",
+    transition: "width 250ms ease",
+  };
+
+  const badge: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "8px 10px",
+    borderRadius: 999,
+    border: "1px solid rgba(255,255,255,0.14)",
+    background: "rgba(255,255,255,0.06)",
+    color: "rgba(255,255,255,0.86)",
+    fontSize: 12,
+    marginRight: 8,
+    marginTop: 8,
+  };
 
   return (
-    <div className="relative">
-      {/* Soft glow behind the demo */}
-      <div className="pointer-events-none absolute -inset-6 rounded-3xl bg-gradient-to-b from-white/12 via-white/6 to-transparent blur-2xl" />
+    <div style={card}>
+      <div style={bar}>
+        <span style={dot("rgba(255,95,86,1)")} />
+        <span style={dot("rgba(255,189,46,1)")} />
+        <span style={dot("rgba(39,201,63,1)")} />
+        <div style={pill}>dominat8.com / preview</div>
+      </div>
 
-      <div
-        className={cn(
-          "relative overflow-hidden rounded-3xl border border-white/12 bg-black/35 shadow-2xl backdrop-blur-xl",
-          "transition-transform duration-700",
-          play && phase !== "idle" ? "translate-y-0 opacity-100" : "translate-y-2 opacity-95"
-        )}
-      >
-        {/* Browser bar */}
-        <div className="flex items-center gap-3 border-b border-white/10 bg-black/35 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <BrowserDot className="bg-red-400/80" />
-            <BrowserDot className="bg-yellow-300/80" />
-            <BrowserDot className="bg-green-400/80" />
+      <div style={body}>
+        <div style={block}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={label}>Generating homepage</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.62)" }}>{p}%</div>
           </div>
-          <div className="flex-1">
-            <div className="mx-auto flex max-w-[420px] items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/70">
-              dominat8.com / preview
-            </div>
+          <div style={progressWrap}><div style={progressFill} /></div>
+          <div style={{ marginTop: 12, fontSize: 16, fontWeight: 700, color: "rgba(255,255,255,0.94)", lineHeight: 1.35 }}>
+            {headline || (play ? " " : full)}
           </div>
-          <div className="hidden sm:flex items-center gap-2 text-white/60">
-            <Sparkle className="opacity-80" />
-            <span className="text-[11px] tracking-wide">Live Builder</span>
+          <div style={{ marginTop: 8, fontSize: 12, color: "rgba(255,255,255,0.62)" }}>
+            Sections assemble automatically — no coding, no templates, no fuss.
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-5 sm:p-6">
-          {/* Top: headline typing */}
-          <div className="mb-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="mb-2 flex items-center justify-between">
-              <div className="text-[11px] uppercase tracking-[0.28em] text-white/55">
-                Generating homepage
-              </div>
-              <div className="text-[11px] text-white/55">{progress}%</div>
-            </div>
-            <MiniProgress value={progress} />
-            <div className="mt-4 text-sm sm:text-base font-semibold text-white">
-              <span>{finalHeadline}</span>
-              {showCursor && (
-                <span className="ml-1 inline-block w-[8px] animate-pulse rounded-sm bg-white/80 align-middle">
-                  &nbsp;
-                </span>
-              )}
-            </div>
-            <div className="mt-2 text-xs text-white/60">
-              Sections assemble automatically — no coding, no templates, no fuss.
-            </div>
+        <div style={block}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.92)" }}>Hero</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.62)" }}>Headline + CTA</div>
           </div>
+          <div style={line} />
+          <div style={{ ...line, width: "72%", opacity: 0.8 }} />
+          <div style={{ marginTop: 12, width: 120, height: 34, borderRadius: 999, background: "rgba(255,255,255,0.14)" }} />
+        </div>
 
-          {/* Middle: sections (slide in) */}
-          <div className="grid gap-3">
-            <div
-              className={cn(
-                "rounded-2xl border border-white/10 bg-white/5 p-4 transition-all duration-700",
-                phase === "heroIn" || phase === "sectionsIn" || phase === "pricingIn" || phase === "badgesIn" || phase === "done"
-                  ? "translate-x-0 opacity-100"
-                  : "translate-x-2 opacity-0"
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold text-white">Hero</div>
-                <div className="text-[11px] text-white/55">Headline + CTA</div>
-              </div>
-              <div className="mt-3 flex gap-2">
-                <div className="h-2 w-2/3 rounded-full bg-white/20" />
-                <div className="h-2 w-1/3 rounded-full bg-white/10" />
-              </div>
-              <div className="mt-3 h-8 w-28 rounded-full bg-white/15" />
-            </div>
-
-            <div
-              className={cn(
-                "rounded-2xl border border-white/10 bg-white/5 p-4 transition-all duration-700",
-                phase === "sectionsIn" || phase === "pricingIn" || phase === "badgesIn" || phase === "done"
-                  ? "translate-x-0 opacity-100"
-                  : "translate-x-2 opacity-0"
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold text-white">Features</div>
-                <div className="text-[11px] text-white/55">Trust + clarity</div>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                <div className="h-10 rounded-xl bg-white/10" />
-                <div className="h-10 rounded-xl bg-white/10" />
-                <div className="h-10 rounded-xl bg-white/10" />
-              </div>
-            </div>
-
-            <div
-              className={cn(
-                "rounded-2xl border border-white/10 bg-white/5 p-4 transition-all duration-700",
-                phase === "pricingIn" || phase === "badgesIn" || phase === "done"
-                  ? "translate-x-0 opacity-100"
-                  : "translate-x-2 opacity-0"
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-semibold text-white">Pricing</div>
-                <div className="text-[11px] text-white/55">Simple plans</div>
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                  <div className="text-[11px] text-white/60">Starter</div>
-                  <div className="mt-1 h-3 w-16 rounded-full bg-white/20" />
-                  <div className="mt-3 h-8 w-full rounded-lg bg-white/10" />
-                </div>
-                <div className="rounded-xl border border-white/15 bg-white/8 p-3">
-                  <div className="text-[11px] text-white/70">Pro</div>
-                  <div className="mt-1 h-3 w-20 rounded-full bg-white/25" />
-                  <div className="mt-3 h-8 w-full rounded-lg bg-white/15" />
-                </div>
-              </div>
-            </div>
+        <div style={block}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.92)" }}>Features</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.62)" }}>Trust + clarity</div>
           </div>
-
-          {/* Bottom: badges tick */}
-          <div
-            className={cn(
-              "mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 transition-all duration-700",
-              phase === "badgesIn" || phase === "done" ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-semibold text-white">Ready to launch</div>
-              <div className="text-[11px] text-white/55">Auto-complete</div>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {badges.map((b) => (
-                <div
-                  key={b.label}
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs",
-                    b.done ? "border-white/18 bg-white/10 text-white" : "border-white/10 bg-white/5 text-white/70"
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "inline-flex h-5 w-5 items-center justify-center rounded-full border",
-                      b.done ? "border-white/25 bg-white/10 text-white" : "border-white/10 bg-white/5 text-white/50"
-                    )}
-                  >
-                    {b.done ? <CheckIcon /> : <span className="text-[10px]">•</span>}
-                  </span>
-                  <span className="tracking-wide">{b.label}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-3 text-xs text-white/60">
-              Animation plays once — then the page stays calm and readable.
-            </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 12 }}>
+            <div style={{ height: 46, borderRadius: 12, background: "rgba(255,255,255,0.10)" }} />
+            <div style={{ height: 46, borderRadius: 12, background: "rgba(255,255,255,0.10)" }} />
+            <div style={{ height: 46, borderRadius: 12, background: "rgba(255,255,255,0.10)" }} />
           </div>
+        </div>
+
+        <div style={block}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.92)" }}>Ready to launch</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.62)" }}>Auto-complete</div>
+          </div>
+          <div>
+            <span style={badge}>✓ SEO Ready</span>
+            <span style={badge}>✓ Sitemap Generated</span>
+            <span style={badge}>✓ Published</span>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>
+          LIVE_MARKER: HOME_EMERGENCY_20260126_082428
         </div>
       </div>
     </div>
@@ -396,70 +219,163 @@ function DemoBrowser({
 export default function HomeClient() {
   const [shouldPlay, markPlayed] = useOncePerSession();
 
-  // When the demo completes, mark session as played so it won't repeat
-  const handleDone = () => markPlayed();
+  const shell: React.CSSProperties = {
+    minHeight: "72vh",
+    padding: "64px 22px",
+    color: "white",
+    fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial",
+    background:
+      "radial-gradient(1200px 600px at 20% 10%, rgba(255,255,255,0.10), transparent 60%)," +
+      "radial-gradient(900px 500px at 90% 30%, rgba(255,255,255,0.08), transparent 55%)," +
+      "linear-gradient(180deg, #050608 0%, #07080b 55%, #06070a 100%)",
+  };
+
+  const wrap: React.CSSProperties = {
+    maxWidth: 1180,
+    margin: "0 auto",
+    display: "grid",
+    gap: 34,
+    alignItems: "center",
+    gridTemplateColumns: "1.05fr 0.95fr",
+  };
+
+  const left: React.CSSProperties = {};
+  const tag: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "10px 14px",
+    borderRadius: 999,
+    border: "1px solid rgba(255,255,255,0.14)",
+    background: "rgba(255,255,255,0.06)",
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 12,
+    letterSpacing: 2.2,
+    textTransform: "uppercase",
+  };
+
+  const h1: React.CSSProperties = {
+    marginTop: 18,
+    fontSize: 46,
+    lineHeight: 1.06,
+    letterSpacing: -1.2,
+    fontWeight: 800,
+  };
+
+  const p: React.CSSProperties = {
+    marginTop: 16,
+    fontSize: 16,
+    lineHeight: 1.65,
+    color: "rgba(255,255,255,0.72)",
+    maxWidth: 560,
+  };
+
+  const row: React.CSSProperties = { marginTop: 22, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" };
+
+  const primary: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "12px 16px",
+    borderRadius: 14,
+    background: "white",
+    color: "black",
+    fontWeight: 800,
+    textDecoration: "none",
+    boxShadow: "0 14px 30px rgba(0,0,0,0.35)",
+  };
+
+  const secondary: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "12px 16px",
+    borderRadius: 14,
+    border: "1px solid rgba(255,255,255,0.16)",
+    background: "rgba(255,255,255,0.06)",
+    color: "rgba(255,255,255,0.92)",
+    fontWeight: 700,
+    textDecoration: "none",
+  };
+
+  const small: React.CSSProperties = { fontSize: 12, color: "rgba(255,255,255,0.60)" };
+
+  const cards: React.CSSProperties = {
+    marginTop: 24,
+    display: "grid",
+    gap: 12,
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    maxWidth: 640,
+  };
+
+  const infoCard: React.CSSProperties = {
+    borderRadius: 16,
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "rgba(255,255,255,0.06)",
+    padding: 14,
+  };
+
+  const title: React.CSSProperties = { fontSize: 13, fontWeight: 800 };
+  const sub: React.CSSProperties = { marginTop: 6, fontSize: 12, color: "rgba(255,255,255,0.62)" };
+
+  const right: React.CSSProperties = { minWidth: 0 };
+
+  // Mobile fallback: stack columns
+  const mobileCss = 
+@media (max-width: 980px) {
+  .d8-wrap { grid-template-columns: 1fr !important; }
+  .d8-h1 { font-size: 38px !important; }
+  .d8-cards { grid-template-columns: 1fr !important; max-width: 520px !important; }
+}
+;
 
   return (
-    <section className="relative w-full">
-      <div className="mx-auto w-full max-w-7xl px-6 py-14 sm:py-18 lg:py-20">
-        <div className="grid items-center gap-10 lg:grid-cols-2">
-          {/* Left: hero copy */}
-          <div className="relative">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-4 py-2 text-xs text-white/75">
-              <Sparkle className="opacity-80" />
-              <span className="tracking-[0.18em] uppercase">AI Website Automation</span>
+    <section style={shell}>
+      <style>{mobileCss}</style>
+
+      <div style={wrap} className="d8-wrap">
+        <div style={left}>
+          <div style={tag}>AI Website Automation</div>
+
+          <h1 style={h1} className="d8-h1">
+            Your site, built for you.
+            <span style={{ display: "block", color: "rgba(255,255,255,0.78)", fontWeight: 800 }}>
+              From idea to published — fast.
+            </span>
+          </h1>
+
+          <p style={p}>
+            Dominat8 assembles a conversion-focused website automatically: structure, sections, and launch-ready output — without the usual setup.
+          </p>
+
+          <div style={row}>
+            <a href="/builder" style={primary}>Start building</a>
+            <a href="/templates" style={secondary}>View examples</a>
+            <span style={small}>No credit card required</span>
+          </div>
+
+          <div style={cards} className="d8-cards">
+            <div style={infoCard}>
+              <div style={title}>Fast</div>
+              <div style={sub}>Assembles pages in minutes</div>
             </div>
-
-            <h1 className="mt-6 text-4xl font-bold tracking-tight text-white sm:text-5xl">
-              Your site, built for you.
-              <span className="block text-white/80">From idea to published — fast.</span>
-            </h1>
-
-            <p className="mt-5 max-w-xl text-base leading-relaxed text-white/70">
-              Dominat8 assembles a conversion-focused website automatically: structure, sections, and launch-ready output —
-              without the usual setup.
-            </p>
-
-            <div className="mt-7 flex flex-wrap items-center gap-3">
-              <a
-                href="/builder"
-                className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-black shadow-lg shadow-black/20 transition hover:opacity-90"
-              >
-                Start building
-              </a>
-
-              <a
-                href="/templates"
-                className="inline-flex items-center justify-center rounded-xl border border-white/14 bg-white/5 px-5 py-3 text-sm font-semibold text-white/90 backdrop-blur transition hover:bg-white/8"
-              >
-                View examples
-              </a>
-
-              <div className="ml-0 mt-2 w-full text-xs text-white/55 sm:ml-2 sm:mt-0 sm:w-auto">
-                No credit card required
-              </div>
+            <div style={infoCard}>
+              <div style={title}>Structured</div>
+              <div style={sub}>Designed to convert</div>
             </div>
-
-            <div className="mt-8 grid max-w-xl grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs font-semibold text-white">Fast</div>
-                <div className="mt-1 text-xs text-white/60">Assembles pages in minutes</div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs font-semibold text-white">Structured</div>
-                <div className="mt-1 text-xs text-white/60">Designed to convert</div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="text-xs font-semibold text-white">Launch-ready</div>
-                <div className="mt-1 text-xs text-white/60">SEO + sitemap included</div>
-              </div>
+            <div style={infoCard}>
+              <div style={title}>Launch-ready</div>
+              <div style={sub}>SEO + sitemap included</div>
             </div>
           </div>
 
-          {/* Right: live builder preview demo */}
-          <div className="relative lg:pl-2">
-            <DemoBrowser play={shouldPlay} onDone={handleDone} />
+          <div style={{ marginTop: 14, fontSize: 11, color: "rgba(255,255,255,0.50)" }}>
+            LIVE_MARKER: HOME_EMERGENCY_20260126_082428
           </div>
+        </div>
+
+        <div style={right}>
+          <Demo play={shouldPlay} onDone={markPlayed} />
         </div>
       </div>
     </section>
