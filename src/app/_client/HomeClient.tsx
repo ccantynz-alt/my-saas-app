@@ -23,7 +23,6 @@ function useParallax() {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => setP({ x: 0, y: 0 }));
     }
-
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("blur", onLeave);
     return () => {
@@ -36,62 +35,40 @@ function useParallax() {
   return p;
 }
 
-function Icon({ kind }: { kind: "site" | "wp" | "shop" | "mail" | "ai" }) {
+function Icon({ name }: { name: "spark" | "shield" | "wand" | "rocket" }) {
   const common = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none" as const };
-  if (kind === "site") {
+  if (name === "shield") {
     return (
       <svg {...common} aria-hidden="true">
-        <path d="M4 6h16v12H4V6z" stroke="currentColor" strokeWidth="1.6" />
-        <path d="M4 9h16" stroke="currentColor" strokeWidth="1.6" />
-        <path d="M7 7.5h.01M10 7.5h.01" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <path d="M12 3l8 4v6c0 5-3.5 8.4-8 9-4.5-.6-8-4-8-9V7l8-4z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+        <path d="M9.5 12l1.7 1.7L15 9.9" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
-  if (kind === "wp") {
+  if (name === "wand") {
     return (
       <svg {...common} aria-hidden="true">
-        <path d="M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" stroke="currentColor" strokeWidth="1.6" />
-        <path
-          d="M7.5 9.5c.8 0 1.3.5 1.6 1.2l2.2 6 1.6-4.4-1-2.8c-.2-.6.2-1.1.8-1.1.5 0 .8.3 1 .8l2.1 6.2"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinejoin="round"
-        />
+        <path d="M4 20l10-10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        <path d="M9 5l3 3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        <path d="M14 2l2 2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        <path d="M12 8l4 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        <path d="M18 10l2 2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
       </svg>
     );
   }
-  if (kind === "shop") {
+  if (name === "rocket") {
     return (
       <svg {...common} aria-hidden="true">
-        <path d="M6 9l2-4h8l2 4" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-        <path d="M5 9h14v10H5V9z" stroke="currentColor" strokeWidth="1.6" />
-        <path d="M9 13h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      </svg>
-    );
-  }
-  if (kind === "mail") {
-    return (
-      <svg {...common} aria-hidden="true">
-        <path d="M4 7h16v10H4V7z" stroke="currentColor" strokeWidth="1.6" />
-        <path d="M4 8l8 6 8-6" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M14 4c3 1 6 4 6 7-3 0-6-3-7-6l1-1z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M13 5c-5 1-8 6-8 11 5 0 10-3 11-8" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="M9 15l-2 5 5-2" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
       </svg>
     );
   }
   return (
     <svg {...common} aria-hidden="true">
-      <path
-        d="M12 2l1.2 5.2L18 9l-4.8 1.8L12 16l-1.2-5.2L6 9l4.8-1.8L12 2z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M4 15l.7 3 3 .7-3 .7-.7 3-.7-3-3-.7 3-.7.7-3z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
-        opacity="0.95"
-      />
+      <path d="M12 2l1.2 5.2L18 9l-4.8 1.8L12 16l-1.2-5.2L6 9l4.8-1.8L12 2z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M4 15l.7 3 3 .7-3 .7-.7 3-.7-3-3-.7 3-.7.7-3z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" opacity="0.95" />
     </svg>
   );
 }
@@ -102,226 +79,454 @@ export default function HomeClient() {
   const p = useParallax();
 
   useEffect(() => {
-    const url = `/api/__probe__?ts=${Date.now()}`;
-    fetch(url, { cache: "no-store" })
+    fetch(`/api/__probe__?ts=${Date.now()}`, { cache: "no-store" })
       .then((r) => setProbeOk(r.ok))
       .catch(() => setProbeOk(false));
   }, []);
 
-  const trust = probeOk === null ? "Checking…" : probeOk ? "LIVE_OK" : "WARN";
-
-  const cards = [
-    { label: "Launch a website", icon: "site" as const },
-    { label: "Transfer WordPress sites", icon: "wp" as const },
-    { label: "Sell online", icon: "shop" as const, active: true },
-    { label: "Send email campaigns", icon: "mail" as const },
-    { label: "Code with AI", icon: "ai" as const },
-  ];
+  const live = probeOk === null ? "Checking…" : probeOk ? "LIVE_OK" : "WARN";
 
   return (
     <>
       <style>{`
         :root{
-          --bg:#0b0e11;
-          --ink:#ffffff;
+          --bg:#070A0F;
+          --ink:rgba(255,255,255,.96);
+          --muted:rgba(255,255,255,.74);
+          --muted2:rgba(255,255,255,.58);
+          --line:rgba(255,255,255,.14);
+          --glass:rgba(0,0,0,.26);
+          --glass2:rgba(0,0,0,.36);
+          --shadow: 0 22px 70px rgba(0,0,0,.55);
+          --shadow2: 0 12px 34px rgba(0,0,0,.45);
+          --radius: 22px;
+          --radius2: 28px;
+          --max: 1160px;
         }
+
         *{ box-sizing:border-box; }
         html, body { margin:0; padding:0; background: var(--bg); color: var(--ink); }
         a{ color:inherit; text-decoration:none; }
+        ::selection{ background: rgba(255,255,255,.18); }
 
         .page{
           min-height: 100vh;
-          background: var(--bg);
           font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+          background: var(--bg);
         }
 
-        .bg{ position: fixed; inset: 0; pointer-events: none; overflow:hidden; }
+        /* FULL-PAGE “BACKGROUND IMAGE” LOOK (no external assets) */
+        .bg{
+          position: fixed;
+          inset: 0;
+          pointer-events: none;
+          overflow: hidden;
+        }
 
-        .bg .layer1{
-          position:absolute; inset:-10%;
-          transform: translate3d(calc(var(--px) * 22px), calc(var(--py) * 16px), 0) scale(1.06);
-          filter: blur(26px) saturate(1.12) contrast(1.05);
-          opacity: .85;
+        /* soft photo field */
+        .bg .photo{
+          position:absolute;
+          inset:-12%;
+          transform: translate3d(calc(var(--px) * 18px), calc(var(--py) * 14px), 0) scale(1.08);
+          filter: blur(22px) saturate(1.15) contrast(1.08);
+          opacity: .92;
           background:
-            radial-gradient(900px 520px at 18% 28%, rgba(255,255,255,.14), transparent 62%),
-            radial-gradient(720px 520px at 72% 38%, rgba(255,255,255,.10), transparent 62%),
-            radial-gradient(680px 420px at 78% 82%, rgba(255,255,255,.08), transparent 62%),
-            linear-gradient(120deg, rgba(255,255,255,.06), rgba(255,255,255,.02) 35%, rgba(0,0,0,.10));
+            radial-gradient(900px 580px at 18% 28%, rgba(255,255,255,.14), transparent 64%),
+            radial-gradient(720px 560px at 72% 36%, rgba(255,255,255,.12), transparent 62%),
+            radial-gradient(760px 520px at 62% 82%, rgba(255,255,255,.09), transparent 64%),
+            radial-gradient(520px 420px at 28% 78%, rgba(120,92,255,.18), transparent 70%),
+            linear-gradient(120deg, rgba(255,255,255,.06), rgba(255,255,255,.02) 40%, rgba(0,0,0,.14));
         }
 
+        /* hero spotlight */
+        .bg .spot{
+          position:absolute;
+          left: -140px;
+          top: -160px;
+          width: 700px;
+          height: 700px;
+          border-radius: 999px;
+          background: radial-gradient(circle at 40% 40%, rgba(140,120,255,.34), transparent 62%);
+          filter: blur(14px);
+          opacity: .55;
+          transform: translate3d(calc(var(--px) * -16px), calc(var(--py) * -10px), 0);
+        }
+
+        /* right “subject” glow */
         .bg .subject{
           position:absolute;
-          right: -120px;
-          bottom: -140px;
-          width: 620px;
-          height: 680px;
-          border-radius: 420px;
-          transform: translate3d(calc(var(--px) * -18px), calc(var(--py) * -14px), 0);
+          right: -160px;
+          bottom: -220px;
+          width: 740px;
+          height: 740px;
+          border-radius: 999px;
           background:
-            radial-gradient(closest-side at 55% 35%, rgba(255,255,255,.16), transparent 62%),
-            radial-gradient(closest-side at 50% 58%, rgba(255,255,255,.10), transparent 70%),
-            radial-gradient(circle at 55% 45%, rgba(255,255,255,.06), transparent 72%);
-          opacity: .75;
+            radial-gradient(circle at 40% 35%, rgba(255,255,255,.14), transparent 60%),
+            radial-gradient(circle at 55% 62%, rgba(0,255,210,.10), transparent 66%);
+          filter: blur(4px);
+          opacity: .66;
+          transform: translate3d(calc(var(--px) * -18px), calc(var(--py) * -14px), 0);
         }
 
+        /* vignette */
         .bg .vignette{
           position:absolute; inset:0;
           background:
-            radial-gradient(60% 55% at 40% 44%, rgba(0,0,0,.25), rgba(0,0,0,.62) 62%, rgba(0,0,0,.88) 100%),
-            radial-gradient(900px 520px at 22% 16%, rgba(255,255,255,.08), transparent 70%);
+            radial-gradient(60% 55% at 44% 38%, rgba(0,0,0,.18), rgba(0,0,0,.62) 62%, rgba(0,0,0,.88) 100%);
         }
 
+        /* grain for “photo” realism */
         .bg .grain{
           position:absolute; inset:0;
-          opacity:.10;
+          opacity:.12;
           background-image:
             repeating-linear-gradient(0deg, rgba(255,255,255,.06), rgba(255,255,255,.06) 1px, transparent 1px, transparent 2px);
           mix-blend-mode: overlay;
           filter: blur(.6px);
         }
 
-        .container{ width: min(1180px, calc(100% - 56px)); margin: 0 auto; }
+        .wrap{
+          position: relative;
+          z-index: 10;
+        }
 
-        .navWrap{
-          position: sticky; top: 0; z-index: 30;
-          backdrop-filter: blur(10px);
-          background: rgba(0,0,0,.18);
+        .container{
+          width: min(var(--max), calc(100% - 56px));
+          margin: 0 auto;
+        }
+
+        /* TOP NAV (premium, not SiteGround copy) */
+        .navBar{
+          position: sticky;
+          top: 0;
+          z-index: 40;
+          backdrop-filter: blur(14px);
+          background: rgba(0,0,0,.22);
+          border-bottom: 1px solid rgba(255,255,255,.10);
         }
         .nav{
-          height: 72px;
-          display:flex; align-items:center; justify-content:space-between; gap: 18px;
+          height: 76px;
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap: 16px;
         }
-        .brand{ display:flex; align-items:center; gap: 10px; font-weight: 950; letter-spacing: -0.02em; }
-        .mark{
-          width: 34px; height: 34px; border-radius: 12px;
+        .brand{
+          display:flex; align-items:center; gap: 10px;
+          font-weight: 950;
+          letter-spacing: -0.03em;
+        }
+        .logo{
+          width: 36px; height: 36px;
+          border-radius: 14px;
           background: rgba(255,255,255,.10);
-          border: 1px solid rgba(255,255,255,.12);
+          border: 1px solid rgba(255,255,255,.14);
+          box-shadow: 0 18px 60px rgba(0,0,0,.45);
           display:grid; place-items:center;
-          box-shadow: 0 10px 30px rgba(0,0,0,.35);
         }
-        .markDot{ width: 10px; height: 10px; border-radius: 999px; background: rgba(255,255,255,.9); box-shadow: 0 0 24px rgba(255,255,255,.24); }
-
+        .logoDot{
+          width: 10px; height: 10px; border-radius: 999px;
+          background: rgba(255,255,255,.92);
+          box-shadow: 0 0 30px rgba(255,255,255,.18);
+        }
         .navLinks{
-          display:none; gap: 22px;
-          font-size: 14px; color: rgba(255,255,255,.78);
-          font-weight: 800;
+          display:none;
+          gap: 22px;
+          color: rgba(255,255,255,.72);
+          font-weight: 850;
+          font-size: 14px;
         }
         .navLinks a:hover{ color: rgba(255,255,255,.92); }
 
         .navRight{
-          display:flex; align-items:center; gap: 14px;
-          color: rgba(255,255,255,.82);
-          font-size: 14px; font-weight: 900;
+          display:flex; align-items:center; gap: 12px;
         }
-        .navChip{
-          display:inline-flex; align-items:center; gap: 8px;
-          padding: 10px 14px;
+        .chip{
+          display:inline-flex; align-items:center; gap: 10px;
+          height: 40px;
+          padding: 0 14px;
           border-radius: 999px;
-          border: 1px solid rgba(255,255,255,.16);
+          border: 1px solid rgba(255,255,255,.14);
           background: rgba(255,255,255,.08);
+          color: rgba(255,255,255,.86);
+          font-weight: 900;
+          font-size: 13px;
+          box-shadow: 0 12px 34px rgba(0,0,0,.26);
         }
-        .navChip:hover{ background: rgba(255,255,255,.10); }
+        .chip:hover{ background: rgba(255,255,255,.10); }
+        .chipPrimary{
+          background: rgba(255,255,255,.92);
+          color: #0b1220;
+          border: none;
+        }
+        .chipPrimary:hover{ background: rgba(255,255,255,.98); }
 
-        .hero{ position: relative; z-index: 10; padding: 52px 0 70px; }
+        /* HERO */
+        .hero{
+          padding: 72px 0 42px;
+        }
         .heroGrid{
-          display:grid; grid-template-columns: 1fr; gap: 34px; align-items:center;
-          min-height: calc(100vh - 72px);
+          display:grid;
+          grid-template-columns: 1fr;
+          gap: 28px;
+          align-items:start;
+          min-height: calc(86vh - 76px);
         }
 
         .pill{
-          display:inline-flex; align-items:center; gap: 10px;
-          padding: 8px 12px; border-radius: 999px;
+          display:inline-flex;
+          align-items:center;
+          gap: 10px;
+          padding: 9px 12px;
+          border-radius: 999px;
           border: 1px solid rgba(255,255,255,.14);
-          background: rgba(255,255,255,.08);
+          background: rgba(0,0,0,.22);
           color: rgba(255,255,255,.80);
-          font-size: 12px; font-weight: 950;
-          letter-spacing: .08em; text-transform: uppercase;
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: .12em;
+          text-transform: uppercase;
+          backdrop-filter: blur(12px);
         }
+
         .h1{
           margin: 18px 0 0;
-          font-size: 56px; line-height: 1.02;
-          letter-spacing: -0.04em;
-          font-weight: 950;
+          font-size: 58px;
+          line-height: 1.01;
+          letter-spacing: -0.05em;
+          font-weight: 1000;
           color: rgba(255,255,255,.96);
-          max-width: 18ch;
+        }
+        .gradientWord{
+          background: linear-gradient(90deg, rgba(145,125,255,.95), rgba(92,255,230,.90), rgba(255,255,255,.92));
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
         }
         .sub{
           margin: 18px 0 0;
-          font-size: 18px; line-height: 1.55;
+          font-size: 18px;
+          line-height: 1.6;
           color: rgba(255,255,255,.74);
-          max-width: 58ch;
+          max-width: 64ch;
         }
-        .ctaRow{ margin-top: 24px; display:flex; gap: 14px; flex-wrap:wrap; align-items:center; }
+
+        .ctaRow{
+          margin-top: 26px;
+          display:flex;
+          flex-wrap:wrap;
+          gap: 12px;
+          align-items:center;
+        }
         .btn{
-          height: 48px; padding: 0 18px; border-radius: 999px;
-          display:inline-flex; align-items:center; justify-content:center;
-          font-weight: 950; letter-spacing: .02em;
-          border: 1px solid rgba(255,255,255,.12);
+          height: 50px;
+          padding: 0 18px;
+          border-radius: 999px;
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          font-weight: 1000;
+          letter-spacing: .02em;
+          border: 1px solid rgba(255,255,255,.14);
           background: rgba(255,255,255,.10);
           color: rgba(255,255,255,.92);
-          box-shadow: 0 12px 34px rgba(0,0,0,.28);
+          box-shadow: 0 18px 60px rgba(0,0,0,.42);
         }
         .btn:hover{ background: rgba(255,255,255,.12); }
-        .btnPrimary{ background: rgba(255,255,255,.92); color: #0c1015; border: none; }
+        .btnPrimary{
+          background: rgba(255,255,255,.92);
+          color: #0b1220;
+          border: none;
+        }
         .btnPrimary:hover{ background: rgba(255,255,255,.98); }
 
-        .proofLine{ margin-top: 18px; font-size: 12px; color: rgba(255,255,255,.55); }
-        .proofLine b{ color: rgba(255,255,255,.74); font-weight: 950; }
-
-        .stack{ position: relative; width: 100%; max-width: 520px; margin-left: auto; }
-        .stackWrap{ position: relative; padding-top: 10px; }
-        .stackCard{
-          position: relative;
-          display:flex; align-items:center; gap: 12px;
-          padding: 16px 18px; border-radius: 18px;
+        /* Right panel: “Preview” glass card */
+        .glass{
+          border-radius: var(--radius2);
           border: 1px solid rgba(255,255,255,.14);
-          background: rgba(0,0,0,.28);
-          backdrop-filter: blur(14px);
-          box-shadow: 0 22px 64px rgba(0,0,0,.48);
-          color: rgba(255,255,255,.88);
-          font-weight: 950; letter-spacing: -0.01em;
-          margin-left: auto; margin-bottom: 14px;
-          transition: transform 240ms ease, background 240ms ease, border-color 240ms ease;
+          background: rgba(0,0,0,.26);
+          backdrop-filter: blur(16px);
+          box-shadow: var(--shadow);
+          overflow:hidden;
         }
-        .stackCard:hover{ transform: translateY(-2px); background: rgba(0,0,0,.34); border-color: rgba(255,255,255,.18); }
-        .iconBox{
-          width: 40px; height: 40px; border-radius: 14px;
+        .glassTop{
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          padding: 16px 16px 14px;
+          border-bottom: 1px solid rgba(255,255,255,.10);
+        }
+        .glassTitle{
+          font-weight: 950;
+          letter-spacing: -0.02em;
+        }
+        .statusPill{
+          display:inline-flex;
+          align-items:center;
+          gap: 8px;
+          padding: 7px 10px;
+          border-radius: 999px;
+          border: 1px solid rgba(255,255,255,.14);
+          background: rgba(255,255,255,.08);
+          font-size: 12px;
+          font-weight: 950;
+          color: rgba(255,255,255,.88);
+        }
+        .dot{
+          width: 8px; height: 8px; border-radius: 999px;
+          background: rgba(92,255,230,.88);
+          box-shadow: 0 0 22px rgba(92,255,230,.28);
+        }
+
+        .glassBody{
+          padding: 16px;
+          display:grid;
+          gap: 10px;
+        }
+        .step{
+          display:flex;
+          gap: 12px;
+          align-items:flex-start;
+          padding: 12px 12px;
+          border-radius: 16px;
+          border: 1px solid rgba(255,255,255,.10);
+          background: rgba(0,0,0,.22);
+        }
+        .stepIcon{
+          width: 36px; height: 36px;
+          border-radius: 14px;
           display:grid; place-items:center;
           background: rgba(255,255,255,.08);
           border: 1px solid rgba(255,255,255,.12);
           color: rgba(255,255,255,.88);
         }
-        .check{
-          position:absolute; right: -8px; top: 50%; transform: translateY(-50%);
-          width: 18px; height: 18px; border-radius: 999px;
-          background: rgba(34,197,94,.95);
-          box-shadow: 0 0 0 6px rgba(34,197,94,.14);
-          display:grid; place-items:center;
-          color: #08110c; font-weight: 950; font-size: 12px;
+        .stepTitle{
+          font-weight: 950;
+          letter-spacing: -0.01em;
+        }
+        .stepText{
+          margin-top: 2px;
+          font-size: 13px;
+          line-height: 1.45;
+          color: rgba(255,255,255,.68);
         }
 
-        .stackCard:nth-child(1){ width: 260px; opacity:.88; transform: translateX(-12px); }
-        .stackCard:nth-child(2){ width: 340px; opacity:.92; transform: translateX(-26px); }
-        .stackCard:nth-child(3){ width: 420px; opacity:1;  transform: translateX(-44px); }
-        .stackCard:nth-child(4){ width: 360px; opacity:.92; transform: translateX(-30px); }
-        .stackCard:nth-child(5){ width: 240px; opacity:.84; transform: translateX(-10px); }
+        /* Proof strip */
+        .proofStrip{
+          margin-top: 18px;
+          padding: 12px 14px;
+          border-radius: 18px;
+          border: 1px solid rgba(255,255,255,.12);
+          background: rgba(0,0,0,.20);
+          backdrop-filter: blur(12px);
+          color: rgba(255,255,255,.70);
+          font-size: 12px;
+          display:flex;
+          flex-wrap:wrap;
+          gap: 10px 14px;
+          align-items:center;
+        }
+        .proofStrip b{ color: rgba(255,255,255,.86); font-weight: 1000; }
+
+        /* Feature grid */
+        .section{
+          padding: 26px 0 64px;
+        }
+        .sectionTitle{
+          font-size: 12px;
+          letter-spacing: .18em;
+          font-weight: 950;
+          text-transform: uppercase;
+          color: rgba(255,255,255,.62);
+        }
+        .sectionH2{
+          margin: 10px 0 0;
+          font-size: 32px;
+          letter-spacing: -0.03em;
+          font-weight: 1000;
+        }
+
+        .cards{
+          margin-top: 18px;
+          display:grid;
+          grid-template-columns: 1fr;
+          gap: 14px;
+        }
+        .card{
+          border-radius: var(--radius);
+          border: 1px solid rgba(255,255,255,.12);
+          background: rgba(0,0,0,.22);
+          backdrop-filter: blur(14px);
+          box-shadow: var(--shadow2);
+          padding: 16px;
+        }
+        .cardTop{
+          display:flex;
+          align-items:center;
+          gap: 10px;
+        }
+        .cardIcon{
+          width: 36px; height: 36px;
+          border-radius: 14px;
+          display:grid; place-items:center;
+          background: rgba(255,255,255,.08);
+          border: 1px solid rgba(255,255,255,.12);
+          color: rgba(255,255,255,.88);
+        }
+        .cardTitle{
+          font-weight: 1000;
+          letter-spacing: -0.01em;
+        }
+        .cardBody{
+          margin-top: 10px;
+          color: rgba(255,255,255,.70);
+          font-size: 14px;
+          line-height: 1.55;
+        }
+
+        /* Bottom CTA */
+        .bigCta{
+          margin-top: 18px;
+          border-radius: var(--radius2);
+          border: 1px solid rgba(255,255,255,.14);
+          background:
+            radial-gradient(800px 260px at 20% 30%, rgba(145,125,255,.20), transparent 70%),
+            radial-gradient(760px 260px at 72% 60%, rgba(92,255,230,.14), transparent 70%),
+            rgba(0,0,0,.24);
+          backdrop-filter: blur(16px);
+          box-shadow: var(--shadow);
+          padding: 18px;
+          display:flex;
+          gap: 14px;
+          align-items:center;
+          justify-content:space-between;
+          flex-wrap:wrap;
+        }
+        .bigCtaTitle{
+          font-weight: 1000;
+          letter-spacing: -0.02em;
+          font-size: 18px;
+        }
+        .bigCtaSub{
+          margin-top: 4px;
+          color: rgba(255,255,255,.70);
+          font-size: 13px;
+        }
 
         @media (min-width: 980px){
           .navLinks{ display:flex; }
-          .heroGrid{ grid-template-columns: 1.1fr .9fr; gap: 34px; }
-          .h1{ font-size: 72px; }
+          .heroGrid{ grid-template-columns: 1.15fr .85fr; gap: 28px; align-items:stretch; }
+          .h1{ font-size: 76px; }
+          .cards{ grid-template-columns: repeat(3, 1fr); }
         }
+
         @media (max-width: 520px){
           .container{ width: calc(100% - 28px); }
           .h1{ font-size: 44px; }
-          .stackCard:nth-child(1),
-          .stackCard:nth-child(2),
-          .stackCard:nth-child(3),
-          .stackCard:nth-child(4),
-          .stackCard:nth-child(5){
-            width: 100% !important;
-            transform: none !important;
-          }
+        }
+
+        @media (prefers-reduced-motion: reduce){
+          .bg .photo, .bg .spot, .bg .subject{ transform:none !important; }
         }
       `}</style>
 
@@ -335,80 +540,160 @@ export default function HomeClient() {
         }
       >
         <div className="bg" aria-hidden="true">
-          <div className="layer1" />
+          <div className="photo" />
+          <div className="spot" />
           <div className="subject" />
           <div className="vignette" />
           <div className="grain" />
         </div>
 
-        <div className="navWrap">
-          <div className="container">
-            <div className="nav">
-              <a className="brand" href="/">
-                <span className="mark"><span className="markDot" /></span>
-                <span>Dominat8</span>
-              </a>
+        <div className="wrap">
+          <div className="navBar">
+            <div className="container">
+              <div className="nav">
+                <a className="brand" href="/">
+                  <span className="logo"><span className="logoDot" /></span>
+                  <span>Dominat8</span>
+                </a>
 
-              <div className="navLinks">
-                <a href="/pricing">Web Hosting</a>
-                <a href="/use-cases">Website Building</a>
-                <a href="/templates">Templates</a>
-                <a href="/pricing">Pricing</a>
-                <a href="/contact">Email Marketing</a>
-              </div>
+                <div className="navLinks">
+                  <a href="/templates">Gallery</a>
+                  <a href="/use-cases">Use cases</a>
+                  <a href="/pricing">Pricing</a>
+                  <a href="/contact">Support</a>
+                </div>
 
-              <div className="navRight">
-                <a className="navChip" href="/contact">Get in Touch</a>
-                <a className="navChip" href="/app">Login</a>
+                <div className="navRight">
+                  <a className="chip" href="/pricing">See pricing</a>
+                  <a className="chip chipPrimary" href="/app">Launch builder</a>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <section className="hero">
-          <div className="container">
-            <div className="heroGrid">
-              <div>
-                <span className="pill">WEB AUTOMATION & BEYOND</span>
+          <section className="hero">
+            <div className="container">
+              <div className="heroGrid">
+                <div>
+                  <span className="pill">AI WEBSITE AUTOMATION BUILDER</span>
 
-                <h1 className="h1">Build, host, grow your online presence</h1>
+                  <h1 className="h1">
+                    Build a <span className="gradientWord">world-class</span> website in minutes.
+                  </h1>
 
-                <p className="sub">
-                  SiteGround-level hero structure: cinematic background, clean hierarchy, and a right-side action stack.
-                </p>
+                  <p className="sub">
+                    Dominat8 assembles your structure, copy, layout, SEO plan, sitemap, and publish flow —
+                    with the “finish-for-me” feeling you want, but with controls you can trust.
+                  </p>
 
-                <div className="ctaRow">
-                  <a className="btn btnPrimary" href="/app">Explore services</a>
-                  <a className="btn" href="/pricing">See pricing</a>
+                  <div className="ctaRow">
+                    <a className="btn btnPrimary" href="/app">Generate my site</a>
+                    <a className="btn" href="/pricing">See pricing</a>
+                  </div>
+
+                  <div className="proofStrip">
+                    <span><b>{live}</b></span>
+                    <span>•</span>
+                    <span><b>ROUTE_PROOF</b></span>
+                    <span>•</span>
+                    <span>HOME_STAMP: <b>{stamp}</b></span>
+                  </div>
                 </div>
 
-                <div className="proofLine">
-                  <b>ROUTE_PROOF</b> • HOME_OK • <b>{trust}</b> • HOME_STAMP: {stamp}
-                </div>
-              </div>
+                <div className="glass" aria-label="Preview panel">
+                  <div className="glassTop">
+                    <div className="glassTitle">Pipeline Preview</div>
+                    <div className="statusPill"><span className="dot" /> Ready</div>
+                  </div>
 
-              <div className="stack" aria-label="Action stack">
-                <div className="stackWrap">
-                  {cards.map((c) => (
-                    <div className="stackCard" key={c.label}>
-                      <div className="iconBox">
-                        <Icon kind={c.icon} />
+                  <div className="glassBody">
+                    <div className="step">
+                      <div className="stepIcon"><Icon name="spark" /></div>
+                      <div>
+                        <div className="stepTitle">Brand + Offer</div>
+                        <div className="stepText">Positioning, tone, hero promise, CTA, trust layer.</div>
                       </div>
-                      <div style={{ fontSize: 14, lineHeight: 1.2 }}>{c.label}</div>
-                      {c.active ? <div className="check">✓</div> : null}
                     </div>
-                  ))}
+
+                    <div className="step">
+                      <div className="stepIcon"><Icon name="wand" /></div>
+                      <div>
+                        <div className="stepTitle">Pages + Layout</div>
+                        <div className="stepText">Homepage, pricing, FAQ, contact, templates — consistent rhythm.</div>
+                      </div>
+                    </div>
+
+                    <div className="step">
+                      <div className="stepIcon"><Icon name="shield" /></div>
+                      <div>
+                        <div className="stepTitle">SEO + Sitemap</div>
+                        <div className="stepText">Metadata, sitemap.xml, robots.txt — publish-ready.</div>
+                      </div>
+                    </div>
+
+                    <div className="step">
+                      <div className="stepIcon"><Icon name="rocket" /></div>
+                      <div>
+                        <div className="stepTitle">Publish</div>
+                        <div className="stepText">Domain-ready output + deploy verification markers.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="section">
+                <div className="sectionTitle">Features</div>
+                <div className="sectionH2">Designed to look expensive — and ship fast.</div>
+
+                <div className="cards">
+                  <div className="card">
+                    <div className="cardTop">
+                      <div className="cardIcon"><Icon name="spark" /></div>
+                      <div className="cardTitle">Finish-for-me pipeline</div>
+                    </div>
+                    <div className="cardBody">
+                      Structured steps with guardrails. You stay in control while the system does the heavy lifting.
+                    </div>
+                  </div>
+
+                  <div className="card">
+                    <div className="cardTop">
+                      <div className="cardIcon"><Icon name="shield" /></div>
+                      <div className="cardTitle">Proof you can trust</div>
+                    </div>
+                    <div className="cardBody">
+                      Live markers, deploy proof, and deterministic outputs — so you know what’s real and what’s cached.
+                    </div>
+                  </div>
+
+                  <div className="card">
+                    <div className="cardTop">
+                      <div className="cardIcon"><Icon name="rocket" /></div>
+                      <div className="cardTitle">Publish-ready outputs</div>
+                    </div>
+                    <div className="cardBody">
+                      SEO plan, sitemap, robots, page structure, and a clean handoff — ready for a custom domain.
+                    </div>
+                  </div>
                 </div>
 
-                <div className="proofLine" style={{ marginTop: 10, color: "rgba(255,255,255,.52)" }}>
-                  Tip: open with <b>?ts=123</b> if you suspect cache.
+                <div className="bigCta">
+                  <div>
+                    <div className="bigCtaTitle">Ready to generate your flagship site?</div>
+                    <div className="bigCtaSub">Launch the builder, answer a few prompts, and publish with confidence.</div>
+                  </div>
+                  <div className="ctaRow" style={{ marginTop: 0 }}>
+                    <a className="btn btnPrimary" href="/app">Launch builder</a>
+                    <a className="btn" href="/templates">Explore templates</a>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <div style={{ height: 30 }} />
+          <div style={{ height: 28 }} />
+        </div>
       </div>
     </>
   );
