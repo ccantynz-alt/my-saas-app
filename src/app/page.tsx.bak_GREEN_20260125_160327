@@ -3,8 +3,8 @@
 const BRAND = "Dominat8";
 
 export default function HomePage() {
-  const BUILD_ID = "BUILD_ID_20260125_160327";
-  const BUILD_ISO = "2026-01-25T03:03:27.3844439Z";
+  const BUILD_ID = "BUILD_ID_20260125_155938";
+  const BUILD_ISO = "2026-01-25T02:59:38.2483518Z";
 
   return (
     <main
@@ -99,7 +99,13 @@ export default function HomePage() {
       </header>
 
       {/* HERO */}
-      <section style={{ position: "relative", padding: "82px 18px 36px 18px" }}>
+      <section
+        style={{
+          position: "relative",
+          padding: "82px 18px 36px 18px",
+        }}
+      >
+        {/* Background layers */}
         <div
           aria-hidden="true"
           style={{
@@ -123,13 +129,22 @@ export default function HomePage() {
             backgroundImage:
               "repeating-linear-gradient(90deg, rgba(255,215,0,0.00) 0px, rgba(255,215,0,0.00) 10px, rgba(255,215,0,0.12) 11px, rgba(255,215,0,0.00) 12px)," +
               "repeating-linear-gradient(180deg, rgba(0,255,200,0.00) 0px, rgba(0,255,200,0.00) 16px, rgba(0,255,200,0.07) 17px, rgba(0,255,200,0.00) 18px)",
-            maskImage: "radial-gradient(640px 400px at 50% 22%, black 22%, transparent 72%)",
-            WebkitMaskImage: "radial-gradient(640px 400px at 50% 22%, black 22%, transparent 72%)",
+            maskImage:
+              "radial-gradient(640px 400px at 50% 22%, black 22%, transparent 72%)",
+            WebkitMaskImage:
+              "radial-gradient(640px 400px at 50% 22%, black 22%, transparent 72%)",
             animation: "d8_drift 7s linear infinite",
+            transform: "translateY(0px)",
           }}
         />
 
+        {/* Floating aura blobs */}
+        <div aria-hidden="true" style={blobStyle("12%", "18%", 480, "rgba(255,215,0,0.18)")} />
+        <div aria-hidden="true" style={blobStyle("78%", "24%", 520, "rgba(0,255,200,0.14)")} />
+        <div aria-hidden="true" style={blobStyle("52%", "48%", 620, "rgba(140,120,255,0.12)")} />
+
         <div style={{ maxWidth: 1180, margin: "0 auto", position: "relative", zIndex: 2 }}>
+          {/* Badge row */}
           <div
             style={{
               display: "inline-flex",
@@ -152,6 +167,7 @@ export default function HomePage() {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1.18fr 0.82fr", gap: 26, alignItems: "center" }}>
+            {/* Left: headline */}
             <div>
               <h1
                 style={{
@@ -164,7 +180,9 @@ export default function HomePage() {
               >
                 The AI that builds
                 <br />
-                <span style={gradientTextStyle()}>a flagship website</span>
+                <span style={gradientTextStyle()}>
+                  a flagship website
+                </span>
                 <br />
                 you are proud to launch.
               </h1>
@@ -178,16 +196,32 @@ export default function HomePage() {
                   opacity: 0.86,
                 }}
               >
-                {BRAND} generates your pages, structure, copy, and polish - fast. Clean layout. Strong spacing.
+                {BRAND} generates your pages, structure, copy, and polish — fast. Clean layout. Strong spacing.
                 Premium feel. Ready for your domain.
               </p>
 
+              {/* CTAs */}
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 26 }}>
-                <a href="/templates" style={primaryCtaStyle()}>Start from a template →</a>
-                <a href="/use-cases" style={secondaryCtaStyle()}>See real outcomes</a>
+                <a href="/templates" style={primaryCtaStyle()}>
+                  Start from a template →
+                </a>
+                <a href="/use-cases" style={secondaryCtaStyle()}>
+                  See real outcomes
+                </a>
               </div>
 
-              <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", marginTop: 18, fontSize: 13, opacity: 0.86 }}>
+              {/* Trust row */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 14,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  marginTop: 18,
+                  opacity: 0.86,
+                  fontSize: 13,
+                }}
+              >
                 <span style={pillStyle()}>Fast build</span>
                 <span style={pillStyle()}>SEO-ready structure</span>
                 <span style={pillStyle()}>Custom domains</span>
@@ -195,18 +229,21 @@ export default function HomePage() {
               </div>
             </div>
 
+            {/* Right: glass card */}
             <div style={glassPanelStyle()}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                 <div>
                   <div style={{ fontWeight: 800, letterSpacing: 0.2 }}>Launch-ready checklist</div>
-                  <div style={{ fontSize: 13, opacity: 0.72, marginTop: 4 }}>The stuff that makes it feel expensive.</div>
+                  <div style={{ fontSize: 13, opacity: 0.72, marginTop: 4 }}>
+                    The stuff that makes it feel expensive.
+                  </div>
                 </div>
                 <span style={miniBadgeStyle()}>Live</span>
               </div>
 
               <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
                 {[
-                  ["Hero and sections", "Spacing + typography tuned"],
+                  ["Hero & sections", "Spacing + typography tuned"],
                   ["Pages generated", "Templates, pricing, use-cases"],
                   ["SEO foundations", "Metadata + structure ready"],
                   ["Domain-ready", "Deploy on your brand"],
@@ -230,11 +267,19 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div style={{ marginTop: 34, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
+          {/* Below fold: 3 feature cards */}
+          <div
+            style={{
+              marginTop: 34,
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gap: 14,
+            }}
+          >
             {[
               ["Finish-for-me pipeline", "Idea → pages → publish. Orchestrated and consistent."],
               ["Premium by default", "Clean rhythm, glass UI, modern gradients, trust signals."],
-              ["Built for scale", "Add agents, domain wizard, billing - without redesigning everything."],
+              ["Built for scale", "Add agents, domain wizard, billing — without redesigning everything."],
             ].map(([t, d]) => (
               <div key={t} style={featureCardStyle()}>
                 <div style={{ fontWeight: 850, marginBottom: 6 }}>{t}</div>
@@ -244,15 +289,22 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* keyframes */}
         <style>{
           @keyframes d8_drift {
             0% { transform: translateY(-10px); opacity: 0.75; }
             50% { transform: translateY(10px); opacity: 0.98; }
             100% { transform: translateY(-10px); opacity: 0.75; }
           }
+          @keyframes d8_float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(14px); }
+            100% { transform: translateY(0px); }
+          }
         }</style>
       </section>
 
+      {/* FOOTER */}
       <footer style={{ padding: "44px 18px 70px 18px", opacity: 0.78 }}>
         <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
           <div style={{ fontWeight: 800 }}>{BRAND}</div>
@@ -262,6 +314,8 @@ export default function HomePage() {
     </main>
   );
 }
+
+/* ---------- styles ---------- */
 
 function linkStyle(): React.CSSProperties {
   return {
@@ -273,6 +327,7 @@ function linkStyle(): React.CSSProperties {
     border: "1px solid rgba(255,255,255,0.00)",
   };
 }
+
 function gradientTextStyle(): React.CSSProperties {
   return {
     background: "linear-gradient(90deg, rgba(255,215,0,0.95), rgba(0,255,200,0.90), rgba(140,120,255,0.90))",
@@ -281,6 +336,7 @@ function gradientTextStyle(): React.CSSProperties {
     color: "transparent",
   };
 }
+
 function primaryCtaStyle(): React.CSSProperties {
   return {
     display: "inline-flex",
@@ -298,6 +354,7 @@ function primaryCtaStyle(): React.CSSProperties {
     letterSpacing: 0.1,
   };
 }
+
 function secondaryCtaStyle(): React.CSSProperties {
   return {
     display: "inline-flex",
@@ -314,6 +371,7 @@ function secondaryCtaStyle(): React.CSSProperties {
     minWidth: 190,
   };
 }
+
 function pillStyle(): React.CSSProperties {
   return {
     padding: "8px 10px",
@@ -322,6 +380,7 @@ function pillStyle(): React.CSSProperties {
     background: "rgba(8,10,16,0.35)",
   };
 }
+
 function glassPanelStyle(): React.CSSProperties {
   return {
     borderRadius: 22,
@@ -334,6 +393,7 @@ function glassPanelStyle(): React.CSSProperties {
     backdropFilter: "blur(16px)" as any,
   };
 }
+
 function miniBadgeStyle(): React.CSSProperties {
   return {
     fontSize: 12,
@@ -345,6 +405,7 @@ function miniBadgeStyle(): React.CSSProperties {
     whiteSpace: "nowrap",
   };
 }
+
 function rowStyle(): React.CSSProperties {
   return {
     display: "grid",
@@ -356,6 +417,7 @@ function rowStyle(): React.CSSProperties {
     background: "rgba(255,255,255,0.03)",
   };
 }
+
 function checkStyle(): React.CSSProperties {
   return {
     width: 22,
@@ -370,6 +432,7 @@ function checkStyle(): React.CSSProperties {
     fontWeight: 900,
   };
 }
+
 function dotStyle(): React.CSSProperties {
   return {
     width: 10,
@@ -380,6 +443,7 @@ function dotStyle(): React.CSSProperties {
     display: "inline-block",
   };
 }
+
 function featureCardStyle(): React.CSSProperties {
   return {
     borderRadius: 22,
@@ -388,5 +452,22 @@ function featureCardStyle(): React.CSSProperties {
     boxShadow: "0 26px 90px rgba(0,0,0,0.35)",
     padding: 18,
     backdropFilter: "blur(14px)" as any,
+  };
+}
+
+function blobStyle(left: string, top: string, size: number, color: string): React.CSSProperties {
+  return {
+    position: "absolute",
+    left,
+    top,
+    width: size,
+    height: size,
+    borderRadius: 999,
+    background: color,
+    filter: "blur(40px)",
+    opacity: 0.75,
+    transform: "translate(-50%, -50%)",
+    animation: "d8_float 10s ease-in-out infinite",
+    pointerEvents: "none",
   };
 }
