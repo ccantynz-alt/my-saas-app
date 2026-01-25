@@ -4,157 +4,183 @@ export default function HomeClient() {
   return (
     <main style={{
       minHeight: "100vh",
-      background: "radial-gradient(circle at 20% 20%, #1f2937, #020617 60%)",
+      display: "flex",
+      alignItems: "center",
+      background:
+        "radial-gradient(1000px 600px at 15% 10%, rgba(255,255,255,0.10), transparent 60%)," +
+        "radial-gradient(900px 500px at 85% 30%, rgba(255,255,255,0.08), transparent 55%)," +
+        "linear-gradient(180deg, #050608 0%, #07080b 55%, #06070a 100%)",
       color: "white",
-      fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial",
-      overflow: "hidden",
-      position: "relative"
+      fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"
     }}>
-      
       <div style={{
-        position: "absolute",
-        inset: 0,
-        background: "linear-gradient(120deg, rgba(56,189,248,0.15), rgba(168,85,247,0.15), rgba(34,197,94,0.15))",
-        filter: "blur(120px)",
-        animation: "float 20s ease-in-out infinite"
-      }} />
-
-      <style>{
-        @keyframes float {
-          0% { transform: translateY(0px); }
-          50% { transform: translateY(-40px); }
-          100% { transform: translateY(0px); }
-        }
-      }</style>
-
-      <div style={{
-        position: "relative",
-        zIndex: 1,
         maxWidth: 1200,
         margin: "0 auto",
-        padding: "120px 32px",
+        padding: "0 32px",
         display: "grid",
-        gridTemplateColumns: "1.2fr 0.8fr",
-        gap: 64,
+        gridTemplateColumns: "1.1fr 0.9fr",
+        gap: 56,
         alignItems: "center"
       }}>
 
+        {/* LEFT: Authority */}
         <div>
-          <h1 style={{
-            fontSize: 64,
-            fontWeight: 900,
-            lineHeight: 1.02,
-            letterSpacing: -2
+          <div style={{
+            display: "inline-block",
+            padding: "10px 16px",
+            borderRadius: 999,
+            border: "1px solid rgba(255,255,255,0.14)",
+            background: "rgba(255,255,255,0.06)",
+            fontSize: 12,
+            letterSpacing: 2.2,
+            textTransform: "uppercase",
+            color: "rgba(255,255,255,0.75)"
           }}>
-            This is how<br />websites are made now.
+            AI Website Automation
+          </div>
+
+          <h1 style={{
+            marginTop: 22,
+            fontSize: 56,
+            lineHeight: 1.05,
+            fontWeight: 900,
+            letterSpacing: -1.4
+          }}>
+            This is how websites<br />are made now.
           </h1>
 
           <p style={{
-            marginTop: 24,
-            fontSize: 20,
+            marginTop: 20,
+            fontSize: 18,
             lineHeight: 1.6,
-            color: "rgba(255,255,255,0.75)",
+            color: "rgba(255,255,255,0.72)",
             maxWidth: 520
           }}>
-            You describe your business.  
-            The site builds itself.
+            Describe your business. Your website assembles itself. Publish.
           </p>
 
-          <div style={{ marginTop: 36, display: "flex", gap: 16 }}>
+          <div style={{
+            marginTop: 30,
+            display: "flex",
+            alignItems: "center",
+            gap: 16
+          }}>
             <a href="/builder" style={{
-              padding: "16px 28px",
+              padding: "16px 24px",
               borderRadius: 16,
               background: "white",
               color: "black",
               fontWeight: 900,
               fontSize: 16,
               textDecoration: "none",
-              boxShadow: "0 25px 60px rgba(0,0,0,0.6)"
+              boxShadow: "0 22px 50px rgba(0,0,0,0.45)"
             }}>
-              Build your site
+              Build my site
             </a>
 
             <span style={{
-              alignSelf: "center",
               fontSize: 14,
               color: "rgba(255,255,255,0.6)"
             }}>
-              No setup. No templates.
+              No templates. No setup.
             </span>
           </div>
 
-          <div style={{ marginTop: 40, fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
-            WOW_085009
+          <div style={{
+            marginTop: 36,
+            fontSize: 11,
+            color: "rgba(255,255,255,0.45)"
+          }}>
+            LIVE_20260126_085401
           </div>
         </div>
 
+        {/* RIGHT: Proof */}
         <div style={{
-          borderRadius: 24,
-          border: "1px solid rgba(255,255,255,0.15)",
-          background: "rgba(0,0,0,0.4)",
-          backdropFilter: "blur(20px)",
-          padding: 24,
-          boxShadow: "0 40px 120px rgba(0,0,0,0.7)"
+          borderRadius: 22,
+          border: "1px solid rgba(255,255,255,0.14)",
+          background: "rgba(0,0,0,0.38)",
+          backdropFilter: "blur(18px)",
+          boxShadow: "0 40px 120px rgba(0,0,0,0.65)",
+          overflow: "hidden"
         }}>
           <div style={{
-            fontSize: 12,
-            letterSpacing: 2,
-            textTransform: "uppercase",
-            color: "rgba(255,255,255,0.6)"
-          }}>
-            Live Preview
-          </div>
-
-          <div style={{
-            marginTop: 16,
-            height: 8,
-            borderRadius: 999,
-            background: "rgba(255,255,255,0.15)",
-            overflow: "hidden"
-          }}>
-            <div style={{
-              width: "78%",
-              height: "100%",
-              background: "linear-gradient(90deg,#22d3ee,#a855f7)",
-              animation: "load 3s ease infinite"
-            }} />
-          </div>
-
-          <style>{
-            @keyframes load {
-              0% { width: 10%; }
-              50% { width: 78%; }
-              100% { width: 10%; }
-            }
-          }</style>
-
-          <div style={{
-            marginTop: 24,
-            fontSize: 18,
-            fontWeight: 700
-          }}>
-            Generating your website…
-          </div>
-
-          <div style={{
-            marginTop: 20,
             display: "flex",
-            flexWrap: "wrap",
-            gap: 10
+            alignItems: "center",
+            gap: 10,
+            padding: "14px 16px",
+            borderBottom: "1px solid rgba(255,255,255,0.10)",
+            background: "rgba(0,0,0,0.45)"
           }}>
-            {["SEO Ready","Fast","Mobile-Perfect","Published"].map(x => (
-              <span key={x} style={{
-                padding: "8px 14px",
-                borderRadius: 999,
-                fontSize: 13,
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.2)"
-              }}>
-                ✓ {x}
-              </span>
-            ))}
+            <span style={{ width: 10, height: 10, borderRadius: 999, background: "#ff5f56" }} />
+            <span style={{ width: 10, height: 10, borderRadius: 999, background: "#ffbd2e" }} />
+            <span style={{ width: 10, height: 10, borderRadius: 999, background: "#27c93f" }} />
+            <div style={{
+              margin: "0 auto",
+              padding: "6px 12px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.06)",
+              fontSize: 11,
+              color: "rgba(255,255,255,0.7)"
+            }}>
+              dominat8.com / preview
+            </div>
+          </div>
+
+          <div style={{ padding: 20 }}>
+            <div style={{
+              fontSize: 11,
+              letterSpacing: 2.4,
+              textTransform: "uppercase",
+              color: "rgba(255,255,255,0.6)"
+            }}>
+              Generating website
+            </div>
+
+            <div style={{
+              marginTop: 10,
+              height: 8,
+              borderRadius: 999,
+              background: "rgba(255,255,255,0.12)",
+              overflow: "hidden"
+            }}>
+              <div style={{
+                width: "78%",
+                height: "100%",
+                background: "linear-gradient(90deg, #22d3ee, #a855f7)"
+              }} />
+            </div>
+
+            <div style={{
+              marginTop: 18,
+              fontSize: 18,
+              fontWeight: 800
+            }}>
+              Building your homepage…
+            </div>
+
+            <div style={{
+              marginTop: 16,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 10
+            }}>
+              {["SEO Ready","Sitemap Generated","Published"].map(x => (
+                <span key={x} style={{
+                  padding: "8px 14px",
+                  borderRadius: 999,
+                  fontSize: 13,
+                  border: "1px solid rgba(255,255,255,0.16)",
+                  background: "rgba(255,255,255,0.06)"
+                }}>
+                  ✓ {x}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
+
       </div>
     </main>
   );
