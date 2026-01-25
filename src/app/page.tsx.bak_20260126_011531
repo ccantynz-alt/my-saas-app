@@ -15,19 +15,19 @@ export default function Page() {
           z-index: 99999;
           background: linear-gradient(90deg, rgba(255,255,255,0.95), rgba(255,255,255,0.90));
           color: #0b1220;
-          border-bottom: 2px solid rgba(0,0,0,0.18);
+          border-bottom: 2px solid rgba(0,0,0,0.15);
           font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
           padding: 14px 16px;
         }
         .routeProofTitle {
-          font-weight: 950;
+          font-weight: 900;
           letter-spacing: -0.02em;
           font-size: 16px;
         }
         .routeProofMeta {
           margin-top: 4px;
           font-size: 12px;
-          opacity: 0.82;
+          opacity: 0.8;
         }
         .routeProofPill {
           display: inline-block;
@@ -35,9 +35,9 @@ export default function Page() {
           padding: 3px 10px;
           border-radius: 999px;
           background: rgba(0,0,0,0.06);
-          border: 1px solid rgba(0,0,0,0.12);
+          border: 1px solid rgba(0,0,0,0.10);
           font-size: 11px;
-          font-weight: 900;
+          font-weight: 800;
           letter-spacing: 0.08em;
           text-transform: uppercase;
         }
@@ -45,11 +45,11 @@ export default function Page() {
 
       <div className="routeProofBanner">
         <div className="routeProofTitle">
-          ✅ ROUTE PURGE ACTIVE — / is now src/app/page.tsx only
-          <span className="routeProofPill">If you see this, routing is fixed</span>
+          ✅ ROUTE OVERRIDE ACTIVE — / is forced to render HomeClient
+          <span className="routeProofPill">If you see this, / is fixed</span>
         </div>
         <div className="routeProofMeta">
-          ROOT_STAMP: {stamp} • This banner must be visible at the top of /.
+          ROOT_STAMP: {stamp} • This banner must be visible at the top of / (no exceptions).
         </div>
       </div>
 
