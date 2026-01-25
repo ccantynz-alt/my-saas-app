@@ -106,8 +106,7 @@ const item: MarketingContentItem = ({
   const idx = await getIndex(idxKey);
   idx.unshift(id);
   await setIndex(idxKey, idx);
-
-  return item;
+  return (item as any);
 }
 
 export async function listContent(campaignId: string): Promise<MarketingContentItem[]> {

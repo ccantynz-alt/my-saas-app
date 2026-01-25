@@ -20,7 +20,8 @@ export function keyBulkRun(runId: string): string {
  * Keep these deterministic; no external deps.
  */
 export const Keys = {
-  prefix: MM_PREFIX,
+    content: (id: string) => `content:${id}`,
+  contentIndexByCampaign: (campaignId: string) => `contentIndexByCampaign:${campaignId}`,prefix: MM_PREFIX,
 
   pageSpec: (slug: string) => keyPageSpec(slug),
   pageHtml: (slug: string) => keyPageHtml(slug),
