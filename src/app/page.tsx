@@ -1,8 +1,8 @@
 ﻿export const dynamic = "force-dynamic";
 
 export default function HomePage() {
-  const BUILD_ID = "BUILD_ID_20260125_154903";
-  const BUILD_ISO = "2026-01-25T02:49:03.9675254Z";
+  const BUILD_ID = "BUILD_ID_20260125_154954";
+  const BUILD_ISO = "2026-01-25T02:49:54.7751673Z";
 
   return (
     <main
@@ -10,7 +10,8 @@ export default function HomePage() {
       data-build-iso={BUILD_ISO}
       style={{
         minHeight: "100vh",
-        background: "radial-gradient(1200px 600px at 20% 0%, rgba(255,215,0,0.08), transparent 60%), radial-gradient(900px 500px at 80% 10%, rgba(0,255,200,0.06), transparent 55%), #05060a",
+        background:
+          "radial-gradient(1200px 600px at 20% 0%, rgba(255,215,0,0.08), transparent 60%), radial-gradient(900px 500px at 80% 10%, rgba(0,255,200,0.06), transparent 55%), #05060a",
         color: "#fff",
       }}
     >
@@ -19,7 +20,6 @@ export default function HomePage() {
         {BUILD_ID}
       </div>
 
-      {/* HERO */}
       <section
         style={{
           position: "relative",
@@ -31,7 +31,6 @@ export default function HomePage() {
           padding: "64px 24px",
         }}
       >
-        {/* subtle vignette */}
         <div
           aria-hidden="true"
           style={{
@@ -43,7 +42,7 @@ export default function HomePage() {
           }}
         />
 
-        {/* GOLD SIGNAL RAIN (WOW v1.2) */}
+        {/* GOLD SIGNAL RAIN */}
         <div
           aria-hidden="true"
           style={{
@@ -51,7 +50,6 @@ export default function HomePage() {
             inset: 0,
             opacity: 0.9,
             pointerEvents: "none",
-            filter: "blur(0px)",
             backgroundImage:
               "repeating-linear-gradient(90deg, rgba(255,215,0,0.0) 0px, rgba(255,215,0,0.0) 12px, rgba(255,215,0,0.12) 13px, rgba(255,215,0,0.0) 14px), repeating-linear-gradient(180deg, rgba(0,255,200,0.0) 0px, rgba(0,255,200,0.0) 18px, rgba(0,255,200,0.08) 19px, rgba(0,255,200,0.0) 20px)",
             maskImage:
@@ -131,19 +129,11 @@ export default function HomePage() {
               opacity: 0.85,
             }}
           >
-            Dominat8 generates your pages, copy, structure, and launch-ready polish — with a
-            clean, modern finish that feels like a top-tier hosting brand homepage.
+            Dominat8 generates your pages, copy, structure, and launch-ready polish — with
+            a clean, modern finish.
           </p>
 
-          <div
-            style={{
-              display: "flex",
-              gap: 14,
-              justifyContent: "center",
-              flexWrap: "wrap",
-              marginBottom: 26,
-            }}
-          >
+          <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <a
               href="/templates"
               style={{
@@ -184,43 +174,11 @@ export default function HomePage() {
             </a>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: 14,
-              marginTop: 18,
-              textAlign: "left",
-            }}
-          >
-            {[
-              { t: "Finish-for-me pipeline", d: "From idea → pages → publish, orchestrated." },
-              { t: "SEO-ready structure", d: "Clean markup, clear hierarchy, fast pages." },
-              { t: "Custom domains", d: "Launch on your brand, not a subdomain." },
-              { t: "Premium feel by default", d: "Typography, spacing, and polish built-in." },
-            ].map((x) => (
-              <div
-                key={x.t}
-                style={{
-                  borderRadius: 18,
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  background: "rgba(10,12,16,0.45)",
-                  padding: 16,
-                  boxShadow: "0 18px 60px rgba(0,0,0,0.35)",
-                }}
-              >
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>{x.t}</div>
-                <div style={{ opacity: 0.82, lineHeight: 1.45 }}>{x.d}</div>
-              </div>
-            ))}
-          </div>
-
           <p style={{ marginTop: 28, fontSize: 12, opacity: 0.55 }}>
             Marker: {BUILD_ID} • {BUILD_ISO}
           </p>
         </div>
 
-        {/* keyframes */}
         <style>{
           @keyframes drift {
             0% { transform: translateY(-6px); opacity: 0.75; }
@@ -228,17 +186,6 @@ export default function HomePage() {
             100% { transform: translateY(-6px); opacity: 0.75; }
           }
         }</style>
-      </section>
-
-      {/* SIMPLE BELOW-FOLD */}
-      <section style={{ padding: "56px 24px 80px 24px" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <h2 style={{ fontSize: 28, margin: "0 0 14px 0" }}>What you ship with Dominat8</h2>
-          <div style={{ opacity: 0.85, lineHeight: 1.65, maxWidth: 860 }}>
-            Multi-page marketing foundations (templates, pricing, use-cases), with the runway to plug in your
-            agents, publishing, and domain wizard as the product matures.
-          </div>
-        </div>
       </section>
     </main>
   );
