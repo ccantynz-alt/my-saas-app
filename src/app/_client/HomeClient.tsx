@@ -2,807 +2,768 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-type ProbeInfo = {
-  ok: boolean;
-  status: number;
-  fetchedAtIso: string;
-  headers: Record<string, string>;
-  json: any;
-  error?: string;
+type Step = {
+  title: string;
+  desc: string;
+  status?: "idle" | "active" | "done";
 };
 
-type DemoPhase = "idle" | "running" | "done";
-
-const SESSION_KEY = "dominat8_home_demo_ran_v9";
-
-function nowIso() {
-  try { return new Date().toISOString(); } catch { return ""; }
+function cn(...xs: Array<string | false | null | undefined>) {
+  return xs.filter(Boolean).join(" ");
 }
 
-function safeJsonParse(text: string) {
-  try { return JSON.parse(text); } catch { return null; }
-}
-
-function pickDomHeaders(all: Headers): Record<string, string> {
-  const out: Record<string, string> = {};
-  try {
-    for (const [k, v] of all.entries()) {
-      const key = (k || "").toLowerCase();
-      if (key.startsWith("x-dominat8-")) out[key] = v;
-    }
-  } catch {}
-  return out;
+function useIsMounted() {
+  const [m, setM] = useState(false);
+  useEffect(() => setM(true), []);
+  return m;
 }
 
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
 }
 
+function fmtPct(n: number) {
+  const v = Math.round(n * 100) / 100;
+  return `${v}%`;
+}
+
+function SigBadge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] tracking-wide text-white/80 shadow-[0_18px_55px_rgba(0,0,0,0.45)]">
+      <span className="h-1.5 w-1.5 rounded-full bg-white/70 shadow-[0_0_18px_rgba(255,255,255,0.35)]" />
+      {children}
+    </span>
+  );
+}
+
+function Hairline() {
+  return <div className="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />;
+}
+
+function GlassCard({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-3xl border border-white/12 bg-white/[0.06] shadow-[0_28px_110px_rgba(0,0,0,0.70),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-[14px]",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+function PrimaryButton({
+  children,
+  href = "#",
+}: {
+  children: React.ReactNode;
+  href?: string;
+}) {
+  return (
+    <a
+      href={href}
+      className="group relative inline-flex items-center justify-center rounded-2xl px-6 py-3 text-sm font-semibold text-black shadow-[0_28px_90px_rgba(0,0,0,0.65)] transition hover:-translate-y-[1px] active:translate-y-0"
+      style={{
+        background:
+          "linear-gradient(90deg, rgba(56,189,248,1), rgba(168,85,247,1), rgba(34,197,94,1))",
+      }}
+    >
+      <span className="relative z-10">{children}</span>
+      {/* sheen */}
+      <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+        <span className="absolute inset-[-40%] translate-x-[-60%] rotate-[12deg] bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-0 transition duration-700 group-hover:opacity-60 group-hover:translate-x-[160%]" />
+      </span>
+    </a>
+  );
+}
+
+function SecondaryButton({
+  children,
+  href = "#",
+}: {
+  children: React.ReactNode;
+  href?: string;
+}) {
+  return (
+    <a
+      href={href}
+      className="inline-flex items-center justify-center rounded-2xl border border-white/12 bg-white/[0.05] px-6 py-3 text-sm font-semibold text-white/85 shadow-[0_18px_55px_rgba(0,0,0,0.45)] transition hover:border-white/18 hover:bg-white/[0.065]"
+    >
+      {children}
+    </a>
+  );
+}
+
+function Metric({
+  k,
+  v,
+  hint,
+}: {
+  k: string;
+  v: string;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+      <div className="text-lg font-semibold text-white/90">{v}</div>
+      <div className="mt-1 text-[10px] uppercase tracking-[0.28em] text-white/55">
+        {k}
+      </div>
+      {hint ? (
+        <div className="mt-2 text-xs leading-relaxed text-white/60">{hint}</div>
+      ) : null}
+    </div>
+  );
+}
+
+function LogoPills() {
+  const items = ["ACME", "NORTHSTAR", "CLOUDLY", "VECTOR", "ARCADIA"];
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {items.map((x) => (
+        <span
+          key={x}
+          className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-semibold tracking-[0.22em] text-white/55"
+        >
+          {x}
+        </span>
+      ))}
+      <span className="text-xs text-white/45">+ your logo here</span>
+    </div>
+  );
+}
+
+function TechBackdropSvg() {
+  // Inline SVG: tech grid + rings + accents (no assets)
+  return (
+    <svg
+      className="absolute inset-0 h-full w-full"
+      viewBox="0 0 1200 800"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <defs>
+        <radialGradient id="g1" cx="50%" cy="35%" r="60%">
+          <stop offset="0%" stopColor="rgba(56,189,248,0.35)" />
+          <stop offset="40%" stopColor="rgba(168,85,247,0.22)" />
+          <stop offset="80%" stopColor="rgba(34,197,94,0.10)" />
+          <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+        </radialGradient>
+
+        <linearGradient id="gridLine" x1="0" x2="1">
+          <stop offset="0" stopColor="rgba(255,255,255,0)" />
+          <stop offset="0.5" stopColor="rgba(255,255,255,0.09)" />
+          <stop offset="1" stopColor="rgba(255,255,255,0)" />
+        </linearGradient>
+
+        <filter id="blur1" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="18" />
+        </filter>
+
+        <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="10" result="b" />
+          <feColorMatrix
+            in="b"
+            type="matrix"
+            values="
+              1 0 0 0 0
+              0 1 0 0 0
+              0 0 1 0 0
+              0 0 0 0.9 0"
+            result="c"
+          />
+          <feMerge>
+            <feMergeNode in="c" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+
+        <mask id="fadeMask">
+          <rect width="1200" height="800" fill="white" />
+          <rect
+            width="1200"
+            height="800"
+            fill="black"
+            opacity="0.0"
+          />
+        </mask>
+      </defs>
+
+      {/* base glow */}
+      <rect width="1200" height="800" fill="url(#g1)" />
+
+      {/* grid */}
+      <g opacity="0.25" mask="url(#fadeMask)">
+        {Array.from({ length: 18 }).map((_, i) => {
+          const x = (i / 18) * 1200;
+          return (
+            <line
+              key={`v-${i}`}
+              x1={x}
+              y1={0}
+              x2={x}
+              y2={800}
+              stroke="rgba(255,255,255,0.10)"
+              strokeWidth="1"
+            />
+          );
+        })}
+        {Array.from({ length: 12 }).map((_, i) => {
+          const y = (i / 12) * 800;
+          return (
+            <line
+              key={`h-${i}`}
+              x1={0}
+              y1={y}
+              x2={1200}
+              y2={y}
+              stroke="rgba(255,255,255,0.10)"
+              strokeWidth="1"
+            />
+          );
+        })}
+      </g>
+
+      {/* rings */}
+      <g filter="url(#softGlow)" opacity="0.9">
+        <circle
+          cx="760"
+          cy="260"
+          r="165"
+          fill="none"
+          stroke="rgba(56,189,248,0.45)"
+          strokeWidth="2"
+        />
+        <circle
+          cx="760"
+          cy="260"
+          r="240"
+          fill="none"
+          stroke="rgba(168,85,247,0.30)"
+          strokeWidth="2"
+        />
+        <circle
+          cx="760"
+          cy="260"
+          r="320"
+          fill="none"
+          stroke="rgba(34,197,94,0.18)"
+          strokeWidth="2"
+        />
+      </g>
+
+      {/* accent lines */}
+      <g opacity="0.85" filter="url(#blur1)">
+        <path
+          d="M180 590 C 320 500, 420 520, 560 430"
+          stroke="rgba(56,189,248,0.40)"
+          strokeWidth="6"
+          fill="none"
+        />
+        <path
+          d="M220 630 C 360 540, 470 560, 650 470"
+          stroke="rgba(168,85,247,0.30)"
+          strokeWidth="5"
+          fill="none"
+        />
+      </g>
+    </svg>
+  );
+}
+
 export default function HomeClient() {
-  const [intro, setIntro] = useState<"armed" | "fired" | "done">("armed");
-  const [demo, setDemo] = useState<DemoPhase>("idle");
-  const [demoStep, setDemoStep] = useState<number>(0);
-  const [demoPulse, setDemoPulse] = useState<number>(0);
-  const [trustOpen, setTrustOpen] = useState<boolean>(false);
-  const [probe, setProbe] = useState<ProbeInfo | null>(null);
+  const isMounted = useIsMounted();
 
-  const timeoutsRef = useRef<number[]>([]);
+  // ------------------------------------------------------
+  // Session-only auto demo (preserve V9 behavior)
+  // ------------------------------------------------------
+  const demoKey = "d8_home_demo_ran_v1";
+  const [demoRan, setDemoRan] = useState(false);
 
-  const demoSteps = useMemo(() => ([
-    { title: "Locking onto your niche", sub: "Reading your intent + audience" },
-    { title: "Generating fullscreen hero", sub: "Brand tone + structure" },
-    { title: "Writing conversion copy", sub: "Benefit-first, bold, clean" },
-    { title: "Building SEO plan", sub: "Sitemap, titles, schema" },
-    { title: "Preview + publish pulse", sub: "Polish → go-live" },
-  ]), []);
-
-  function clearTimers() {
-    for (const t of timeoutsRef.current) {
-      try { clearTimeout(t); } catch {}
-    }
-    timeoutsRef.current = [];
-  }
-
-  async function runProbe() {
-    const ts = Math.floor(Date.now() / 1000);
-    const url = `/api/__probe__?ts=${ts}`;
-
-    const base: ProbeInfo = {
-      ok: false,
-      status: 0,
-      fetchedAtIso: nowIso(),
-      headers: {},
-      json: null,
-    };
-
-    try {
-      const res = await fetch(url, { cache: "no-store" });
-      const text = await res.text();
-      const parsed = safeJsonParse(text);
-
-      setProbe({
-        ...base,
-        ok: res.ok,
-        status: res.status,
-        headers: pickDomHeaders(res.headers),
-        json: parsed ?? { raw: text?.slice(0, 2000) },
-      });
-    } catch (e: any) {
-      setProbe({
-        ...base,
-        ok: false,
-        status: 0,
-        headers: {},
-        json: null,
-        error: (e && e.message) ? String(e.message) : "Probe failed",
-      });
-    }
-  }
-
-  function fireIntro() {
-    setIntro("fired");
-    const t1 = window.setTimeout(() => setIntro("done"), 900);
-    timeoutsRef.current.push(t1);
-  }
-
-  function startDemoOncePerSession() {
-    let already = false;
-    try { already = sessionStorage.getItem(SESSION_KEY) === "1"; } catch { already = false; }
-    if (already) return;
-
-    try { sessionStorage.setItem(SESSION_KEY, "1"); } catch {}
-
-    setDemo("running");
-    setDemoStep(0);
-    setDemoPulse(0);
-
-    const stepMs = 860;
-    const pulseMs = 260;
-
-    for (let i = 0; i < demoSteps.length; i++) {
-      const t = window.setTimeout(() => {
-        setDemoStep(i);
-        setDemoPulse((p) => p + 1);
-      }, i * stepMs);
-      timeoutsRef.current.push(t);
-    }
-
-    for (let i = 1; i <= 12; i++) {
-      const t = window.setTimeout(() => setDemoPulse((p) => p + 1), i * pulseMs);
-      timeoutsRef.current.push(t);
-    }
-
-    const doneAt = demoSteps.length * stepMs + 260;
-    const tDone = window.setTimeout(() => setDemo("done"), doneAt);
-    timeoutsRef.current.push(tDone);
-  }
+  // ------------------------------------------------------
+  // Parallax / depth (V10) — subtle, tasteful, safe
+  // ------------------------------------------------------
+  const heroRef = useRef<HTMLDivElement | null>(null);
+  const [mx, setMx] = useState(0);
+  const [my, setMy] = useState(0);
 
   useEffect(() => {
-    const t0 = window.setTimeout(() => fireIntro(), 30);
-    timeoutsRef.current.push(t0);
+    if (!isMounted) return;
 
-    const tDemo = window.setTimeout(() => startDemoOncePerSession(), 120);
-    timeoutsRef.current.push(tDemo);
+    // Auto-demo once per session
+    try {
+      const already = sessionStorage.getItem(demoKey) === "1";
+      if (!already) {
+        sessionStorage.setItem(demoKey, "1");
+        setDemoRan(true);
+      } else {
+        setDemoRan(false);
+      }
+    } catch {
+      setDemoRan(false);
+    }
+  }, [isMounted]);
 
-    const tProbe = window.setTimeout(() => runProbe(), 160);
-    timeoutsRef.current.push(tProbe);
+  useEffect(() => {
+    if (!isMounted) return;
 
-    return () => clearTimers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const el = heroRef.current;
+    if (!el) return;
 
-  const activeStep = clamp(demoStep, 0, demoSteps.length - 1);
-  const demoOn = demo === "running";
+    let raf = 0;
 
-  const impactClass =
-    intro === "armed" ? "impact-armed" :
-    intro === "fired" ? "impact-fired" :
-    "impact-done";
+    function onMove(e: PointerEvent) {
+      const r = el.getBoundingClientRect();
+      const px = (e.clientX - r.left) / Math.max(1, r.width);
+      const py = (e.clientY - r.top) / Math.max(1, r.height);
+      const dx = clamp((px - 0.5) * 2, -1, 1);
+      const dy = clamp((py - 0.5) * 2, -1, 1);
+
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        setMx(dx);
+        setMy(dy);
+      });
+    }
+
+    function onLeave() {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        setMx(0);
+        setMy(0);
+      });
+    }
+
+    el.addEventListener("pointermove", onMove, { passive: true });
+    el.addEventListener("pointerleave", onLeave, { passive: true });
+
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener("pointermove", onMove as any);
+      el.removeEventListener("pointerleave", onLeave as any);
+    };
+  }, [isMounted]);
+
+  const depth = useMemo(() => {
+    // these are intentionally small to avoid “cheap parallax”
+    const tiltX = my * -2.2; // deg
+    const tiltY = mx * 2.4;  // deg
+    const driftX = mx * 18;  // px
+    const driftY = my * 14;  // px
+    const glowX = mx * 24;
+    const glowY = my * 18;
+    return { tiltX, tiltY, driftX, driftY, glowX, glowY };
+  }, [mx, my]);
+
+  // ------------------------------------------------------
+  // Live stamps / probe (preserve V9 expectations)
+  // ------------------------------------------------------
+  const stamp = useMemo(() => new Date().toISOString(), []);
+  const [probeOk, setProbeOk] = useState<null | boolean>(null);
+
+  useEffect(() => {
+    if (!isMounted) return;
+
+    const url = `/api/__probe__?ts=${Date.now()}`;
+    fetch(url, { cache: "no-store" })
+      .then((r) => setProbeOk(r.ok))
+      .catch(() => setProbeOk(false));
+  }, [isMounted]);
+
+  // ------------------------------------------------------
+  // Demo steps (presentation-grade)
+  // ------------------------------------------------------
+  const steps: Step[] = useMemo(
+    () => [
+      { title: "Brand + Offer", desc: "Tone, positioning, hero promise, CTA hierarchy.", status: "done" },
+      { title: "Pages + Layout", desc: "Homepage, pricing, FAQ, contact — rhythm that sells.", status: "done" },
+      { title: "SEO + Sitemap", desc: "Metadata plan, sitemap, robots, publish sanity checks.", status: "active" },
+      { title: "Publish", desc: "Deploy proof + domain readiness so you trust what’s live.", status: "idle" },
+    ],
+    []
+  );
+
+  const trustMode = useMemo(() => {
+    if (probeOk === null) return "Trust Mode: verifying…";
+    if (probeOk === true) return "Trust Mode: LIVE_OK (probe no-store)";
+    return "Trust Mode: WARN (probe failed)";
+  }, [probeOk]);
+
+  // ------------------------------------------------------
+  // Motion: micro-kick + shock rings (keep but refine)
+  // ------------------------------------------------------
+  const [kick, setKick] = useState(false);
+  useEffect(() => {
+    if (!isMounted) return;
+    setKick(true);
+    const t = setTimeout(() => setKick(false), 900);
+    return () => clearTimeout(t);
+  }, [isMounted]);
 
   return (
-    <div className="home-root">
-      {/* TRUST STRIP */}
-      <div className="trust-strip">
-        <div className="trust-left">
-          <span className="trust-pill">TRUST MODE</span>
-          <span className="trust-text">no-store probe • live route proof</span>
+    <main className="min-h-screen bg-[#05060A] text-white/90">
+      {/* Backdrop (tech svg + glow layers) */}
+      <div className="pointer-events-none fixed inset-0">
+        <div
+          className="absolute inset-0 opacity-[0.85]"
+          style={{
+            transform: `translate3d(${depth.driftX * 0.25}px, ${depth.driftY * 0.20}px, 0)`,
+            transition: "transform 120ms ease-out",
+          }}
+        >
+          <TechBackdropSvg />
         </div>
-        <div className="trust-right">
-          <button
-            className="trust-btn"
-            onClick={() => setTrustOpen(v => !v)}
-            aria-expanded={trustOpen ? "true" : "false"}
-            type="button"
-          >
-            {trustOpen ? "Hide probe" : "Show probe"}
-          </button>
-        </div>
+
+        {/* animated glow blob */}
+        <div
+          className="absolute left-1/2 top-[-12%] h-[520px] w-[920px] -translate-x-1/2 rounded-full blur-3xl"
+          style={{
+            background:
+              "radial-gradient(circle at 35% 40%, rgba(56,189,248,0.40), transparent 55%), radial-gradient(circle at 65% 45%, rgba(168,85,247,0.34), transparent 60%), radial-gradient(circle at 50% 75%, rgba(34,197,94,0.16), transparent 55%)",
+            transform: `translate3d(${depth.glowX * 0.20}px, ${depth.glowY * 0.20}px, 0)`,
+            transition: "transform 120ms ease-out",
+          }}
+        />
+
+        {/* vignette */}
+        <div className="absolute inset-0 bg-[radial-gradient(60%_55%_at_50%_30%,rgba(0,0,0,0),rgba(0,0,0,0.50)_70%,rgba(0,0,0,0.80)_100%)]" />
       </div>
 
-      {trustOpen && (
-        <div className="trust-panel">
-          <div className="trust-grid">
-            <div className="trust-card">
-              <div className="trust-card-title">/api/__probe__</div>
-              <div className="trust-kv">
-                <div className="k">fetchedAt</div>
-                <div className="v">{probe?.fetchedAtIso ?? "…"}</div>
-                <div className="k">status</div>
-                <div className="v">{probe ? String(probe.status) : "…"}</div>
-                <div className="k">ok</div>
-                <div className="v">{probe ? (probe.ok ? "true" : "false") : "…"}</div>
-              </div>
-              {probe?.error && <div className="trust-error">{probe.error}</div>}
+      {/* Top bar */}
+      <header className="relative z-10">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-white/[0.06] shadow-[0_18px_55px_rgba(0,0,0,0.45)]">
+              <div
+                className="h-3 w-3 rounded-full shadow-[0_0_24px_rgba(255,255,255,0.35)]"
+                style={{
+                  background:
+                    "linear-gradient(90deg, rgba(56,189,248,1), rgba(168,85,247,1), rgba(34,197,94,1))",
+                }}
+              />
             </div>
-
-            <div className="trust-card">
-              <div className="trust-card-title">x-dominat8-* headers</div>
-              <pre className="trust-pre">
-{probe ? JSON.stringify(probe.headers ?? {}, null, 2) : "…"}
-              </pre>
-            </div>
-
-            <div className="trust-card trust-card-wide">
-              <div className="trust-card-title">probe json</div>
-              <pre className="trust-pre">
-{probe ? JSON.stringify(probe.json ?? {}, null, 2) : "…"}
-              </pre>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* FULLSCREEN HERO */}
-      <main className={"hero hero-full " + impactClass}>
-        <div className="hero-bg" aria-hidden="true">
-          <div className="bg-photo" />
-          <div className="bg-tech" />
-          <div className="bg-glow" />
-          <div className="bg-vignette" />
-          <div className="rings" />
-        </div>
-
-        <div className="hero-inner">
-          <div className="top-row glass">
-            <div className="badge-row">
-              <span className="badge">DOMINAT8</span>
-              <span className="badge subtle">AI Website Automation Builder</span>
-              <span className="badge subtle">LIVE_OK</span>
-            </div>
-
-            <div className="micro-proof">
-              <div className="proof-kv">
-                <span className="k">HOME_OK</span>
-                <span className="v">V9_GLASS_FIX</span>
-              </div>
-              <div className="proof-kv">
-                <span className="k">CACHE</span>
-                <span className="v">Try ?ts=123</span>
-              </div>
+            <div className="leading-tight">
+              <div className="text-sm font-semibold tracking-wide text-white/90">Dominat8</div>
+              <div className="text-xs text-white/55">Homepage V10 • Signature Polish</div>
             </div>
           </div>
 
-          <div className="hero-grid">
-            <section className="hero-left glass">
-              <h1 className="hero-title">
-                Your SaaS deserves a <span className="accent">premium</span> homepage —
-                generated, polished, and shipped.
-              </h1>
+          <nav className="hidden items-center gap-7 text-sm text-white/70 md:flex">
+            <a className="transition hover:text-white/90" href="#how">How it works</a>
+            <a className="transition hover:text-white/90" href="#proof">Credibility</a>
+            <a className="transition hover:text-white/90" href="#cta">Launch</a>
+          </nav>
 
-              <p className="hero-sub">
-                Dominat8 runs a real pipeline: strategy → layout → copy → SEO → publish.
-                Instant first-load impact + an auto demo that runs once per session.
-              </p>
+          <div className="flex items-center gap-3">
+            <a
+              href="/templates"
+              className="hidden rounded-xl border border-white/10 bg-white/[0.05] px-4 py-2 text-sm text-white/80 shadow-[0_18px_55px_rgba(0,0,0,0.45)] transition hover:border-white/15 hover:bg-white/[0.065] md:inline-flex"
+            >
+              Browse templates
+            </a>
+            <PrimaryButton href="/app">Launch builder</PrimaryButton>
+          </div>
+        </div>
+        <div className="mx-auto max-w-6xl px-6">
+          <Hairline />
+        </div>
+      </header>
 
-              <div className="cta-row">
-                <a className="cta primary" href="/projects/new">
-                  Start a new build
-                  <span className="cta-glow" aria-hidden="true" />
-                </a>
-                <a className="cta ghost" href="/templates">
-                  Explore templates
-                </a>
+      {/* HERO (Fullscreen) */}
+      <section className="relative z-10">
+        <div
+          ref={heroRef}
+          className="mx-auto grid min-h-[calc(100vh-88px)] max-w-6xl grid-cols-1 gap-10 px-6 py-10 md:grid-cols-12 md:py-14"
+        >
+          {/* Left: copy */}
+          <div className="md:col-span-7">
+            <div className="flex flex-wrap items-center gap-3">
+              <SigBadge>LIVE_OK • fullscreen hero • visible glass</SigBadge>
+              <span className="text-xs text-white/55">HOME_STAMP: {stamp}</span>
+            </div>
+
+            <h1 className="mt-6 text-4xl font-semibold leading-[1.05] tracking-tight text-white md:text-6xl">
+              Build a{" "}
+              <span
+                className="bg-clip-text text-transparent"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(90deg, rgba(56,189,248,1), rgba(168,85,247,1), rgba(34,197,94,1))",
+                }}
+              >
+                flagship website
+              </span>{" "}
+              that looks expensive.
+            </h1>
+
+            <p className="mt-5 max-w-xl text-base leading-relaxed text-white/70 md:text-lg">
+              Dominat8 generates a clean, premium site structure — hero, sections, pages, SEO plan, sitemap —
+              then gives you the controls to iterate without chaos.
+            </p>
+
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <PrimaryButton href="/app">Generate my site</PrimaryButton>
+              <SecondaryButton href="/pricing">See pricing</SecondaryButton>
+              <div className="text-xs text-white/55">
+                Trust-first output • deploy proof • no guessing
               </div>
+            </div>
 
-              <div className="value-row">
-                <div className="value">
-                  <div className="value-k">Conversion-ready</div>
-                  <div className="value-v">Hero + sections with rhythm</div>
+            {/* Trust strip */}
+            <div className="mt-8">
+              <GlassCard className="p-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={cn(
+                        "h-2 w-2 rounded-full",
+                        probeOk === null ? "bg-white/50" : probeOk ? "bg-emerald-400" : "bg-amber-300"
+                      )}
+                    />
+                    <div className="text-xs font-semibold text-white/85">{trustMode}</div>
+                  </div>
+                  <div className="text-xs text-white/55">
+                    Probe fetched with <span className="text-white/70">cache: no-store</span>
+                  </div>
                 </div>
-                <div className="value">
-                  <div className="value-k">SEO baked in</div>
-                  <div className="value-v">Titles, schema, sitemap</div>
-                </div>
-                <div className="value">
-                  <div className="value-k">Publishable output</div>
-                  <div className="value-v">No toy previews</div>
-                </div>
-              </div>
-            </section>
+              </GlassCard>
+            </div>
 
-            <section className={"demo glass " + (demoOn ? "demo-on" : demo === "done" ? "demo-done" : "")}>
-              <div className="demo-left">
-                <div className="demo-title">
-                  {demoOn ? "Auto demo: generating…" : (demo === "done" ? "Demo complete" : "Demo")}
+            {/* Enterprise credibility strip (V10) */}
+            <div id="proof" className="mt-8">
+              <GlassCard className="p-6">
+                <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.32em] text-white/55">
+                      Enterprise credibility
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-white/90">
+                      Built for speed, SEO hygiene, and publish confidence.
+                    </div>
+                    <div className="mt-2 text-sm leading-relaxed text-white/65">
+                      This strip is deliberately “serious SaaS”: metrics + proof markers + placeholders for logos.
+                    </div>
+                  </div>
+                  <div className="md:text-right">
+                    <div className="text-xs text-white/55">Proof marker:</div>
+                    <div className="mt-1 rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-[11px] text-white/70">
+                      ROUTE_PROOF • HOME_OK • {stamp}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="steps">
-                  {demoSteps.map((s, idx) => {
-                    const isActive = demoOn && idx === activeStep;
-                    const isDone = demo !== "idle" && idx < activeStep;
-                    return (
-                      <div
-                        key={idx}
-                        className={"step " + (isActive ? "active" : "") + (isDone ? " done" : "")}
-                      >
-                        <div className="dot" aria-hidden="true" />
-                        <div className="step-text">
-                          <div className="step-title">{s.title}</div>
-                          <div className="step-sub">{s.sub}</div>
-                        </div>
-                        <div className="step-right" aria-hidden="true">
-                          {isActive ? <span className="spinner" /> : (isDone ? "✓" : "")}
-                        </div>
+                <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <Metric k="Speed to first build" v="Minutes" hint="Structured output that’s usable immediately." />
+                  <Metric k="SEO baseline" v="Planned" hint="Metadata + sitemap + robots (publish-ready habits)." />
+                  <Metric k="Deploy confidence" v="Proof" hint="Stamps + probe checks to reduce doubt." />
+                </div>
+
+                <div className="mt-6">
+                  <div className="text-[10px] uppercase tracking-[0.28em] text-white/50">
+                    Trusted by teams (placeholders)
+                  </div>
+                  <div className="mt-3">
+                    <LogoPills />
+                  </div>
+                </div>
+              </GlassCard>
+            </div>
+          </div>
+
+          {/* Right: demo panel (glass + depth tilt) */}
+          <div className="md:col-span-5">
+            <div
+              className="relative"
+              style={{
+                transform: `perspective(900px) rotateX(${depth.tiltX}deg) rotateY(${depth.tiltY}deg) translate3d(0,0,0)`,
+                transformStyle: "preserve-3d",
+                transition: "transform 120ms ease-out",
+              }}
+            >
+              {/* outer gradient border */}
+              <div className="absolute inset-0 rounded-3xl opacity-80"
+                style={{
+                  background:
+                    "linear-gradient(140deg, rgba(56,189,248,0.55), rgba(168,85,247,0.42), rgba(34,197,94,0.22))",
+                  filter: "blur(0px)",
+                }}
+              />
+              <div className="relative rounded-3xl p-[1px]">
+                <GlassCard className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-semibold text-white/90">Auto Demo</div>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-[0.22em] text-white/60">
+                      {demoRan ? "ran this session" : "ready"}
+                    </span>
+                  </div>
+
+                  {/* micro-kick + shock rings */}
+                  <div className="relative mt-5 overflow-hidden rounded-2xl border border-white/10 bg-black/25 p-5">
+                    <div
+                      className={cn(
+                        "absolute left-1/2 top-1/2 h-[260px] w-[260px] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-0",
+                        kick && "opacity-100"
+                      )}
+                      style={{
+                        border: "1px solid rgba(255,255,255,0.20)",
+                        boxShadow: "0 0 80px rgba(56,189,248,0.10)",
+                        transform: `translate(-50%, -50%) scale(${kick ? 1.15 : 0.85})`,
+                        transition: "transform 900ms ease-out, opacity 900ms ease-out",
+                      }}
+                    />
+                    <div
+                      className="absolute inset-0 opacity-70"
+                      style={{
+                        background:
+                          "radial-gradient(circle at 35% 30%, rgba(56,189,248,0.18), transparent 55%), radial-gradient(circle at 75% 35%, rgba(168,85,247,0.14), transparent 60%), radial-gradient(circle at 55% 80%, rgba(34,197,94,0.08), transparent 55%)",
+                      }}
+                    />
+                    <div className="relative">
+                      <div className="text-xs uppercase tracking-[0.28em] text-white/55">
+                        Pipeline Preview
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="mt-2 text-sm font-semibold text-white/90">
+                        Structured steps that feel “finish-for-me”
+                      </div>
+                      <div className="mt-4 space-y-3">
+                        {steps.map((s) => (
+                          <div
+                            key={s.title}
+                            className={cn(
+                              "rounded-2xl border p-4 transition",
+                              s.status === "done"
+                                ? "border-white/12 bg-white/[0.05]"
+                                : s.status === "active"
+                                ? "border-white/18 bg-white/[0.07]"
+                                : "border-white/10 bg-white/[0.04]"
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="text-xs font-semibold text-white/85">
+                                {s.title}
+                              </div>
+                              <span
+                                className={cn(
+                                  "rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.22em]",
+                                  s.status === "done"
+                                    ? "bg-emerald-500/15 text-emerald-200 border border-emerald-400/25"
+                                    : s.status === "active"
+                                    ? "bg-sky-500/15 text-sky-200 border border-sky-400/25"
+                                    : "bg-white/5 text-white/55 border border-white/10"
+                                )}
+                              >
+                                {s.status ?? "idle"}
+                              </span>
+                            </div>
+                            <div className="mt-1 text-xs leading-relaxed text-white/60">
+                              {s.desc}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
 
-                <div className="demo-foot">
-                  <span className="micro">
-                    {demoOn ? "Runs once per session (sessionStorage)" : "Refresh won’t spam the demo in this tab."}
-                  </span>
-                </div>
-              </div>
+                      <div className="mt-5 grid grid-cols-2 gap-3">
+                        <a
+                          href="/templates"
+                          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-xs font-semibold text-white/85 transition hover:border-white/15 hover:bg-white/[0.065]"
+                        >
+                          Explore templates
+                        </a>
+                        <a
+                          href="/use-cases"
+                          className="rounded-2xl px-4 py-3 text-center text-xs font-semibold text-black transition hover:-translate-y-[1px]"
+                          style={{
+                            background:
+                              "linear-gradient(90deg, rgba(56,189,248,1), rgba(168,85,247,1), rgba(34,197,94,1))",
+                          }}
+                        >
+                          See use-cases
+                        </a>
+                      </div>
 
-              <div className="demo-right">
-                <div className={"preview " + (demoOn ? "pulse" : "")} data-pulse={demoPulse}>
-                  <div className="preview-top">
-                    <div className="preview-dots" aria-hidden="true">
-                      <span /><span /><span />
+                      <div className="mt-5 text-[11px] text-white/50">
+                        Depth: <span className="text-white/70">{fmtPct((Math.abs(mx) + Math.abs(my)) * 20)}</span>{" "}
+                        • Tilt: <span className="text-white/70">{Math.round(depth.tiltY)}°/{Math.round(depth.tiltX)}°</span>
+                      </div>
                     </div>
-                    <div className="preview-url">www.dominat8.com</div>
-                    <div className="preview-tag">{demoOn ? "GENERATING" : (demo === "done" ? "READY" : "PREVIEW")}</div>
                   </div>
 
-                  <div className="preview-body">
-                    <div className="preview-hero">
-                      <div className="ph-title" />
-                      <div className="ph-sub" />
-                      <div className="ph-cta" />
+                  {/* Route proof (keep anxiety-killer) */}
+                  <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-xs text-white/70">
+                    <div className="font-semibold text-white/85">ROUTE_PROOF</div>
+                    <div className="mt-1">
+                      If you see this, you are on the deployed homepage route.
                     </div>
-
-                    <div className="preview-grid">
-                      <div className="card" />
-                      <div className="card" />
-                      <div className="card" />
-                    </div>
+                    <div className="mt-2 text-white/55">HOME_STAMP: {stamp}</div>
                   </div>
-
-                  <div className="preview-glow" aria-hidden="true" />
-                </div>
+                </GlassCard>
               </div>
-            </section>
+            </div>
           </div>
         </div>
-      </main>
+      </section>
 
-      <style jsx>{`
-        .home-root{
-          min-height:100vh;
-          background:#050608;
-          color:#eef2ff;
-        }
+      {/* HOW */}
+      <section id="how" className="relative z-10">
+        <div className="mx-auto max-w-6xl px-6 pb-16">
+          <GlassCard className="p-8 md:p-10">
+            <div className="text-xs uppercase tracking-[0.32em] text-white/55">How it works</div>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white/90 md:text-3xl">
+              Premium rhythm. Clean hierarchy. No clutter.
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/65 md:text-base">
+              The homepage isn’t trying to be clever. It’s trying to look trustworthy:
+              spacing, type, glass depth, a signature gradient, and proof markers that end doubt.
+            </p>
 
-        /* TRUST STRIP */
-        .trust-strip{
-          position:sticky;
-          top:0;
-          z-index:50;
-          display:flex;
-          align-items:center;
-          justify-content:space-between;
-          gap:12px;
-          padding:10px 14px;
-          border-bottom:1px solid rgba(255,255,255,0.10);
-          background:rgba(5,6,8,0.86);
-          backdrop-filter: blur(12px);
-        }
-        .trust-left{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
-        .trust-pill{
-          font-size:11px;
-          letter-spacing:0.18em;
-          padding:6px 10px;
-          border-radius:999px;
-          border:1px solid rgba(255,255,255,0.20);
-          background:rgba(255,255,255,0.08);
-          box-shadow: 0 10px 24px rgba(0,0,0,0.25);
-        }
-        .trust-text{ font-size:12px; opacity:0.78; }
-        .trust-btn{
-          font-size:12px;
-          padding:8px 10px;
-          border-radius:10px;
-          border:1px solid rgba(255,255,255,0.18);
-          background:rgba(255,255,255,0.08);
-          color:#eef2ff;
-          cursor:pointer;
-        }
-        .trust-btn:hover{ background:rgba(255,255,255,0.12); }
+            <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                <div className="text-sm font-semibold text-white/90">Brand pass</div>
+                <div className="mt-2 text-sm text-white/65">
+                  Dominat8’s signature accent is now consistent across CTAs, highlights, and demo.
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                <div className="text-sm font-semibold text-white/90">Depth pass</div>
+                <div className="mt-2 text-sm text-white/65">
+                  Subtle parallax + tilt gives “expensive” without looking gimmicky.
+                </div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+                <div className="text-sm font-semibold text-white/90">Credibility pass</div>
+                <div className="mt-2 text-sm text-white/65">
+                  Enterprise strip: metrics + proof markers + logos (placeholders).
+                </div>
+              </div>
+            </div>
 
-        .trust-panel{
-          padding:14px;
-          border-bottom:1px solid rgba(255,255,255,0.10);
-          background:rgba(8,9,12,0.66);
-        }
-        .trust-grid{
-          display:grid;
-          grid-template-columns: 1fr 1fr;
-          gap:12px;
-          max-width:1180px;
-          margin:0 auto;
-        }
-        .trust-card{
-          border-radius:18px;
-          border:1px solid rgba(255,255,255,0.14);
-          background:rgba(255,255,255,0.06);
-          padding:12px;
-          overflow:hidden;
-          box-shadow: 0 18px 60px rgba(0,0,0,0.35);
-        }
-        .trust-card-wide{ grid-column: 1 / span 2; }
-        .trust-card-title{
-          font-size:12px;
-          letter-spacing:0.12em;
-          text-transform:uppercase;
-          opacity:0.72;
-          margin-bottom:10px;
-        }
-        .trust-kv{
-          display:grid;
-          grid-template-columns: 110px 1fr;
-          gap:6px 10px;
-          font-size:12px;
-        }
-        .trust-kv .k{ opacity:0.65; }
-        .trust-kv .v{ opacity:0.92; word-break:break-word; }
-        .trust-pre{
-          margin:0;
-          font-size:12px;
-          line-height:1.45;
-          white-space:pre-wrap;
-          word-break:break-word;
-          opacity:0.92;
-        }
-        .trust-error{ margin-top:10px; font-size:12px; color:#ffd3d3; opacity:0.95; }
+            <div id="cta" className="mt-10 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+              <div className="text-sm text-white/65">
+                Next optional polish: scroll-reveal section animations + richer “SiteGround-style” feature tiles.
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <PrimaryButton href="/app">Start now</PrimaryButton>
+                <SecondaryButton href="/templates">Browse templates</SecondaryButton>
+              </div>
+            </div>
 
-        /* FULLSCREEN HERO */
-        .hero{
-          position:relative;
-          overflow:hidden;
-          padding: 18px 14px 34px;
-        }
-        .hero-full{
-          min-height: calc(100vh - 46px);
-          display:flex;
-          align-items:stretch;
-        }
-        .hero-inner{
-          position:relative;
-          max-width: 1180px;
-          margin: 0 auto;
-          width:100%;
-          display:flex;
-          flex-direction:column;
-          justify-content:center;
-          padding: 22px 0 34px;
-        }
-
-        /* "GLASS" that actually shows */
-        .glass{
-          border-radius:22px;
-          border:1px solid rgba(255,255,255,0.16);
-          background: rgba(12,14,20,0.56);
-          box-shadow:
-            0 26px 90px rgba(0,0,0,0.55),
-            0 1px 0 rgba(255,255,255,0.06) inset;
-          backdrop-filter: blur(14px);
-        }
-
-        .hero-bg{ position:absolute; inset:0; pointer-events:none; }
-        .bg-photo{
-          position:absolute; inset:-30%;
-          background:
-            radial-gradient(900px 520px at 18% 25%, rgba(255,255,255,0.16), rgba(255,255,255,0.00) 58%),
-            radial-gradient(820px 560px at 72% 42%, rgba(255,255,255,0.14), rgba(255,255,255,0.00) 62%),
-            radial-gradient(920px 720px at 55% 85%, rgba(255,255,255,0.08), rgba(255,255,255,0.00) 62%),
-            linear-gradient(180deg, rgba(18,20,28,0.0), rgba(5,6,8,1));
-        }
-        .bg-tech{
-          position:absolute; inset:-10%;
-          opacity:0.55;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900' viewBox='0 0 900 900'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ffffff' stop-opacity='0.14'/%3E%3Cstop offset='1' stop-color='%23ffffff' stop-opacity='0.04'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg stroke='url(%23g)' stroke-width='1'%3E%3Cpath d='M0 90 H900 M0 180 H900 M0 270 H900 M0 360 H900 M0 450 H900 M0 540 H900 M0 630 H900 M0 720 H900 M0 810 H900'/%3E%3Cpath d='M90 0 V900 M180 0 V900 M270 0 V900 M360 0 V900 M450 0 V900 M540 0 V900 M630 0 V900 M720 0 V900 M810 0 V900'/%3E%3C/g%3E%3Cg stroke='%23ffffff' stroke-opacity='0.10' stroke-width='1' fill='none'%3E%3Cpath d='M130 210 C240 170 330 170 440 210 S640 250 770 210'/%3E%3Cpath d='M150 520 C260 440 360 430 470 500 S650 600 780 540'/%3E%3Cpath d='M230 320 H680'/%3E%3Cpath d='M220 610 H670'/%3E%3C/g%3E%3Cg fill='%23ffffff' fill-opacity='0.11'%3E%3Ccircle cx='230' cy='320' r='3'/%3E%3Ccircle cx='680' cy='320' r='3'/%3E%3Ccircle cx='220' cy='610' r='3'/%3E%3Ccircle cx='670' cy='610' r='3'/%3E%3Ccircle cx='470' cy='500' r='3'/%3E%3C/g%3E%3C/svg%3E");
-          background-size: 860px 860px;
-          background-repeat: repeat;
-          background-position: 0 0;
-        }
-        .bg-glow{
-          position:absolute; inset:-30%;
-          background:
-            radial-gradient(760px 460px at 42% 28%, rgba(255,255,255,0.22), rgba(255,255,255,0.0) 60%),
-            radial-gradient(900px 640px at 74% 55%, rgba(255,255,255,0.14), rgba(255,255,255,0.0) 64%);
-          opacity:0.55;
-          filter: blur(14px);
-        }
-        /* lighter vignette so the bg reads */
-        .bg-vignette{
-          position:absolute; inset:0;
-          background:
-            radial-gradient(980px 560px at 40% 28%, rgba(0,0,0,0.0), rgba(0,0,0,0.32) 64%),
-            radial-gradient(1200px 820px at 50% 75%, rgba(0,0,0,0.0), rgba(0,0,0,0.52) 72%),
-            linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.45));
-        }
-
-        .rings{ position:absolute; inset:0; opacity:0; transform: scale(0.95); }
-        .rings:before, .rings:after{
-          content:"";
-          position:absolute;
-          left:50%;
-          top:40%;
-          width:520px; height:520px;
-          border-radius:999px;
-          transform: translate(-50%,-50%) scale(0.60);
-          border:1px solid rgba(255,255,255,0.16);
-          box-shadow: 0 0 0 1px rgba(255,255,255,0.06) inset;
-          opacity:0;
-        }
-        .rings:after{ width:760px; height:760px; border-color: rgba(255,255,255,0.10); }
-
-        .top-row{
-          display:flex;
-          align-items:flex-start;
-          justify-content:space-between;
-          gap:12px;
-          flex-wrap:wrap;
-          padding: 14px 16px;
-        }
-
-        .badge-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-        .badge{
-          font-size:12px;
-          padding:7px 10px;
-          border-radius:999px;
-          border:1px solid rgba(255,255,255,0.18);
-          background:rgba(255,255,255,0.08);
-          letter-spacing:0.14em;
-          text-transform:uppercase;
-        }
-        .badge.subtle{ opacity:0.82; letter-spacing:0.10em; }
-
-        .micro-proof{ display:flex; gap:10px; flex-wrap:wrap; opacity:0.90; }
-        .proof-kv{
-          display:flex;
-          gap:8px;
-          align-items:center;
-          border:1px solid rgba(255,255,255,0.16);
-          background: rgba(255,255,255,0.06);
-          padding:8px 10px;
-          border-radius:14px;
-          font-size:12px;
-        }
-        .proof-kv .k{ letter-spacing:0.12em; text-transform:uppercase; opacity:0.72; }
-        .proof-kv .v{ opacity:0.92; }
-
-        .hero-grid{
-          margin-top: 16px;
-          display:grid;
-          grid-template-columns: minmax(520px, 1.05fr) minmax(420px, 0.95fr);
-          gap:14px;
-          align-items:stretch;
-        }
-
-        .hero-left{ padding: 18px 18px 16px; }
-
-        .hero-title{
-          margin: 6px 0 10px;
-          font-size: 50px;
-          line-height: 1.03;
-          letter-spacing: -0.02em;
-        }
-        .accent{
-          background: linear-gradient(90deg, rgba(255,255,255,1), rgba(255,255,255,0.62));
-          -webkit-background-clip:text;
-          background-clip:text;
-          color:transparent;
-        }
-        .hero-sub{
-          margin:0 0 16px;
-          font-size:16px;
-          line-height:1.65;
-          opacity:0.84;
-          max-width: 66ch;
-        }
-
-        .cta-row{ display:flex; gap:10px; flex-wrap:wrap; margin: 12px 0 14px; }
-        .cta{
-          position:relative;
-          display:inline-flex;
-          align-items:center;
-          justify-content:center;
-          gap:10px;
-          padding:12px 14px;
-          border-radius:14px;
-          border:1px solid rgba(255,255,255,0.18);
-          text-decoration:none;
-          color:#eef2ff;
-          font-weight:800;
-          letter-spacing:0.01em;
-          overflow:hidden;
-          background: rgba(255,255,255,0.08);
-        }
-        .cta.primary{ background:rgba(255,255,255,0.14); }
-        .cta.ghost{ background:rgba(255,255,255,0.08); opacity:0.96; }
-        .cta:hover{ background:rgba(255,255,255,0.16); }
-        .cta-glow{
-          position:absolute;
-          inset:-20px;
-          background: radial-gradient(circle at 40% 20%, rgba(255,255,255,0.35), rgba(255,255,255,0.0) 55%);
-          opacity:0.0;
-          transition: opacity 180ms ease;
-          pointer-events:none;
-        }
-        .cta.primary:hover .cta-glow{ opacity:0.7; }
-
-        .value-row{
-          display:grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap:10px;
-          margin-top: 10px;
-        }
-        .value{
-          border-radius:16px;
-          border:1px solid rgba(255,255,255,0.16);
-          background: rgba(255,255,255,0.06);
-          padding: 12px;
-        }
-        .value-k{ font-size:12px; letter-spacing:0.14em; text-transform:uppercase; opacity:0.72; }
-        .value-v{ margin-top:6px; font-size:13px; opacity:0.90; line-height:1.4; }
-
-        /* DEMO */
-        .demo{
-          overflow:hidden;
-          display:flex;
-          flex-direction:column;
-        }
-        .demo-left{ padding: 14px 14px 10px; }
-        .demo-title{
-          font-size:12px;
-          letter-spacing:0.14em;
-          text-transform:uppercase;
-          opacity:0.72;
-          margin-bottom:10px;
-        }
-        .steps{ display:flex; flex-direction:column; gap:8px; }
-        .step{
-          display:flex;
-          align-items:flex-start;
-          gap:10px;
-          padding:10px 10px;
-          border-radius:14px;
-          border:1px solid rgba(255,255,255,0.14);
-          background:rgba(255,255,255,0.06);
-        }
-        .step .dot{
-          width:10px; height:10px;
-          border-radius:999px;
-          margin-top:5px;
-          border:1px solid rgba(255,255,255,0.24);
-          background:rgba(255,255,255,0.10);
-          flex: 0 0 auto;
-        }
-        .step-text{ flex:1; }
-        .step-title{ font-size:13px; font-weight:900; opacity:0.94; }
-        .step-sub{ font-size:12px; opacity:0.70; margin-top:2px; }
-        .step-right{
-          font-size:12px;
-          opacity:0.84;
-          width:24px;
-          display:flex;
-          align-items:center;
-          justify-content:center;
-          margin-top:2px;
-        }
-        .step.active{
-          border-color: rgba(255,255,255,0.22);
-          background: rgba(255,255,255,0.10);
-        }
-        .step.active .dot{
-          background: rgba(255,255,255,0.24);
-          box-shadow: 0 0 0 6px rgba(255,255,255,0.08);
-        }
-        .step.done{ opacity:0.84; }
-
-        .spinner{
-          width:14px; height:14px;
-          border-radius:999px;
-          border:2px solid rgba(255,255,255,0.25);
-          border-top-color: rgba(255,255,255,0.90);
-          animation: spin 700ms linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .demo-foot{ margin-top:10px; opacity:0.72; font-size:12px; }
-
-        .demo-right{ padding: 0 14px 14px; }
-        .preview{
-          position:relative;
-          min-height: 260px;
-          border-radius:16px;
-          border:1px solid rgba(255,255,255,0.18);
-          background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.05));
-          overflow:hidden;
-          box-shadow: 0 18px 60px rgba(0,0,0,0.45);
-        }
-        .preview-top{
-          display:flex;
-          align-items:center;
-          justify-content:space-between;
-          gap:10px;
-          padding:10px 10px;
-          border-bottom:1px solid rgba(255,255,255,0.12);
-          background: rgba(0,0,0,0.18);
-        }
-        .preview-dots{ display:flex; gap:6px; }
-        .preview-dots span{
-          width:9px; height:9px; border-radius:999px;
-          background: rgba(255,255,255,0.16);
-          border: 1px solid rgba(255,255,255,0.14);
-        }
-        .preview-url{ font-size:12px; opacity:0.78; flex:1; text-align:center; }
-        .preview-tag{
-          font-size:11px;
-          letter-spacing:0.14em;
-          opacity:0.86;
-          padding:5px 8px;
-          border-radius:999px;
-          border:1px solid rgba(255,255,255,0.14);
-          background: rgba(255,255,255,0.08);
-          white-space:nowrap;
-        }
-        .preview-body{ padding:14px; }
-        .preview-hero{
-          border-radius:14px;
-          border:1px solid rgba(255,255,255,0.14);
-          background: rgba(255,255,255,0.06);
-          padding:14px;
-          margin-bottom:12px;
-        }
-        .ph-title{ height:18px; border-radius:10px; background: rgba(255,255,255,0.18); width:72%; }
-        .ph-sub{ margin-top:10px; height:10px; border-radius:10px; background: rgba(255,255,255,0.10); width:88%; }
-        .ph-cta{ margin-top:12px; height:34px; border-radius:12px; background: rgba(255,255,255,0.14); width:44%; border:1px solid rgba(255,255,255,0.14); }
-        .preview-grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; }
-        .preview-grid .card{ height:70px; border-radius:14px; border:1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.06); }
-
-        .preview-glow{
-          position:absolute; inset:-30%;
-          background: radial-gradient(circle at 40% 20%, rgba(255,255,255,0.24), rgba(255,255,255,0.0) 55%);
-          opacity:0.0;
-          pointer-events:none;
-        }
-        .preview.pulse .preview-glow{ animation: glowPulse 600ms ease-out infinite; }
-        @keyframes glowPulse{
-          0%{ opacity:0.06; transform: scale(1.0); }
-          50%{ opacity:0.22; transform: scale(1.02); }
-          100%{ opacity:0.08; transform: scale(1.0); }
-        }
-
-        /* RESPONSIVE */
-        @media (max-width: 1140px){
-          .hero-grid{ grid-template-columns: 1fr; }
-        }
-        @media (max-width: 720px){
-          .hero-title{ font-size: 36px; }
-          .value-row{ grid-template-columns: 1fr; }
-          .preview-grid{ grid-template-columns: 1fr; }
-          .preview-grid .card{ height:58px; }
-        }
-
-        /* IMPACT INTRO */
-        .impact-armed .glass{ opacity:0; transform: translateY(14px) scale(0.985); }
-        .impact-fired{ animation: microKick 180ms cubic-bezier(0.2, 0.9, 0.2, 1) 0ms 1 both; }
-        @keyframes microKick{
-          0%{ transform: translate3d(0,0,0) rotate(0deg); }
-          35%{ transform: translate3d(0,-2px,0) rotate(-0.12deg); }
-          70%{ transform: translate3d(0,1px,0) rotate(0.10deg); }
-          100%{ transform: translate3d(0,0,0) rotate(0deg); }
-        }
-        .impact-fired .glass{ animation: snapIn 560ms cubic-bezier(0.18, 0.92, 0.20, 1) 60ms 1 both; }
-        @keyframes snapIn{
-          0%{ opacity:0; transform: translateY(14px) scale(0.92); filter: blur(2px); }
-          60%{ opacity:1; transform: translateY(-2px) scale(1.01); filter: blur(0px); }
-          100%{ opacity:1; transform: translateY(0px) scale(1.0); filter: blur(0px); }
-        }
-        .impact-fired .rings{
-          opacity:1;
-          animation: ringsOn 900ms ease-out 0ms 1 both;
-        }
-        .impact-fired .rings:before{ animation: ring 760ms ease-out 0ms 1 both; }
-        .impact-fired .rings:after{ animation: ring 900ms ease-out 40ms 1 both; }
-        @keyframes ringsOn{
-          0%{ opacity:0; transform: scale(0.95); }
-          25%{ opacity:1; transform: scale(1.0); }
-          100%{ opacity:0.18; transform: scale(1.05); }
-        }
-        @keyframes ring{
-          0%{ opacity:0; transform: translate(-50%,-50%) scale(0.55); }
-          25%{ opacity:0.85; }
-          100%{ opacity:0; transform: translate(-50%,-50%) scale(1.05); }
-        }
-
-        @media (prefers-reduced-motion: reduce){
-          .impact-fired, .impact-fired .glass, .rings, .preview-glow, .spinner { animation: none !important; }
-        }
-      `}</style>
-    </div>
+            <div className="mt-8">
+              <Hairline />
+              <div className="mt-5 flex flex-col justify-between gap-2 text-xs text-white/50 md:flex-row">
+                <div>© {new Date().getFullYear()} Dominat8 • Presentation-grade baseline</div>
+                <div>HOME_OK • {stamp}</div>
+              </div>
+            </div>
+          </GlassCard>
+        </div>
+      </section>
+    </main>
   );
 }
