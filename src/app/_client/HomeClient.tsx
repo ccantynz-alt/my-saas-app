@@ -1,575 +1,882 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
-type ProbePayload = {
+type ProbeInfo = {
   ok: boolean;
-  probe: string;
-  serverTimeIso: string;
-  serverTimeMs: number;
-  rand: string;
-  ts: string | null;
-  env?: Record<string, string | null>;
+  status: number;
+  fetchedAtIso: string;
+  headers: Record<string, string>;
+  json: any;
+  error?: string;
 };
 
-function cx(...classes: Array<string | false | null | undefined>) {
-  return classes.filter(Boolean).join(" ");
+type DemoPhase =
+  | "idle"
+  | "running"
+  | "done";
+
+const SESSION_KEY = "dominat8_home_demo_ran_v7";
+
+function nowIso() {
+  try { return new Date().toISOString(); } catch { return ""; }
 }
 
-function usePrefersReducedMotion() {
-  const [reduced, setReduced] = React.useState(false);
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-    // Guard: some older browsers
-    const mq = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
-    const onChange = () => setReduced(!!mq?.matches);
-    onChange();
-    mq?.addEventListener?.("change", onChange);
-    return () => mq?.removeEventListener?.("change", onChange);
-  }, []);
-  return reduced;
+function safeJsonParse(text: string) {
+  try { return JSON.parse(text); } catch { return null; }
 }
 
-async function fetchProbe(ts: number): Promise<ProbePayload> {
-  const r = await fetch(`/api/__probe__?ts=${ts}`, {
-    method: "GET",
-    cache: "no-store",
-    headers: { "cache-control": "no-store" },
-  });
-  if (!r.ok) throw new Error(`Probe failed: ${r.status}`);
-  return (await r.json()) as ProbePayload;
+function pickDomHeaders(all: Headers): Record<string, string> {
+  const out: Record<string, string> = {};
+  try {
+    for (const [k, v] of all.entries()) {
+      const key = (k || "").toLowerCase();
+      if (key.startsWith("x-dominat8-")) out[key] = v;
+    }
+  } catch {
+    // ignore
+  }
+  return out;
 }
 
-function formatRelative(ms: number) {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}m ${r}s`;
-}
-
-function Chip({ text }: { text: string }) {
-  return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/30 px-3 py-1 text-xs text-white/75">
-      <span className="h-1.5 w-1.5 rounded-full bg-white/25" />
-      {text}
-    </div>
-  );
-}
-
-function GlassCard({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div
-      className={cx(
-        "relative overflow-hidden rounded-3xl border border-white/12 bg-white/[0.045] shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_30px_90px_rgba(0,0,0,0.68)] backdrop-blur",
-        className
-      )}
-    >
-      <div className="pointer-events-none absolute inset-0 opacity-[0.55] [mask-image:radial-gradient(ellipse_at_top,black,transparent_65%)] bg-gradient-to-b from-white/12 via-white/0 to-white/0" />
-      <div className="relative">{children}</div>
-    </div>
-  );
-}
-
-type DemoState = "idle" | "running" | "done";
-
-const PRESETS = [
-  "A luxury AI website builder for founders. Dark, premium, punchy.",
-  "A local trades business site with booking + trust badges + reviews.",
-  "A SaaS landing page for an AI tool with pricing + FAQ + strong CTA.",
-];
-
-const THEMES = [
-  { name: "Nebula Purple", a: "rgba(168,85,247,0.78)", b: "rgba(59,130,246,0.60)", c: "rgba(34,211,238,0.25)" },
-  { name: "Hyper Blue", a: "rgba(59,130,246,0.78)", b: "rgba(34,211,238,0.60)", c: "rgba(255,255,255,0.18)" },
-  { name: "Fuchsia Pop", a: "rgba(217,70,239,0.78)", b: "rgba(168,85,247,0.60)", c: "rgba(59,130,246,0.25)" },
-];
-
-function Step({ on, title, desc }: { on: boolean; title: string; desc: string }) {
-  return (
-    <div
-      className={cx(
-        "rounded-2xl border p-4 transition-all",
-        on ? "border-fuchsia-300/28 bg-fuchsia-300/12 shadow-[0_0_0_1px_rgba(217,70,239,0.10),0_18px_60px_rgba(168,85,247,0.16)]"
-           : "border-white/10 bg-black/25"
-      )}
-    >
-      <div className="text-sm font-bold text-white/92">{title}</div>
-      <div className="mt-1 text-xs text-white/70">{desc}</div>
-    </div>
-  );
-}
-
-function PreviewShell({ variant, hot }: { variant: number; hot: boolean }) {
-  const v = variant % 3;
-  const top = [
-    { h: "AI Tool Landing", s: "Conversion hero + pricing + FAQ", tag: "SaaS" },
-    { h: "Local Service Site", s: "Trust, reviews, booking CTA", tag: "Local" },
-    { h: "Agency Portfolio", s: "Showcase + lead capture + proof", tag: "Agency" },
-  ][v];
-
-  const blocks =
-    v === 0
-      ? ["Hero + glow", "Benefits", "Pricing", "FAQ", "Closing CTA"]
-      : v === 1
-      ? ["Hero + booking", "Services", "Reviews", "Areas", "Call now"]
-      : ["Hero + reel", "Case studies", "Proof", "Process", "Contact CTA"];
-
-  return (
-    <div className={cx(
-      "relative overflow-hidden rounded-3xl border border-white/12 bg-black/35 transition-transform",
-      hot ? "scale-[1.012]" : "scale-100"
-    )}>
-      <div className={cx(
-        "absolute inset-0 opacity-[0.34]",
-        hot ? "animate-d8-flicker" : ""
-      )} style={{
-        background:
-          "radial-gradient(circle_at_20%_25%,rgba(255,255,255,0.12),transparent_55%),radial-gradient(circle_at_85%_60%,rgba(255,255,255,0.07),transparent_60%)"
-      }} />
-      <div className="relative p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-xs uppercase tracking-[0.28em] text-white/55">{top.tag} preview</div>
-            <div className="mt-1 text-sm font-extrabold text-white/90">{top.h}</div>
-            <div className="mt-1 text-xs text-white/65">{top.s}</div>
-          </div>
-          <div className="rounded-2xl border border-white/12 bg-white/[0.06] px-3 py-2 text-xs text-white/75">
-            Live preview
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-3">
-          <div className={cx(
-            "h-24 rounded-2xl border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.16),rgba(255,255,255,0.04))]",
-            hot ? "shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_18px_70px_rgba(168,85,247,0.14)]" : ""
-          )} />
-          <div className="grid grid-cols-2 gap-3">
-            <div className="h-16 rounded-2xl border border-white/10 bg-white/[0.06]" />
-            <div className="h-16 rounded-2xl border border-white/10 bg-white/[0.06]" />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="h-14 rounded-2xl border border-white/10 bg-white/[0.05]" />
-            <div className="h-14 rounded-2xl border border-white/10 bg-white/[0.05]" />
-            <div className="h-14 rounded-2xl border border-white/10 bg-white/[0.05]" />
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          {blocks.map((b) => (
-            <div key={b} className="rounded-full border border-white/12 bg-black/25 px-3 py-1 text-xs text-white/70">
-              {b}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
 }
 
 export default function HomeClient() {
-  const reducedMotion = usePrefersReducedMotion();
+  const [intro, setIntro] = useState<"armed" | "fired" | "done">("armed");
+  const [demo, setDemo] = useState<DemoPhase>("idle");
+  const [demoStep, setDemoStep] = useState<number>(0);
+  const [demoPulse, setDemoPulse] = useState<number>(0);
+  const [trustOpen, setTrustOpen] = useState<boolean>(false);
+  const [probe, setProbe] = useState<ProbeInfo | null>(null);
 
-  const [clientStartMs] = React.useState<number>(() => Date.now());
-  const [clientTs] = React.useState<number>(() => Math.floor(Date.now() / 1000));
-  const [probe, setProbe] = React.useState<ProbePayload | null>(null);
-  const [probeErr, setProbeErr] = React.useState<string | null>(null);
-  const [probeOpen, setProbeOpen] = React.useState<boolean>(false);
-  const [loading, setLoading] = React.useState<boolean>(true);
+  const timeoutsRef = useRef<number[]>([]);
+  const mountedRef = useRef<boolean>(false);
 
-  // Cursor spotlight
-  const [mouse, setMouse] = React.useState<{ x: number; y: number }>({ x: -9999, y: -9999 });
-  const mouseRef = React.useRef<{ x: number; y: number }>({ x: -9999, y: -9999 });
-  const rafRef = React.useRef<number | null>(null);
+  const demoSteps = useMemo(() => ([
+    { title: "Locking onto your niche", sub: "Reading your intent + audience" },
+    { title: "Generating homepage layout", sub: "Hero, sections, flow rhythm" },
+    { title: "Writing conversion copy", sub: "Benefit-first, bold, clean" },
+    { title: "Building SEO plan", sub: "Sitemap, titles, meta, schema" },
+    { title: "Preview + publish pulse", sub: "Final polish + go-live" },
+  ]), []);
 
-  // Demo
-  const [prompt, setPrompt] = React.useState<string>(PRESETS[0]);
-  const [demo, setDemo] = React.useState<DemoState>("idle");
-  const [step, setStep] = React.useState<number>(0);
-  const [variant, setVariant] = React.useState<number>(0);
-  const [theme, setTheme] = React.useState<number>(0);
-  const [impact, setImpact] = React.useState<boolean>(true);   // first load impact
-  const [hot, setHot] = React.useState<boolean>(false);        // preview highlight pulse
-
-  React.useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setLoading(true);
-        setProbeErr(null);
-        const data = await fetchProbe(clientTs);
-        if (!alive) return;
-        setProbe(data);
-      } catch (e: any) {
-        if (!alive) return;
-        setProbeErr(e?.message ?? "Unknown error");
-      } finally {
-        if (!alive) return;
-        setLoading(false);
-      }
-    })();
-    return () => { alive = false; };
-  }, [clientTs]);
-
-  React.useEffect(() => {
-    if (reducedMotion) return;
-    const onMove = (e: MouseEvent) => {
-      mouseRef.current = { x: e.clientX, y: e.clientY };
-      if (rafRef.current !== null) return;
-      rafRef.current = window.requestAnimationFrame(() => {
-        rafRef.current = null;
-        setMouse(mouseRef.current);
-      });
-    };
-    window.addEventListener("mousemove", onMove, { passive: true });
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
-    };
-  }, [reducedMotion]);
-
-  function runDemo() {
-    if (demo === "running") return;
-    setDemo("running");
-    setStep(0);
-    setHot(true);
-
-    setTheme((t) => (t + 1) % THEMES.length);
-    setVariant((v) => v + 1);
-
-    const times = [380, 780, 1180, 1580];
-    times.forEach((ms, i) => {
-      window.setTimeout(() => setStep(i + 1), ms);
-    });
-    window.setTimeout(() => setDemo("done"), 1820);
-    window.setTimeout(() => setHot(false), 1300);
-    window.setTimeout(() => setDemo("idle"), 5200);
+  function clearTimers() {
+    for (const t of timeoutsRef.current) {
+      try { clearTimeout(t); } catch {}
+    }
+    timeoutsRef.current = [];
   }
 
-  // Auto-fire once per browser (first wow hit)
-  React.useEffect(() => {
-    if (reducedMotion) { setImpact(false); return; }
+  async function runProbe() {
+    const ts = Math.floor(Date.now() / 1000);
+    const url = `/api/__probe__?ts=${ts}`;
+
+    const base: ProbeInfo = {
+      ok: false,
+      status: 0,
+      fetchedAtIso: nowIso(),
+      headers: {},
+      json: null,
+    };
+
     try {
-      const key = "dominat8_home_auto_demo_v7";
-      const already = window.sessionStorage.getItem(key);
-      if (!already) {
-        window.sessionStorage.setItem(key, "1");
-        // brief delay so layout paints first
-        window.setTimeout(() => runDemo(), 420);
-      }
-    } catch {
-      // ignore
+      const res = await fetch(url, { cache: "no-store" });
+      const text = await res.text();
+      const parsed = safeJsonParse(text);
+
+      setProbe({
+        ...base,
+        ok: res.ok,
+        status: res.status,
+        headers: pickDomHeaders(res.headers),
+        json: parsed ?? { raw: text?.slice(0, 2000) },
+      });
+    } catch (e: any) {
+      setProbe({
+        ...base,
+        ok: false,
+        status: 0,
+        headers: {},
+        json: null,
+        error: (e && e.message) ? String(e.message) : "Probe failed",
+      });
     }
-    window.setTimeout(() => setImpact(false), 1400);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reducedMotion]);
+  }
 
-  const nowMs = Date.now();
-  const uptime = nowMs - clientStartMs;
-  const serverNowMs = probe?.serverTimeMs ?? null;
-  const skewMs = serverNowMs ? Math.round(nowMs - serverNowMs) : null;
+  function fireIntro() {
+    // impact snap + shock rings + glare burst
+    setIntro("fired");
+    const t1 = window.setTimeout(() => setIntro("done"), 900);
+    timeoutsRef.current.push(t1);
+  }
 
-  const t = THEMES[theme];
-  const mx = reducedMotion ? -9999 : mouse.x;
-  const my = reducedMotion ? -9999 : mouse.y;
+  function startDemoOncePerSession() {
+    let already = false;
+    try {
+      already = sessionStorage.getItem(SESSION_KEY) === "1";
+    } catch {
+      already = false;
+    }
+
+    if (already) return;
+
+    try { sessionStorage.setItem(SESSION_KEY, "1"); } catch {}
+
+    setDemo("running");
+    setDemoStep(0);
+    setDemoPulse(0);
+
+    // Drive steps + pulses (fast, but readable)
+    const stepMs = 850;
+    const pulseMs = 280;
+
+    for (let i = 0; i < demoSteps.length; i++) {
+      const t = window.setTimeout(() => {
+        setDemoStep(i);
+        setDemoPulse((p) => p + 1);
+      }, i * stepMs);
+      timeoutsRef.current.push(t);
+    }
+
+    // Add some preview pulses between steps
+    for (let i = 1; i <= 10; i++) {
+      const t = window.setTimeout(() => {
+        setDemoPulse((p) => p + 1);
+      }, i * pulseMs);
+      timeoutsRef.current.push(t);
+    }
+
+    const doneAt = demoSteps.length * stepMs + 250;
+    const tDone = window.setTimeout(() => setDemo("done"), doneAt);
+    timeoutsRef.current.push(tDone);
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    // Impact intro (fast)
+    const t0 = window.setTimeout(() => fireIntro(), 30);
+    timeoutsRef.current.push(t0);
+
+    // Auto-demo once per session
+    const tDemo = window.setTimeout(() => startDemoOncePerSession(), 120);
+    timeoutsRef.current.push(tDemo);
+
+    // Trust probe (no-store)
+    const tProbe = window.setTimeout(() => runProbe(), 160);
+    timeoutsRef.current.push(tProbe);
+
+    return () => {
+      mountedRef.current = false;
+      clearTimers();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const activeStep = clamp(demoStep, 0, demoSteps.length - 1);
+  const step = demoSteps[activeStep];
+
+  const impactClass =
+    intro === "armed" ? "impact-armed" :
+    intro === "fired" ? "impact-fired" :
+    "impact-done";
+
+  const demoOn = demo === "running";
 
   return (
-    <main
-      className={cx("min-h-screen bg-black text-white", impact && !reducedMotion ? "animate-d8-kick" : "")}
-      style={
-        {
-          ["--mx" as any]: `${mx}px`,
-          ["--my" as any]: `${my}px`,
-          ["--a" as any]: t.a,
-          ["--b" as any]: t.b,
-          ["--c" as any]: t.c,
-        } as React.CSSProperties
-      }
-    >
-      {/* Background */}
-      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(255,255,255,0.06),transparent_55%),radial-gradient(circle_at_80%_30%,rgba(255,255,255,0.04),transparent_60%)]" />
-
-        <div className={cx(
-          "absolute inset-0 opacity-[0.32] bg-[radial-gradient(circle_at_18%_20%,var(--a),transparent_55%),radial-gradient(circle_at_78%_26%,var(--b),transparent_58%),radial-gradient(circle_at_55%_82%,var(--c),transparent_65%)]",
-          reducedMotion ? "" : "animate-d8-aurora"
-        )} />
-
-        <div
-          className={cx("absolute inset-0", reducedMotion ? "opacity-0" : "opacity-[0.75]")}
-          style={{
-            background:
-              "radial-gradient(820px circle at var(--mx) var(--my), rgba(217,70,239,0.20), transparent 46%), radial-gradient(1120px circle at var(--mx) var(--my), rgba(59,130,246,0.14), transparent 56%)",
-          }}
-        />
-
-        <div className="absolute inset-0 opacity-[0.11] [background-image:linear-gradient(to_right,rgba(255,255,255,0.09)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:72px_72px]" />
-
-        <div className="absolute inset-0 opacity-[0.08] [background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22><filter id=%22n%22 x=%220%22 y=%220%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%224%22 stitchTiles=%22stitch%22/></filter><rect width=%22200%22 height=%22200%22 filter=%22url(%23n)%22 opacity=%220.35%22/></svg>')]" />
-
-        {/* Impact overlays */}
-        {reducedMotion ? null : (
-          <>
-            <div className={cx("absolute inset-0 opacity-0", impact ? "animate-d8-glare" : "")}
-                 style={{ background: "radial-gradient(700px circle at 50% 18%, rgba(255,255,255,0.18), transparent 60%)" }} />
-            <div className={cx("absolute left-1/2 top-[18%] h-[980px] w-[980px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/12 opacity-0", impact ? "animate-d8-shock" : "")} />
-            <div className={cx("absolute left-1/2 top-[18%] h-[560px] w-[560px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/14 opacity-0", impact ? "animate-d8-shock2" : "")} />
-          </>
-        )}
+    <div className="home-root">
+      {/* TRUST STRIP */}
+      <div className="trust-strip">
+        <div className="trust-left">
+          <span className="trust-pill">TRUST MODE</span>
+          <span className="trust-text">no-store probe • live route proof</span>
+        </div>
+        <div className="trust-right">
+          <button
+            className="trust-btn"
+            onClick={() => setTrustOpen(v => !v)}
+            aria-expanded={trustOpen ? "true" : "false"}
+            type="button"
+          >
+            {trustOpen ? "Hide probe" : "Show probe"}
+          </button>
+        </div>
       </div>
 
-      {/* Keyframes */}
-      <style jsx global>{`
-        @keyframes d8Aurora {
-          0% { transform: translate3d(0px, 0px, 0px) scale(1); filter: hue-rotate(0deg) saturate(1.16); }
-          50% { transform: translate3d(-22px, 12px, 0px) scale(1.03); filter: hue-rotate(-10deg) saturate(1.20); }
-          100% { transform: translate3d(0px, 0px, 0px) scale(1); filter: hue-rotate(0deg) saturate(1.16); }
-        }
-        .animate-d8-aurora { animation: d8Aurora 22s ease-in-out infinite; will-change: transform, filter; }
-
-        @keyframes d8Shock {
-          0% { transform: translate(-50%, -50%) scale(0.52); opacity: 0; }
-          20% { opacity: 0.40; }
-          100% { transform: translate(-50%, -50%) scale(1.28); opacity: 0; }
-        }
-        @keyframes d8Shock2 {
-          0% { transform: translate(-50%, -50%) scale(0.74); opacity: 0; }
-          25% { opacity: 0.32; }
-          100% { transform: translate(-50%, -50%) scale(1.45); opacity: 0; }
-        }
-        .animate-d8-shock { animation: d8Shock 1.15s ease-out 1; }
-        .animate-d8-shock2 { animation: d8Shock2 1.35s ease-out 1; }
-
-        @keyframes d8Glare {
-          0% { opacity: 0; }
-          18% { opacity: 1; }
-          100% { opacity: 0; }
-        }
-        .animate-d8-glare { animation: d8Glare 1.05s ease-out 1; }
-
-        @keyframes d8Kick {
-          0% { transform: translate3d(0, 0, 0) scale(0.995); }
-          18% { transform: translate3d(0, -2px, 0) scale(1.006); }
-          28% { transform: translate3d(0, 1px, 0) scale(1.002); }
-          100% { transform: translate3d(0, 0, 0) scale(1); }
-        }
-        .animate-d8-kick { animation: d8Kick 520ms ease-out 1; }
-
-        @keyframes d8Flicker {
-          0% { opacity: 0.22; }
-          30% { opacity: 0.52; }
-          100% { opacity: 0.28; }
-        }
-        .animate-d8-flicker { animation: d8Flicker 1.0s ease-out 1; }
-
-        .d8-gradient-text {
-          background: linear-gradient(90deg, rgba(255,255,255,0.96), rgba(217,70,239,0.96), rgba(168,85,247,0.96), rgba(59,130,246,0.90), rgba(34,211,238,0.84));
-          -webkit-background-clip: text;
-          background-clip: text;
-          color: transparent;
-        }
-
-        @keyframes snapIn {
-          0% { transform: translateY(12px) scale(0.98); opacity: 0; filter: blur(6px); }
-          70% { opacity: 1; }
-          100% { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
-        }
-        .d8-snap { animation: snapIn 520ms cubic-bezier(.2,.8,.2,1) 1; }
-
-        @keyframes caret {
-          0%, 49% { opacity: 1; }
-          50%, 100% { opacity: 0; }
-        }
-        .d8-caret { animation: caret 1s steps(1,end) infinite; }
-      `}</style>
-
-      <div className="mx-auto max-w-6xl px-6">
-        {/* Trust strip */}
-        <div className="pt-6">
-          <GlassCard className="p-5">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="inline-flex items-center overflow-hidden rounded-full border border-white/12 bg-white/[0.05] text-xs text-white/80">
-                    <span className="px-4 py-2">Trust Mode</span>
-                    <span className="h-5 w-px bg-white/12" />
-                    <span className="px-4 py-2 text-white/70">Live proof enabled</span>
-                  </div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/30 px-3 py-1 text-xs text-white/70">
-                    <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-300/80" />
-                    no-store probe
-                  </div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-black/30 px-3 py-1 text-xs text-white/70">
-                    <span className="font-mono text-white/70">V7</span> timber slap
-                  </div>
-                </div>
-                <div className="mt-2 text-sm text-white/80">
-                  Uptime: <span className="font-mono text-white/85">{formatRelative(uptime)}</span>
-                  {" • "}Skew: <span className="font-mono text-white/85">{skewMs === null ? "—" : `${skewMs}ms`}</span>
-                  {" • "}env: <span className="font-mono text-white/85">{probe?.env?.VERCEL_ENV ?? (loading ? "…" : "—")}</span>
-                </div>
+      {trustOpen && (
+        <div className="trust-panel">
+          <div className="trust-grid">
+            <div className="trust-card">
+              <div className="trust-card-title">/api/__probe__</div>
+              <div className="trust-kv">
+                <div className="k">fetchedAt</div>
+                <div className="v">{probe?.fetchedAtIso ?? "…"}</div>
+                <div className="k">status</div>
+                <div className="v">{probe ? String(probe.status) : "…"}</div>
+                <div className="k">ok</div>
+                <div className="v">{probe ? (probe.ok ? "true" : "false") : "…"}</div>
               </div>
-
-              <div className="flex flex-wrap gap-2">
-                <a className="rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white/90 hover:bg-white/[0.10]" href={`/?ts=${clientTs}`}>
-                  Refresh ts={clientTs}
-                </a>
-                <button
-                  className="rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white/90 hover:bg-white/[0.10]"
-                  onClick={async () => {
-                    try {
-                      setLoading(true);
-                      setProbeErr(null);
-                      const tt = Math.floor(Date.now() / 1000);
-                      const data = await fetchProbe(tt);
-                      setProbe(data);
-                    } catch (e: any) {
-                      setProbeErr(e?.message ?? "Unknown error");
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                >
-                  Re-run probe
-                </button>
-                <button
-                  className={cx(
-                    "rounded-2xl border px-4 py-2 text-sm font-semibold transition-colors",
-                    probeOpen ? "border-fuchsia-300/25 bg-fuchsia-300/10 text-white" : "border-white/15 bg-white/[0.06] text-white/90 hover:bg-white/[0.10]"
-                  )}
-                  onClick={() => setProbeOpen((v) => !v)}
-                >
-                  {probeOpen ? "Hide proof" : "Show proof"}
-                </button>
-              </div>
+              {probe?.error && <div className="trust-error">{probe.error}</div>}
             </div>
 
-            {probeOpen ? (
-              <div className="mt-4 rounded-3xl border border-white/10 bg-black/40 p-4">
-                {probeErr ? (
-                  <div className="text-sm text-red-200">
-                    Probe error: <span className="font-mono">{probeErr}</span>
-                  </div>
-                ) : (
-                  <pre className="max-h-[260px] overflow-auto whitespace-pre-wrap break-words text-xs text-white/85">
-{JSON.stringify(probe, null, 2)}
-                  </pre>
-                )}
-              </div>
-            ) : null}
-          </GlassCard>
-        </div>
-
-        {/* HERO */}
-        <section className="relative pt-10 pb-14">
-          <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
-            <div className="d8-snap">
-              <div className="flex flex-wrap gap-2">
-                <Chip text="Auto demo on first load" />
-                <Chip text="Impact intro" />
-                <Chip text="Feels alive" />
-              </div>
-
-              <h1 className="mt-7 max-w-xl text-balance text-4xl font-extrabold leading-[1.02] tracking-tight md:text-6xl">
-                Not a template builder.
-                <span className="block d8-gradient-text">A launch machine.</span>
-              </h1>
-
-              <p className="mt-5 max-w-xl text-pretty text-lg text-white/75 leading-relaxed">
-                The page proves itself instantly: it runs a mini generation demo on first load — then you can drive it.
-              </p>
-
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                <button
-                  className="group relative overflow-hidden rounded-2xl bg-white px-6 py-3 text-sm font-extrabold text-black shadow-[0_18px_90px_rgba(168,85,247,0.18),0_18px_70px_rgba(59,130,246,0.12)] hover:bg-white/90"
-                  onClick={runDemo}
-                >
-                  <span className="relative z-10">{demo === "running" ? "Generating…" : "Hit me again"}</span>
-                  <span className="relative z-10 ml-2 text-black/60 transition-transform group-hover:translate-x-0.5">→</span>
-                </button>
-
-                <a className="rounded-2xl border border-white/18 bg-white/[0.06] px-6 py-3 text-center text-sm font-bold text-white hover:bg-white/[0.10]" href="/templates">
-                  Browse templates
-                </a>
-              </div>
+            <div className="trust-card">
+              <div className="trust-card-title">x-dominat8-* headers</div>
+              <pre className="trust-pre">
+{probe ? JSON.stringify(probe.headers ?? {}, null, 2) : "…"}
+              </pre>
             </div>
 
-            <div>
-              <GlassCard className="p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-xs uppercase tracking-[0.28em] text-white/55">Timber Slap</div>
-                    <div className="mt-1 text-sm font-extrabold text-white/90">Live generator preview</div>
-                  </div>
-                  <div className="rounded-2xl border border-white/12 bg-white/[0.06] px-3 py-2 text-xs text-white/75">
-                    {THEMES[theme].name}
-                  </div>
-                </div>
-
-                <div className="mt-4 rounded-3xl border border-white/10 bg-black/35 p-4">
-                  <div className="text-xs text-white/60">Prompt</div>
-                  <div className="mt-2 flex flex-col gap-2">
-                    <textarea
-                      className="min-h-[92px] w-full resize-none rounded-2xl border border-white/12 bg-black/30 p-3 text-sm text-white/90 outline-none placeholder:text-white/35 focus:border-fuchsia-300/25"
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      placeholder="Describe the site you want…"
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      <button className="rounded-2xl border border-white/12 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white/90 hover:bg-white/[0.10]" onClick={() => setPrompt(PRESETS[0])}>Preset 1</button>
-                      <button className="rounded-2xl border border-white/12 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white/90 hover:bg-white/[0.10]" onClick={() => setPrompt(PRESETS[1])}>Preset 2</button>
-                      <button className="rounded-2xl border border-white/12 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white/90 hover:bg-white/[0.10]" onClick={() => setPrompt(PRESETS[2])}>Preset 3</button>
-
-                      <button
-                        className={cx(
-                          "ml-auto rounded-2xl px-4 py-2 text-sm font-extrabold",
-                          demo === "running" ? "bg-white/70 text-black" : "bg-white text-black hover:bg-white/90"
-                        )}
-                        onClick={runDemo}
-                      >
-                        {demo === "running" ? "Generating…" : "Generate"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="space-y-3">
-                    <Step on={step >= 1} title="Plan layout" desc="Hero, proof, steps, pricing, FAQ" />
-                    <Step on={step >= 2} title="Write conversion copy" desc="Outcome-driven headline + CTAs" />
-                    <Step on={step >= 3} title="Assemble sections" desc="Rhythm, spacing, hierarchy" />
-                    <Step on={step >= 4} title="Ready to publish" desc="Deploy-friendly structure + proof" />
-                  </div>
-                  <div className="relative">
-                    <div className="mb-3 text-xs text-white/60">
-                      Preview{" "}
-                      {demo === "running" ? (
-                        <span className="font-mono">
-                          generating<span className="d8-caret">|</span>
-                        </span>
-                      ) : (
-                        <span className="font-mono">ready</span>
-                      )}
-                    </div>
-                    <PreviewShell variant={variant} hot={hot && !reducedMotion} />
-                  </div>
-                </div>
-              </GlassCard>
-
-              <div className="mt-4 text-xs text-white/55">
-                First load runs the demo once automatically. Refresh and it won’t spam (sessionStorage).
-              </div>
+            <div className="trust-card trust-card-wide">
+              <div className="trust-card-title">probe json</div>
+              <pre className="trust-pre">
+{probe ? JSON.stringify(probe.json ?? {}, null, 2) : "…"}
+              </pre>
             </div>
           </div>
+        </div>
+      )}
 
-          <footer className="mt-12 border-t border-white/10 py-8 text-sm text-white/60">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div>© {new Date().getFullYear()} Dominat8</div>
-              <div className="font-mono">clientTs:{clientTs}</div>
+      {/* HERO */}
+      <main className={"hero " + impactClass}>
+        <div className="hero-bg" aria-hidden="true">
+          <div className="grain" />
+          <div className="glare" />
+          <div className="rings" />
+        </div>
+
+        <div className="hero-inner">
+          <div className="badge-row">
+            <span className="badge">DOMINAT8</span>
+            <span className="badge subtle">AI Website Automation Builder</span>
+            <span className="badge subtle">LIVE_OK</span>
+          </div>
+
+          <h1 className="hero-title">
+            Build a <span className="accent">premium</span> website in minutes —
+            with an AI that actually ships.
+          </h1>
+
+          <p className="hero-sub">
+            Not a toy generator. A pipeline: strategy → layout → copy → SEO → publish.
+            First-load impact + auto demo (once per session).
+          </p>
+
+          <div className="cta-row">
+            <a className="cta primary" href="/projects/new">
+              Start a new build
+              <span className="cta-glow" aria-hidden="true" />
+            </a>
+            <a className="cta ghost" href="/templates">
+              Explore templates
+            </a>
+          </div>
+
+          {/* AUTO DEMO */}
+          <section className={"demo " + (demoOn ? "demo-on" : demo === "done" ? "demo-done" : "")}>
+            <div className="demo-left">
+              <div className="demo-title">
+                {demoOn ? "Auto demo: generating…" : (demo === "done" ? "Demo complete" : "Demo")}
+              </div>
+
+              <div className="steps">
+                {demoSteps.map((s, idx) => {
+                  const isActive = demoOn && idx === activeStep;
+                  const isDone = demo !== "idle" && idx < activeStep;
+                  return (
+                    <div
+                      key={idx}
+                      className={"step " + (isActive ? "active" : "") + (isDone ? " done" : "")}
+                    >
+                      <div className="dot" aria-hidden="true" />
+                      <div className="step-text">
+                        <div className="step-title">{s.title}</div>
+                        <div className="step-sub">{s.sub}</div>
+                      </div>
+                      <div className="step-right" aria-hidden="true">
+                        {isActive ? <span className="spinner" /> : (isDone ? "✓" : "")}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="demo-foot">
+                <span className="micro">
+                  {demoOn ? "Runs once per session (sessionStorage)" : "Refresh won’t spam the demo in this tab."}
+                </span>
+              </div>
             </div>
-          </footer>
-        </section>
-      </div>
-    </main>
+
+            <div className="demo-right">
+              <div className={"preview " + (demoOn ? "pulse" : "")} data-pulse={demoPulse}>
+                <div className="preview-top">
+                  <div className="preview-dots" aria-hidden="true">
+                    <span /><span /><span />
+                  </div>
+                  <div className="preview-url">www.dominat8.com</div>
+                  <div className="preview-tag">{demoOn ? "GENERATING" : (demo === "done" ? "READY" : "PREVIEW")}</div>
+                </div>
+
+                <div className="preview-body">
+                  <div className="preview-hero">
+                    <div className="ph-title" />
+                    <div className="ph-sub" />
+                    <div className="ph-cta" />
+                  </div>
+
+                  <div className="preview-grid">
+                    <div className="card" />
+                    <div className="card" />
+                    <div className="card" />
+                  </div>
+                </div>
+
+                <div className="preview-glow" aria-hidden="true" />
+              </div>
+            </div>
+          </section>
+
+          {/* CONFIRM MARKER */}
+          <div className="proof">
+            <div className="proof-kv">
+              <span className="k">HOME_OK</span>
+              <span className="v">V7_TIMBER_SLAP</span>
+            </div>
+            <div className="proof-kv">
+              <span className="k">TIP</span>
+              <span className="v">Use ?ts=123 to bust any stale caches</span>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <style jsx>{`
+        .home-root{
+          min-height:100vh;
+          background:#050608;
+          color:#eef2ff;
+        }
+
+        /* TRUST STRIP */
+        .trust-strip{
+          position:sticky;
+          top:0;
+          z-index:50;
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:12px;
+          padding:10px 14px;
+          border-bottom:1px solid rgba(255,255,255,0.08);
+          background:rgba(5,6,8,0.80);
+          backdrop-filter: blur(10px);
+        }
+        .trust-left{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+        .trust-pill{
+          font-size:11px;
+          letter-spacing:0.18em;
+          padding:5px 10px;
+          border-radius:999px;
+          border:1px solid rgba(255,255,255,0.16);
+          background:rgba(255,255,255,0.06);
+        }
+        .trust-text{
+          font-size:12px;
+          opacity:0.78;
+        }
+        .trust-btn{
+          font-size:12px;
+          padding:8px 10px;
+          border-radius:10px;
+          border:1px solid rgba(255,255,255,0.14);
+          background:rgba(255,255,255,0.06);
+          color:#eef2ff;
+          cursor:pointer;
+        }
+        .trust-btn:hover{ background:rgba(255,255,255,0.10); }
+
+        .trust-panel{
+          padding:14px;
+          border-bottom:1px solid rgba(255,255,255,0.08);
+          background:rgba(8,9,12,0.60);
+        }
+        .trust-grid{
+          display:grid;
+          grid-template-columns: 1fr 1fr;
+          gap:12px;
+          max-width:1100px;
+          margin:0 auto;
+        }
+        .trust-card{
+          border-radius:16px;
+          border:1px solid rgba(255,255,255,0.10);
+          background:rgba(255,255,255,0.04);
+          padding:12px;
+          overflow:hidden;
+        }
+        .trust-card-wide{ grid-column: 1 / span 2; }
+        .trust-card-title{
+          font-size:12px;
+          letter-spacing:0.12em;
+          text-transform:uppercase;
+          opacity:0.72;
+          margin-bottom:10px;
+        }
+        .trust-kv{
+          display:grid;
+          grid-template-columns: 110px 1fr;
+          gap:6px 10px;
+          font-size:12px;
+        }
+        .trust-kv .k{ opacity:0.65; }
+        .trust-kv .v{ opacity:0.92; word-break:break-word; }
+        .trust-pre{
+          margin:0;
+          font-size:12px;
+          line-height:1.45;
+          white-space:pre-wrap;
+          word-break:break-word;
+          opacity:0.92;
+        }
+        .trust-error{
+          margin-top:10px;
+          font-size:12px;
+          color:#ffd3d3;
+          opacity:0.95;
+        }
+
+        /* HERO */
+        .hero{
+          position:relative;
+          overflow:hidden;
+          padding:28px 14px 60px;
+        }
+        .hero-inner{
+          position:relative;
+          max-width:1100px;
+          margin:0 auto;
+        }
+
+        .hero-bg{
+          position:absolute;
+          inset:0;
+          pointer-events:none;
+        }
+        .grain{
+          position:absolute;
+          inset:-40px;
+          background-image: radial-gradient(rgba(255,255,255,0.05) 1px, transparent 1px);
+          background-size: 18px 18px;
+          opacity:0.22;
+          filter: blur(0.2px);
+          transform: rotate(2deg);
+        }
+        .glare{
+          position:absolute;
+          left:-20%;
+          top:-35%;
+          width:140%;
+          height:140%;
+          background: radial-gradient(closest-side, rgba(255,255,255,0.10), rgba(255,255,255,0.0) 60%);
+          opacity:0.30;
+          transform: translate3d(0,0,0);
+        }
+        .rings{
+          position:absolute;
+          inset:0;
+          opacity:0;
+          transform: scale(0.95);
+        }
+        .rings:before,
+        .rings:after{
+          content:"";
+          position:absolute;
+          left:50%;
+          top:32%;
+          width:520px;
+          height:520px;
+          border-radius:999px;
+          transform: translate(-50%,-50%) scale(0.60);
+          border:1px solid rgba(255,255,255,0.16);
+          box-shadow: 0 0 0 1px rgba(255,255,255,0.06) inset;
+          opacity:0;
+        }
+        .rings:after{
+          width:760px;
+          height:760px;
+          border-color: rgba(255,255,255,0.10);
+        }
+
+        .badge-row{
+          display:flex;
+          align-items:center;
+          gap:10px;
+          flex-wrap:wrap;
+          margin-top:10px;
+        }
+        .badge{
+          font-size:12px;
+          padding:6px 10px;
+          border-radius:999px;
+          border:1px solid rgba(255,255,255,0.14);
+          background:rgba(255,255,255,0.06);
+          letter-spacing:0.14em;
+          text-transform:uppercase;
+        }
+        .badge.subtle{ opacity:0.78; letter-spacing:0.10em; }
+
+        .hero-title{
+          margin:18px 0 10px;
+          font-size:44px;
+          line-height:1.05;
+          letter-spacing:-0.02em;
+          max-width:920px;
+        }
+        .accent{
+          background: linear-gradient(90deg, rgba(255,255,255,1), rgba(255,255,255,0.65));
+          -webkit-background-clip:text;
+          background-clip:text;
+          color:transparent;
+        }
+        .hero-sub{
+          margin:0 0 18px;
+          max-width:820px;
+          font-size:16px;
+          line-height:1.6;
+          opacity:0.80;
+        }
+
+        .cta-row{
+          display:flex;
+          gap:10px;
+          flex-wrap:wrap;
+          margin: 12px 0 22px;
+        }
+        .cta{
+          position:relative;
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          gap:10px;
+          padding:12px 14px;
+          border-radius:14px;
+          border:1px solid rgba(255,255,255,0.14);
+          text-decoration:none;
+          color:#eef2ff;
+          font-weight:600;
+          letter-spacing:0.01em;
+          overflow:hidden;
+        }
+        .cta.primary{
+          background:rgba(255,255,255,0.12);
+        }
+        .cta.ghost{
+          background:rgba(255,255,255,0.05);
+          opacity:0.92;
+        }
+        .cta:hover{ background:rgba(255,255,255,0.14); }
+        .cta-glow{
+          position:absolute;
+          inset:-20px;
+          background: radial-gradient(circle at 40% 20%, rgba(255,255,255,0.35), rgba(255,255,255,0.0) 55%);
+          opacity:0.0;
+          transition: opacity 180ms ease;
+          pointer-events:none;
+        }
+        .cta.primary:hover .cta-glow{ opacity:0.7; }
+
+        /* DEMO */
+        .demo{
+          margin-top:12px;
+          display:grid;
+          grid-template-columns: 1.2fr 1fr;
+          gap:12px;
+          align-items:stretch;
+        }
+        @media (max-width: 920px){
+          .hero-title{ font-size:34px; }
+          .demo{ grid-template-columns: 1fr; }
+        }
+
+        .demo-left,.demo-right{
+          border-radius:18px;
+          border:1px solid rgba(255,255,255,0.10);
+          background:rgba(255,255,255,0.04);
+          overflow:hidden;
+        }
+        .demo-left{ padding:14px; }
+        .demo-title{
+          font-size:12px;
+          letter-spacing:0.14em;
+          text-transform:uppercase;
+          opacity:0.72;
+          margin-bottom:10px;
+        }
+        .steps{ display:flex; flex-direction:column; gap:8px; }
+        .step{
+          display:flex;
+          align-items:flex-start;
+          gap:10px;
+          padding:10px 10px;
+          border-radius:14px;
+          border:1px solid rgba(255,255,255,0.08);
+          background:rgba(255,255,255,0.03);
+        }
+        .step .dot{
+          width:10px; height:10px;
+          border-radius:999px;
+          margin-top:5px;
+          border:1px solid rgba(255,255,255,0.22);
+          background:rgba(255,255,255,0.06);
+          box-shadow: 0 0 0 0 rgba(255,255,255,0.0);
+          flex: 0 0 auto;
+        }
+        .step-text{ flex:1; }
+        .step-title{ font-size:13px; font-weight:700; opacity:0.92; }
+        .step-sub{ font-size:12px; opacity:0.68; margin-top:2px; }
+        .step-right{
+          font-size:12px;
+          opacity:0.80;
+          width:24px;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          margin-top:2px;
+        }
+        .step.active{
+          border-color: rgba(255,255,255,0.16);
+          background: rgba(255,255,255,0.06);
+          transform: translateZ(0);
+        }
+        .step.active .dot{
+          background: rgba(255,255,255,0.20);
+          box-shadow: 0 0 0 6px rgba(255,255,255,0.06);
+        }
+        .step.done{
+          opacity:0.78;
+        }
+
+        .spinner{
+          width:14px;
+          height:14px;
+          border-radius:999px;
+          border:2px solid rgba(255,255,255,0.25);
+          border-top-color: rgba(255,255,255,0.85);
+          animation: spin 700ms linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .demo-foot{
+          margin-top:10px;
+          display:flex;
+          justify-content:space-between;
+          gap:10px;
+          opacity:0.70;
+          font-size:12px;
+        }
+
+        /* PREVIEW */
+        .demo-right{ padding:14px; }
+        .preview{
+          position:relative;
+          height:100%;
+          min-height:260px;
+          border-radius:16px;
+          border:1px solid rgba(255,255,255,0.12);
+          background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+          overflow:hidden;
+          transform: translateZ(0);
+        }
+        .preview-top{
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:10px;
+          padding:10px 10px;
+          border-bottom:1px solid rgba(255,255,255,0.08);
+          background: rgba(0,0,0,0.18);
+        }
+        .preview-dots{ display:flex; gap:6px; }
+        .preview-dots span{
+          width:9px; height:9px; border-radius:999px;
+          background: rgba(255,255,255,0.14);
+          border: 1px solid rgba(255,255,255,0.12);
+        }
+        .preview-url{
+          font-size:12px;
+          opacity:0.75;
+          flex:1;
+          text-align:center;
+        }
+        .preview-tag{
+          font-size:11px;
+          letter-spacing:0.14em;
+          opacity:0.80;
+          padding:5px 8px;
+          border-radius:999px;
+          border:1px solid rgba(255,255,255,0.12);
+          background: rgba(255,255,255,0.05);
+          white-space:nowrap;
+        }
+        .preview-body{
+          padding:14px;
+        }
+        .preview-hero{
+          border-radius:14px;
+          border:1px solid rgba(255,255,255,0.10);
+          background: rgba(255,255,255,0.04);
+          padding:14px;
+          margin-bottom:12px;
+        }
+        .ph-title{
+          height:18px;
+          border-radius:10px;
+          background: rgba(255,255,255,0.14);
+          width:72%;
+        }
+        .ph-sub{
+          margin-top:10px;
+          height:10px;
+          border-radius:10px;
+          background: rgba(255,255,255,0.08);
+          width:88%;
+        }
+        .ph-cta{
+          margin-top:12px;
+          height:34px;
+          border-radius:12px;
+          background: rgba(255,255,255,0.10);
+          width:44%;
+          border:1px solid rgba(255,255,255,0.10);
+        }
+        .preview-grid{
+          display:grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap:10px;
+        }
+        .preview-grid .card{
+          height:70px;
+          border-radius:14px;
+          border:1px solid rgba(255,255,255,0.10);
+          background: rgba(255,255,255,0.04);
+        }
+        @media (max-width: 520px){
+          .preview-grid{ grid-template-columns: 1fr; }
+          .preview-grid .card{ height:58px; }
+        }
+
+        .preview-glow{
+          position:absolute;
+          inset:-30%;
+          background: radial-gradient(circle at 40% 20%, rgba(255,255,255,0.22), rgba(255,255,255,0.0) 55%);
+          opacity:0.0;
+          pointer-events:none;
+          transform: translate3d(0,0,0);
+        }
+        .preview.pulse .preview-glow{
+          animation: glowPulse 600ms ease-out infinite;
+        }
+        @keyframes glowPulse{
+          0%{ opacity:0.05; transform: translate3d(0,0,0) scale(1.0); }
+          50%{ opacity:0.22; transform: translate3d(0,0,0) scale(1.02); }
+          100%{ opacity:0.06; transform: translate3d(0,0,0) scale(1.0); }
+        }
+
+        /* PROOF */
+        .proof{
+          margin-top:14px;
+          display:flex;
+          flex-wrap:wrap;
+          gap:10px;
+          opacity:0.72;
+        }
+        .proof-kv{
+          display:flex;
+          gap:8px;
+          align-items:center;
+          border:1px solid rgba(255,255,255,0.10);
+          background: rgba(255,255,255,0.04);
+          padding:8px 10px;
+          border-radius:14px;
+          font-size:12px;
+        }
+        .proof-kv .k{ letter-spacing:0.12em; text-transform:uppercase; opacity:0.72; }
+        .proof-kv .v{ opacity:0.90; }
+
+        /* IMPACT INTRO (THE SLAP) */
+        .impact-armed .hero-title,
+        .impact-armed .hero-sub,
+        .impact-armed .cta-row,
+        .impact-armed .demo,
+        .impact-armed .proof{
+          opacity:0;
+          transform: translateY(10px) scale(0.985);
+        }
+
+        .impact-fired{
+          animation: microKick 180ms cubic-bezier(0.2, 0.9, 0.2, 1) 0ms 1 both;
+        }
+        @keyframes microKick{
+          0%{ transform: translate3d(0,0,0) rotate(0deg); }
+          35%{ transform: translate3d(0,-2px,0) rotate(-0.12deg); }
+          70%{ transform: translate3d(0,1px,0) rotate(0.10deg); }
+          100%{ transform: translate3d(0,0,0) rotate(0deg); }
+        }
+
+        .impact-fired .hero-title{
+          animation: snapIn 520ms cubic-bezier(0.18, 0.92, 0.20, 1) 40ms 1 both;
+        }
+        .impact-fired .hero-sub{
+          animation: snapIn 520ms cubic-bezier(0.18, 0.92, 0.20, 1) 80ms 1 both;
+        }
+        .impact-fired .cta-row{
+          animation: snapIn 520ms cubic-bezier(0.18, 0.92, 0.20, 1) 120ms 1 both;
+        }
+        .impact-fired .demo{
+          animation: snapIn 520ms cubic-bezier(0.18, 0.92, 0.20, 1) 160ms 1 both;
+        }
+        .impact-fired .proof{
+          animation: snapIn 520ms cubic-bezier(0.18, 0.92, 0.20, 1) 200ms 1 both;
+        }
+
+        @keyframes snapIn{
+          0%{ opacity:0; transform: translateY(12px) scale(0.92); filter: blur(2px); }
+          60%{ opacity:1; transform: translateY(-2px) scale(1.01); filter: blur(0px); }
+          100%{ opacity:1; transform: translateY(0px) scale(1.0); filter: blur(0px); }
+        }
+
+        .impact-fired .rings{
+          opacity:1;
+          animation: ringsOn 900ms ease-out 0ms 1 both;
+        }
+        .impact-fired .rings:before{
+          animation: ring 760ms ease-out 0ms 1 both;
+        }
+        .impact-fired .rings:after{
+          animation: ring 900ms ease-out 40ms 1 both;
+        }
+        @keyframes ringsOn{
+          0%{ opacity:0; transform: scale(0.95); }
+          25%{ opacity:1; transform: scale(1.0); }
+          100%{ opacity:0.18; transform: scale(1.05); }
+        }
+        @keyframes ring{
+          0%{ opacity:0; transform: translate(-50%,-50%) scale(0.55); }
+          25%{ opacity:0.85; }
+          100%{ opacity:0; transform: translate(-50%,-50%) scale(1.05); }
+        }
+
+        .impact-fired .glare{
+          animation: glareBurst 620ms ease-out 0ms 1 both;
+        }
+        @keyframes glareBurst{
+          0%{ opacity:0.05; transform: translate3d(0,0,0) scale(0.98); }
+          35%{ opacity:0.55; transform: translate3d(0,0,0) scale(1.02); }
+          100%{ opacity:0.28; transform: translate3d(0,0,0) scale(1.0); }
+        }
+      `}</style>
+    </div>
   );
 }
