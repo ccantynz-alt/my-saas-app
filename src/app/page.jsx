@@ -12,33 +12,35 @@ function Pill({ children }) {
   );
 }
 
-function LogoChip({ children }) {
+function ProofTile({ title, desc }) {
   return (
-    <div className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 shadow-sm">
-      {children}
+    <div className="rounded-2xl bg-white/85 p-4 ring-1 ring-slate-200 shadow-sm">
+      <div className="text-xs font-semibold text-slate-700">✔ {title}</div>
+      <div className="mt-1 text-xs text-slate-600">{desc}</div>
     </div>
   );
 }
 
-function Step({ n, title, desc }) {
-  return (
-    <div className="rounded-3xl bg-white/85 p-6 ring-1 ring-slate-200 shadow-sm d8-fade-up">
-      <div className="flex items-start gap-4">
-        <div className="h-10 w-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-sm font-semibold">
-          {n}
-        </div>
-        <div>
-          <div className="text-sm font-semibold text-slate-950">{title}</div>
-          <div className="mt-1 text-sm leading-relaxed text-slate-600">{desc}</div>
-        </div>
-      </div>
-    </div>
-  );
+async function getGalleryFirstCard() {
+  try {
+    const base = process.env.VERCEL_URL ? "https://" + process.env.VERCEL_URL : "";
+    const url = (base ? base : "") + "/api/gallery/list";
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const cards = json && Array.isArray(json.cards) ? json.cards : [];
+    return cards.length > 0 ? cards[0] : null;
+  } catch {
+    return null;
+  }
 }
 
-function ExamplePreview() {
-  // This is a “real output preview” card, designed to feel like a screenshot.
-  // Next upgrade: swap this to pull a real preview thumbnail (gallery renderer).
+function RealOutputCard({ card }) {
+  const projectId = card && card.projectId ? String(card.projectId) : "";
+  const title = card && card.title ? String(card.title) : "Real output example";
+  const desc = card && card.desc ? String(card.desc) : "Generated from a brief, publish-ready.";
+  const href = (card && card.url) ? String(card.url) : (projectId ? ("/p/" + projectId) : "/p/new");
+
   return (
     <div className="rounded-[2rem] bg-white/85 ring-1 ring-slate-200 shadow-sm overflow-hidden d8-fade-up d8-delay-4">
       <div className="px-6 py-4 border-b border-slate-200 bg-white/90">
@@ -48,8 +50,10 @@ function ExamplePreview() {
               D8
             </div>
             <div>
-              <div className="text-sm font-semibold text-slate-950">Example output</div>
-              <div className="text-xs text-slate-500">Generated in minutes • publish-ready</div>
+              <div className="text-sm font-semibold text-slate-950">Real output</div>
+              <div className="text-xs text-slate-500">
+                From KV • Project <span className="font-mono">{projectId || "—"}</span>
+              </div>
             </div>
           </div>
           <div className="text-[11px] text-slate-500 font-mono">{MONSTER_MARKER}</div>
@@ -58,50 +62,74 @@ function ExamplePreview() {
 
       <div className="p-6">
         <div className="rounded-3xl bg-white ring-1 ring-slate-200 overflow-hidden">
-          {/* Fake “screenshot” hero */}
-          <div className="h-44 d8-thumb-bg relative">
-            <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(255,255,255,0.0),rgba(255,255,255,0.65))]" />
-            <div className="absolute left-6 top-6 flex items-center gap-2">
-              <div className="h-8 w-8 rounded-2xl bg-slate-900" />
-              <div className="h-3 w-28 rounded bg-slate-200" />
-            </div>
-            <div className="absolute left-6 bottom-6">
-              <div className="h-4 w-60 rounded bg-slate-900/90" />
-              <div className="mt-2 h-3 w-72 rounded bg-slate-900/20" />
-              <div className="mt-2 flex gap-2">
-                <div className="h-10 w-32 rounded-2xl bg-slate-900" />
-                <div className="h-10 w-32 rounded-2xl bg-white ring-1 ring-slate-200" />
-              </div>
-            </div>
+          <div className="h-56 bg-white">
+            {projectId ? (
+              <img
+                alt={title}
+                className="h-full w-full object-cover"
+                src={"/api/gallery/thumb?projectId=" + encodeURIComponent(projectId) + "&v=" + encodeURIComponent(MONSTER_MARKER)}
+              />
+            ) : (
+              <div className="h-full w-full d8-thumb-bg" />
+            )}
           </div>
 
-          {/* Fake “sections” */}
           <div className="p-6">
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                <div className="h-3 w-24 rounded bg-slate-300" />
-                <div className="mt-3 space-y-2">
-                  <div className="h-2 w-40 rounded bg-slate-200" />
-                  <div className="h-2 w-36 rounded bg-slate-200" />
-                  <div className="h-2 w-28 rounded bg-slate-200" />
-                </div>
-              </div>
-              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                <div className="h-3 w-24 rounded bg-slate-300" />
-                <div className="mt-3 space-y-2">
-                  <div className="h-2 w-40 rounded bg-slate-200" />
-                  <div className="h-2 w-36 rounded bg-slate-200" />
-                  <div className="h-2 w-28 rounded bg-slate-200" />
-                </div>
-              </div>
-              <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200">
-                <div className="h-3 w-24 rounded bg-slate-300" />
-                <div className="mt-3 space-y-2">
-                  <div className="h-2 w-40 rounded bg-slate-200" />
-                  <div className="h-2 w-36 rounded bg-slate-200" />
-                  <div className="h-2 w-28 rounded bg-slate-200" />
-                </div>
-              </div>
+            <div className="text-xs text-slate-500">Example</div>
+            <div className="mt-2 text-xl font-semibold text-slate-950">{title}</div>
+            <div className="mt-2 text-sm leading-relaxed text-slate-700">{desc}</div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <a
+                className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 shadow-sm d8-btn-lift"
+                href={href}
+              >
+                Open live example
+              </a>
+              <a
+                className="inline-flex w-full items-center justify-center rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50 shadow-sm d8-btn-lift"
+                href="/gallery"
+              >
+                Browse gallery
+              </a>
+            </div>
+
+            <div className="mt-4 text-[11px] text-slate-500">
+              This preview is generated from published KV data. Update the gallery index to change which example appears here.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmptyOutputCard() {
+  return (
+    <div className="rounded-[2rem] bg-white/85 ring-1 ring-slate-200 shadow-sm overflow-hidden d8-fade-up d8-delay-4">
+      <div className="px-6 py-4 border-b border-slate-200 bg-white/90">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-xs font-semibold">
+              D8
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-slate-950">Real output</div>
+              <div className="text-xs text-slate-500">Gallery index is empty</div>
+            </div>
+          </div>
+          <div className="text-[11px] text-slate-500 font-mono">{MONSTER_MARKER}</div>
+        </div>
+      </div>
+
+      <div className="p-6">
+        <div className="rounded-3xl bg-white ring-1 ring-slate-200 overflow-hidden">
+          <div className="h-56 d8-thumb-bg" />
+          <div className="p-6">
+            <div className="text-xs text-slate-500">Next step</div>
+            <div className="mt-2 text-xl font-semibold text-slate-950">Add a real project to the homepage</div>
+            <div className="mt-2 text-sm leading-relaxed text-slate-700">
+              Set <span className="font-mono">gallery:index:v1</span> with your published project IDs, then rebuild previews.
             </div>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -109,27 +137,29 @@ function ExamplePreview() {
                 className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 shadow-sm d8-btn-lift"
                 href="/p/new"
               >
-                Generate this style
+                Generate a project
               </a>
               <a
                 className="inline-flex w-full items-center justify-center rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50 shadow-sm d8-btn-lift"
                 href="/gallery"
               >
-                Browse more examples
+                Go to gallery
               </a>
             </div>
-          </div>
-        </div>
 
-        <div className="mt-4 text-[11px] text-slate-500">
-          Next upgrade: connect this preview to real published projects using the Gallery Preview Renderer.
+            <div className="mt-4 text-[11px] text-slate-500">
+              Once your index is set, the hero will automatically show the first published example.
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const first = await getGalleryFirstCard();
+
   return (
     <main className="min-h-screen bg-white text-slate-900">
       {/* Premium bright background */}
@@ -143,8 +173,7 @@ export default function HomePage() {
 
       {/* HERO */}
       <section className="mx-auto max-w-6xl px-6 pt-6 pb-10">
-        <div className="flex flex-col gap-10 md:flex-row md:items-start md:justify-between">
-          {/* Left */}
+        <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
           <div className="max-w-2xl">
             <Pill>
               Premium, clean, fast — SiteGround-style build
@@ -178,20 +207,21 @@ export default function HomePage() {
               </a>
             </div>
 
-            {/* Logos / Proof strip */}
-            <div className="mt-8 d8-fade-up d8-delay-4">
-              <div className="text-xs font-semibold text-slate-500">Built for</div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <LogoChip>SaaS</LogoChip>
-                <LogoChip>Local services</LogoChip>
-                <LogoChip>AI tools</LogoChip>
-                <LogoChip>Landing pages</LogoChip>
-                <LogoChip>Agencies</LogoChip>
-              </div>
+            <div className="mt-8 grid gap-3 sm:grid-cols-2 d8-fade-up d8-delay-4">
+              <ProofTile title="Publish-ready HTML" desc="Clean output, structured sections, consistent rhythm." />
+              <ProofTile title="SEO included" desc="Titles, metas, schema, sitemap + robots." />
+              <ProofTile title="Custom domain ready" desc="Publish + map when you’re ready." />
+              <ProofTile title="No templates to fight" desc="Premium layout defaults that stay consistent." />
+            </div>
+
+            <div className="mt-6 text-[11px] text-slate-500 d8-fade-up d8-delay-4">
+              Marker: <span className="font-mono text-slate-700">{MONSTER_MARKER}</span>
             </div>
           </div>
 
-          {/* Right */}
+          {/* Keep your existing right-side trust card by delegating to MarketingShell's HeaderNav/TopBar/Footer.
+              We do not rewrite that part here to avoid mismatches across your components.
+              The "killer" proof is the Real Output block below. */}
           <div className="w-full max-w-md d8-fade-up d8-delay-2">
             <div className="rounded-3xl bg-white/85 p-6 ring-1 ring-slate-200 shadow-sm d8-card-float">
               <div className="flex items-start justify-between gap-4">
@@ -201,95 +231,51 @@ export default function HomePage() {
                     Premium output, every time
                   </div>
                 </div>
-                <div className="text-amber-500 text-sm" aria-label="5 stars">
-                  ★★★★★
-                </div>
+                <div className="text-amber-500 text-sm" aria-label="5 stars">★★★★★</div>
               </div>
 
               <div className="mt-5 rounded-2xl bg-white p-5 ring-1 ring-slate-200">
                 <div className="text-xs font-semibold text-slate-600">What you get</div>
                 <div className="mt-3 space-y-2 text-sm text-slate-700">
-                  <div className="flex items-center gap-2">
-                    <span className="text-emerald-600">✓</span> Homepage + marketing pages
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-emerald-600">✓</span> SEO plan + sitemap
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-emerald-600">✓</span> Publish-ready HTML
-                  </div>
+                  <div className="flex items-center gap-2"><span className="text-emerald-600">✓</span> Homepage + marketing pages</div>
+                  <div className="flex items-center gap-2"><span className="text-emerald-600">✓</span> SEO plan + sitemap</div>
+                  <div className="flex items-center gap-2"><span className="text-emerald-600">✓</span> Publish-ready HTML</div>
                 </div>
               </div>
 
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                <a
-                  className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 shadow-sm d8-btn-lift"
-                  href="/pricing"
-                >
+                <a className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 shadow-sm d8-btn-lift" href="/pricing">
                   View pricing
                 </a>
-                <a
-                  className="inline-flex w-full items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50 shadow-sm d8-btn-lift"
-                  href="/__status"
-                >
+                <a className="inline-flex w-full items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50 shadow-sm d8-btn-lift" href="/__status">
                   Check status
                 </a>
               </div>
 
               <div className="mt-4 text-[11px] text-slate-500">
-                Marker: <span className="font-mono text-slate-700">{MONSTER_MARKER}</span>
+                Build: <span className="font-mono text-slate-700">{BUILD_MARKER}</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* HOW IT WORKS (3 steps) */}
-      <section className="mx-auto max-w-6xl px-6 pb-12">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <div className="text-xs font-semibold text-slate-500">How it works</div>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">
-              From brief → publish, without chaos
-            </h2>
-            <p className="mt-2 text-sm text-slate-600 max-w-2xl">
-              A tight workflow that produces consistent, conversion-ready pages — fast.
-            </p>
-          </div>
-          <a className="hidden sm:inline-flex rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50 shadow-sm d8-btn-lift" href="/__status">
-            See status
-          </a>
-        </div>
-
-        <div className="mt-6 grid gap-5 md:grid-cols-3">
-          <div className="d8-delay-1">
-            <Step n="1" title="Brief" desc="Tell us what you do. We extract structure, tone, and layout rhythm." />
-          </div>
-          <div className="d8-delay-2">
-            <Step n="2" title="Generate" desc="Pages + content + components — polished, consistent, and brand-aligned." />
-          </div>
-          <div className="d8-delay-3">
-            <Step n="3" title="Publish" desc="SEO, sitemap, HTML, domain — ready to ship when you are." />
-          </div>
-        </div>
-      </section>
-
-      {/* BIG EXAMPLE PREVIEW */}
+      {/* KILLER SECTION: REAL OUTPUT */}
       <section className="mx-auto max-w-6xl px-6 pb-16">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <div className="text-xs font-semibold text-slate-500">Example output</div>
+            <div className="text-xs font-semibold text-slate-500">Proof</div>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">
-              See what “expensive” looks like
+              Real output, pulled from production
             </h2>
             <p className="mt-2 text-sm text-slate-600 max-w-2xl">
-              This is the quality bar Dominat8 targets by default. Next upgrade: plug this into your real published sites.
+              This isn’t a mock. It’s a published project rendered from your KV-backed gallery.
             </p>
           </div>
         </div>
 
         <div className="mt-6">
-          <ExamplePreview />
+          {first ? <RealOutputCard card={first} /> : <EmptyOutputCard />}
         </div>
       </section>
 
