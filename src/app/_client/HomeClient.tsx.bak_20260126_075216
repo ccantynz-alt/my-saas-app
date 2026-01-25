@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 
@@ -67,17 +67,6 @@ function Icon({ name }: { name: "spark" | "shield" | "bolt" | "check" }) {
 }
 
 export default function HomeClient() {
-  const [sparkleOnce, setSparkleOnce] = useState(false);
-
-  useEffect(() => {
-    const seen = sessionStorage.getItem('d8_sparkle_seen');
-    if (!seen) {
-      setSparkleOnce(true);
-      sessionStorage.setItem('d8_sparkle_seen', '1');
-      setTimeout(() => setSparkleOnce(false), 1600);
-    }
-  }, []);
-
   const stamp = useMemo(() => new Date().toISOString(), []);
   const [probeOk, setProbeOk] = useState<null | boolean>(null);
   const p = useParallax();
@@ -88,7 +77,7 @@ export default function HomeClient() {
       .catch(() => setProbeOk(false));
   }, []);
 
-  const live = probeOk === null ? "Checkingâ€¦" : probeOk ? "LIVE_OK" : "WARN";
+  const live = probeOk === null ? "Checking…" : probeOk ? "LIVE_OK" : "WARN";
 
   // Optional: set your own background image without editing code:
   // Vercel env var: NEXT_PUBLIC_HERO_BG_URL = "https://...your-image.jpg"
@@ -149,7 +138,7 @@ export default function HomeClient() {
             radial-gradient(60% 55% at 40% 28%, rgba(0,0,0,.28), rgba(0,0,0,.70) 60%, rgba(0,0,0,.90) 100%),
             linear-gradient(180deg, rgba(0,0,0,.60), rgba(0,0,0,.70));
         }
-        /* subtle â€œsparkleâ€ highlights â€” NOT purple moon */
+        /* subtle “sparkle” highlights — NOT purple moon */
         .bgSheen{
           position:absolute; inset:-20%;
           background:
@@ -160,7 +149,7 @@ export default function HomeClient() {
           opacity: .75;
           transform: translate3d(calc(var(--px) * -10px), calc(var(--py) * -8px), 0);
         }
-        /* gentle grain for â€œpremium photoâ€ look */
+        /* gentle grain for “premium photo” look */
         .bgGrain{
           position:absolute; inset:0;
           opacity:.10;
@@ -342,7 +331,7 @@ export default function HomeClient() {
         .trust b{ color: rgba(255,255,255,.92); font-weight: 1000; }
         .sep{ opacity: .35; }
 
-        /* Right â€œpreviewâ€ panel â€“ classy, minimal */
+        /* Right “preview” panel – classy, minimal */
         .panel{
           border-radius: var(--r2);
           border: 1px solid rgba(255,255,255,.14);
@@ -512,10 +501,8 @@ export default function HomeClient() {
                   <a className="chip" href="/pricing">See pricing</a>
                   <a className="chip chipPrimary" href="/app">Launch builder</a>
                 </div>
-)}
-
-        </div>
-      </div>
+              </div>
+            </div>
           </div>
 
           <section className="hero">
@@ -525,11 +512,11 @@ export default function HomeClient() {
                   <span className="pill">AI WEBSITE AUTOMATION</span>
 
                   <h1 className="h1">
-                    A <span className="grad">flagship</span> website that sells â€” built fast, refined clean.
+                    A <span className="grad">flagship</span> website that sells — built fast, refined clean.
                   </h1>
 
                   <p className="sub">
-                    Dominat8 generates your structure, copy, layout rhythm, SEO plan, and publish-ready outputs â€”
+                    Dominat8 generates your structure, copy, layout rhythm, SEO plan, and publish-ready outputs —
                     then gives you controls to perfect the final result.
                   </p>
 
@@ -541,11 +528,11 @@ export default function HomeClient() {
                   <div className="trust">
                     <span className="dot" />
                     <span><b>{live}</b></span>
-                    <span className="sep">â€¢</span>
+                    <span className="sep">•</span>
                     <span>Deploy stamp: <b>{stamp}</b></span>
-                    <span className="sep">â€¢</span>
+                    <span className="sep">•</span>
                     <span><b>SEO</b> + <b>Sitemap</b> + <b>Publish</b> included</span>
-                    <span className="sep">â€¢</span>
+                    <span className="sep">•</span>
                     <span>Built for <b>subscriptions</b></span>
                   </div>
                 </div>
@@ -561,36 +548,29 @@ export default function HomeClient() {
                       <div className="rowIcon"><Icon name="spark" /></div>
                       <div>
                         <div className="rowTitle">Premium homepage rhythm</div>
-                        <div className="rowText">Clean hierarchy, strong hero, and sections that feel â€œenterpriseâ€.</div>
-)}
-
-        </div>
-      </div>
+                        <div className="rowText">Clean hierarchy, strong hero, and sections that feel “enterprise”.</div>
+                      </div>
+                    </div>
 
                     <div className="row">
                       <div className="rowIcon"><Icon name="bolt" /></div>
                       <div>
                         <div className="rowTitle">Fast build, clean control</div>
-                        <div className="rowText">The system drafts, you refine â€” without â€œtemplate soupâ€.</div>
-)}
-
-        </div>
-      </div>
+                        <div className="rowText">The system drafts, you refine — without “template soup”.</div>
+                      </div>
+                    </div>
 
                     <div className="row">
                       <div className="rowIcon"><Icon name="shield" /></div>
                       <div>
                         <div className="rowTitle">Publish-ready outputs</div>
                         <div className="rowText">SEO plan, sitemap, robots, and proof markers baked in.</div>
-)}
-
-        </div>
-      </div>
+                      </div>
+                    </div>
                   </div>
-)}
+                </div>
 
-        </div>
-      </div>
+              </div>
 
               <div className="section">
                 <div className="cards">
@@ -600,15 +580,13 @@ export default function HomeClient() {
                       <div className="cardTitle">Designed to convert</div>
                     </div>
                     <div className="cardBody">
-                      Not â€œpretty sectionsâ€ â€” a structured sales narrative.
+                      Not “pretty sections” — a structured sales narrative.
                       <div className="list">
                         <div className="li"><i><Icon name="check" /></i><span>One clear promise</span></div>
                         <div className="li"><i><Icon name="check" /></i><span>Credibility strip</span></div>
                         <div className="li"><i><Icon name="check" /></i><span>High-signal features</span></div>
-)}
-
-        </div>
-      </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="card">
@@ -622,10 +600,8 @@ export default function HomeClient() {
                         <div className="li"><i><Icon name="check" /></i><span>Deploy proof markers</span></div>
                         <div className="li"><i><Icon name="check" /></i><span>No-store probes</span></div>
                         <div className="li"><i><Icon name="check" /></i><span>Deterministic outputs</span></div>
-)}
-
-        </div>
-      </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="card">
@@ -634,15 +610,13 @@ export default function HomeClient() {
                       <div className="cardTitle">Launch-ready</div>
                     </div>
                     <div className="cardBody">
-                      The aesthetic is clean and sharp â€” ready for a paid product.
+                      The aesthetic is clean and sharp — ready for a paid product.
                       <div className="list">
                         <div className="li"><i><Icon name="check" /></i><span>Photo background + overlays</span></div>
                         <div className="li"><i><Icon name="check" /></i><span>Premium glass hierarchy</span></div>
                         <div className="li"><i><Icon name="check" /></i><span>Strong CTA system</span></div>
-)}
-
-        </div>
-      </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -655,10 +629,9 @@ export default function HomeClient() {
                     <a className="btn btnPrimary" href="/app">Launch builder</a>
                     <a className="btn" href="/pricing">See pricing</a>
                   </div>
-)}
+                </div>
 
-        </div>
-      </div>
+              </div>
 
             </div>
           </section>
