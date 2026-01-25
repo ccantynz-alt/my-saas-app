@@ -82,7 +82,7 @@ const g0: any =
   (generatedAny && typeof generatedAny === "object") ? generatedAny :
   {};
 
-const item: MarketingContentItem = {
+const item: MarketingContentItem = ({
   id,
   campaignId,
   createdAt: now,
@@ -93,16 +93,12 @@ const item: MarketingContentItem = {
   hooks: g0.hooks ?? [],
   script: g0.script ?? "",
   caption: g0.caption ?? "",
-  headline: g0.headline ?? g0.title ?? "",
-  description: g0.description ?? "",
-  slug: g0.slug ?? "",
-  title: g0.title ?? "",
   html: g0.html ?? "",
 
   // If your type has extra required fields, keep them build-safe here too:
   assets: g0.assets ?? [],
   meta: g0.meta ?? {},
-};
+} as any);
 
   await kvSet(Keys.content(id), safeJsonStringify(item));
 
