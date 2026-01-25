@@ -1,5 +1,5 @@
 ﻿export default function HomePage() {
-  const marker = "HERO_WOW_V1_OK_20260125_152438";
+  const marker = "HERO_WOW_V1_1_OK_20260125_152828";
 
   return (
     <main className="d8-root">
@@ -7,49 +7,57 @@
       <div className="d8-hidden">{marker}</div>
 
       <section className="d8-hero">
-        {/* Background layers */}
+        {/* Background */}
         <div className="d8-bg d8-bgBase" aria-hidden="true" />
-        <div className="d8-bg d8-bgSweep" aria-hidden="true" />
-        <div className="d8-bg d8-bgNoise" aria-hidden="true" />
         <div className="d8-bg d8-bgVignette" aria-hidden="true" />
 
+        {/* New: premium headline halo + side glow */}
+        <div className="d8-halo d8-haloMain" aria-hidden="true" />
+        <div className="d8-halo d8-haloSide" aria-hidden="true" />
+
+        {/* New: subtle grain (pure CSS, no extra files) */}
+        <div className="d8-grain" aria-hidden="true" />
+
         <div className="d8-shell">
-          <div className="d8-badge d8-enter">
+          <div className="d8-badge">
             <span className="d8-dot" />
             <span className="d8-badgeText">Dominat8 — Enterprise AI website automation</span>
             <span className="d8-badgePill">Premium</span>
           </div>
 
-          <h1 className="d8-h1 d8-enter d8-delay1">
+          <h1 className="d8-h1">
             Launch a{" "}
-            <span className="d8-gradText">world-class</span>{" "}
+            <span className="d8-gradText d8-strong">world-class</span>{" "}
             site
             <br />
-            in minutes — not weeks.
+            <span className="d8-h1Lite">in minutes — not weeks.</span>
           </h1>
 
-          <p className="d8-sub d8-enter d8-delay2">
+          <p className="d8-sub">
             Dominat8 generates pages, writes SEO, and prepares your publish pipeline —
             so you ship faster with control, consistency, and confidence.
           </p>
 
-          <div className="d8-ctaRow d8-enter d8-delay3">
+          <div className="d8-ctaRow">
             <a className="d8-btn d8-btnPrimary" href="/new">
-              Build my site
-              <span className="d8-btnArrow">→</span>
+              Build my site <span className="d8-btnArrow">→</span>
             </a>
 
             <a className="d8-btn d8-btnSecondary" href="/templates">
               View templates
             </a>
+          </div>
 
+          <div className="d8-proofRow">
             <div className="d8-proof">
               <div className="d8-proofTop">Built for serious launches</div>
-              <div className="d8-proofSub">Structured outputs • Repeatable quality • Clean publishing</div>
+              <div className="d8-proofSub">
+                Structured outputs • Repeatable quality • Clean publishing
+              </div>
             </div>
           </div>
 
-          <div className="d8-cards d8-enter d8-delay4">
+          <div className="d8-cards">
             <div className="d8-card">
               <div className="d8-cardTitle">Finish-for-me</div>
               <div className="d8-cardBody">From brief → full site structure, automatically.</div>
@@ -74,6 +82,7 @@
 
       <style>{\
         :root { color-scheme: dark; }
+
         .d8-root{
           min-height:100vh;
           background:#000;
@@ -92,13 +101,19 @@
           justify-content:center;
           padding:96px 20px 72px;
         }
+
+        /* New: slight left bias (feels designed, not template) */
         .d8-shell{
           position:relative;
           width:min(1120px, 100%);
           z-index:2;
+          transform: translateX(-34px);
+        }
+        @media (max-width: 860px){
+          .d8-shell{ transform:none; }
         }
 
-        /* Background layers */
+        /* Background base */
         .d8-bg{ position:absolute; inset:0; z-index:0; }
         .d8-bgBase{
           background-image:url('/hero/hero-bg.svg');
@@ -107,25 +122,55 @@
           transform:scale(1.03);
           filter:saturate(1.12) contrast(1.05);
         }
-        .d8-bgSweep{
-          background:
-            radial-gradient(900px 520px at 32% 30%, rgba(124,92,255,0.34), rgba(0,0,0,0) 62%),
-            radial-gradient(780px 480px at 52% 38%, rgba(77,210,255,0.18), rgba(0,0,0,0) 60%),
-            linear-gradient(110deg, rgba(124,92,255,0.18), rgba(77,210,255,0.10), rgba(0,0,0,0) 65%);
-          mix-blend-mode:screen;
-          opacity:0.95;
-          animation:d8Sweep 10s ease-in-out infinite;
-        }
-        .d8-bgNoise{
-          background-image:url('/hero/noise.svg');
-          background-size:420px 420px;
-          opacity:0.16;
-          mix-blend-mode:overlay;
-        }
         .d8-bgVignette{
           background:
-            radial-gradient(900px 540px at 35% 32%, rgba(0,0,0,0.08), rgba(0,0,0,0.75) 72%),
-            linear-gradient(to bottom, rgba(0,0,0,0.08), rgba(0,0,0,0.78));
+            radial-gradient(1000px 560px at 35% 32%, rgba(0,0,0,0.10), rgba(0,0,0,0.78) 72%),
+            linear-gradient(to bottom, rgba(0,0,0,0.10), rgba(0,0,0,0.82));
+        }
+
+        /* New: premium halo glows (tight, headline-focused) */
+        .d8-halo{
+          position:absolute;
+          z-index:1;
+          pointer-events:none;
+          filter: blur(10px);
+          opacity: 0.95;
+        }
+        .d8-haloMain{
+          width: 920px;
+          height: 560px;
+          left: 120px;
+          top: 110px;
+          background:
+            radial-gradient(closest-side at 35% 35%, rgba(124,92,255,0.52), rgba(0,0,0,0) 68%),
+            radial-gradient(closest-side at 55% 45%, rgba(77,210,255,0.20), rgba(0,0,0,0) 70%);
+        }
+        .d8-haloSide{
+          width: 760px;
+          height: 520px;
+          left: -140px;
+          top: 220px;
+          background:
+            radial-gradient(closest-side at 55% 45%, rgba(77,210,255,0.14), rgba(0,0,0,0) 70%),
+            radial-gradient(closest-side at 45% 35%, rgba(124,92,255,0.18), rgba(0,0,0,0) 72%);
+          opacity: 0.65;
+        }
+        @media (max-width: 720px){
+          .d8-haloMain{ left: -40px; top: 70px; width: 760px; height: 520px; }
+          .d8-haloSide{ display:none; }
+        }
+
+        /* New: subtle grain overlay (no image) */
+        .d8-grain{
+          position:absolute;
+          inset:0;
+          z-index:1;
+          pointer-events:none;
+          opacity:0.10;
+          background-image:
+            repeating-linear-gradient(0deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 6px),
+            repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, rgba(0,0,0,0) 2px, rgba(0,0,0,0) 7px);
+          mix-blend-mode: overlay;
         }
 
         /* Badge */
@@ -162,13 +207,21 @@
           opacity:0.9;
         }
 
-        /* Headline */
+        /* Headline micro polish */
         .d8-h1{
-          font-size:clamp(2.6rem, 4.9vw, 4.3rem);
+          font-size:clamp(2.7rem, 5.0vw, 4.35rem);
           line-height:1.03;
-          letter-spacing:-1px;
+          letter-spacing:-1.15px;
           margin:0 0 16px;
-          text-shadow: 0 16px 60px rgba(0,0,0,0.65);
+          text-shadow: 0 18px 70px rgba(0,0,0,0.70);
+        }
+        .d8-strong{
+          font-weight: 950;
+          letter-spacing: -1.35px;
+        }
+        .d8-h1Lite{
+          font-weight: 650;
+          opacity: 0.96;
         }
         .d8-gradText{
           background: linear-gradient(135deg, rgba(124,92,255,1), rgba(77,210,255,1));
@@ -190,7 +243,7 @@
           display:flex;
           gap:12px;
           flex-wrap:wrap;
-          align-items:flex-start;
+          align-items:center;
         }
         .d8-btn{
           display:inline-flex;
@@ -207,17 +260,13 @@
           font-weight:900;
           color:#06070b;
           background: linear-gradient(135deg, #7c5cff, #4dd2ff);
-          box-shadow: 0 18px 70px rgba(124,92,255,0.22);
+          box-shadow: 0 18px 70px rgba(124,92,255,0.24);
         }
         .d8-btnPrimary:hover{
           transform: translateY(-1px);
-          box-shadow: 0 22px 90px rgba(124,92,255,0.30);
+          box-shadow: 0 22px 92px rgba(124,92,255,0.32);
         }
-        .d8-btnArrow{
-          margin-left:10px;
-          font-weight:900;
-          opacity:0.85;
-        }
+        .d8-btnArrow{ margin-left:10px; font-weight:900; opacity:0.85; }
         .d8-btnSecondary{
           font-weight:800;
           color:#fff;
@@ -231,22 +280,22 @@
           box-shadow: 0 18px 70px rgba(0,0,0,0.55);
         }
 
-        /* Proof block */
+        /* Proof */
+        .d8-proofRow{ margin-top: 14px; }
         .d8-proof{
-          margin-left: 6px;
           padding: 10px 12px;
           border-radius: 14px;
           border: 1px solid rgba(255,255,255,0.12);
-          background: rgba(0,0,0,0.28);
+          background: rgba(0,0,0,0.26);
           backdrop-filter: blur(12px);
-          max-width: 420px;
+          max-width: 520px;
         }
-        .d8-proofTop{ font-weight:800; opacity:0.95; margin-bottom:2px; }
+        .d8-proofTop{ font-weight:900; opacity:0.95; margin-bottom:2px; }
         .d8-proofSub{ font-size:13px; opacity:0.72; line-height:1.35; }
 
         /* Cards */
         .d8-cards{
-          margin-top:28px;
+          margin-top:22px;
           display:grid;
           grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
           gap:12px;
@@ -278,37 +327,6 @@
           padding: 22px 20px 46px;
           opacity:0.65;
           text-align:center;
-        }
-
-        /* Motion: one tasteful entrance + subtle background sweep */
-        .d8-enter{
-          animation: d8Enter 680ms cubic-bezier(.2,.8,.2,1) both;
-        }
-        .d8-delay1{ animation-delay: 80ms; }
-        .d8-delay2{ animation-delay: 150ms; }
-        .d8-delay3{ animation-delay: 220ms; }
-        .d8-delay4{ animation-delay: 290ms; }
-
-        @keyframes d8Enter{
-          from{ opacity:0; transform: translateY(8px); filter: blur(1px); }
-          to{ opacity:1; transform: translateY(0); filter: blur(0); }
-        }
-
-        @keyframes d8Sweep{
-          0%{ transform: translate3d(0,0,0) scale(1.0); opacity:0.80; }
-          50%{ transform: translate3d(-1.5%, 1%, 0) scale(1.02); opacity:0.98; }
-          100%{ transform: translate3d(0,0,0) scale(1.0); opacity:0.80; }
-        }
-
-        @media (prefers-reduced-motion: reduce){
-          .d8-enter{ animation:none !important; }
-          .d8-bgSweep{ animation:none !important; }
-          .d8-btn{ transition:none !important; }
-        }
-
-        @media (max-width: 720px){
-          .d8-proof{ max-width: 100%; }
-          .d8-badgeText{ white-space:normal; }
         }
       \}</style>
     </main>
