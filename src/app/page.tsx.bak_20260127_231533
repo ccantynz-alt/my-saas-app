@@ -1,0 +1,59 @@
+import HomeClient from "./_client/HomeClient";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export default function Page() {
+  const stamp = new Date().toISOString();
+
+  return (
+    <>
+      <style>{`
+        .routeProofBanner {
+          position: sticky;
+          top: 0;
+          z-index: 99999;
+          background: linear-gradient(90deg, rgba(255,255,255,0.98), rgba(255,255,255,0.92));
+          color: #071018;
+          border-bottom: 3px solid rgba(0,0,0,0.20);
+          font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+          padding: 14px 16px;
+        }
+        .routeProofTitle {
+          font-weight: 950;
+          letter-spacing: -0.02em;
+          font-size: 16px;
+        }
+        .routeProofMeta {
+          margin-top: 4px;
+          font-size: 12px;
+          opacity: 0.82;
+        }
+        .routeProofPill {
+          display: inline-block;
+          margin-left: 10px;
+          padding: 3px 10px;
+          border-radius: 999px;
+          background: rgba(0,0,0,0.06);
+          border: 1px solid rgba(0,0,0,0.12);
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+      `}</style>
+
+      <div className="routeProofBanner">
+        <div className="routeProofTitle">
+          ✅ ROUTE OK — V31_MARKER_FORCE_DEPLOY
+          <span className="routeProofPill">If you see this, / is updated</span>
+        </div>
+        <div className="routeProofMeta">
+          ROOT_STAMP: {stamp}
+        </div>
+      </div>
+
+      <HomeClient />
+    </>
+  );
+}
