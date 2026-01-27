@@ -50,7 +50,7 @@ function extractPatchScript(text: string): { script: string; mode: string } | nu
     if (body) psMatches.push(body);
   }
   if (psMatches.length) {
-    psMatches.sort((a, b) => b.length - a.length);
+    psMatches.sort((a,b) => b.length - a.length);
     return { script: psMatches[0], mode: "powershell_fence" };
   }
 
@@ -62,23 +62,20 @@ function extractPatchScript(text: string): { script: string; mode: string } | nu
     if (body) anyMatches.push(body);
   }
   if (anyMatches.length) {
-    anyMatches.sort((a, b) => b.length - a.length);
+    anyMatches.sort((a,b) => b.length - a.length);
     return { script: anyMatches[0], mode: "any_fence" };
   }
 
   // 3) Fallback: store plain text as PowerShell comment block (SAFE)
   const header = [
-    "Set-StrictMode -Version Latest",
+    'Set-StrictMode -Version Latest',
     '$ErrorActionPreference = "Stop"',
-    "",
+    '',
     'Write-Host "NOTE: Fallback patch saved (no fenced code block found). Review before running."',
-    "",
+    ''
   ].join("\r\n");
 
-  const commented = t
-    .split(/\r?\n/)
-    .map((line) => "# " + line)
-    .join("\r\n");
+  const commented = t.split(/\r?\n/).map(line => "# " + line).join("\r\n");
   const script = header + "\r\n" + commented + "\r\n";
 
   return { script, mode: "fallback_text" };
@@ -86,46 +83,27 @@ function extractPatchScript(text: string): { script: string; mode: string } | nu
 
 function minimalPatch(runId: string, agentId: string) {
   return [
-    "Set-StrictMode -Version Latest",
+    'Set-StrictMode -Version Latest',
     '$ErrorActionPreference = "Stop"',
-    "",
-    'Write-Host "NOTE: Empty output from agent. Creating diagnostic file."',
+    '',
+    `Write-Host "NOTE: Empty output from agent. Creating diagnostic file."`,
     `Set-Content -Path ".\\AGENT_EMPTY_${runId}.txt" -Value "EMPTY_OUTPUT agentId=${agentId} runId=${runId}" -Encoding UTF8 -NoNewline`,
-    "",
+    ''
   ].join("\r\n");
 }
 
 export async function POST(req: Request) {
   let body: any = {};
-  try {
-    body = await req.json();
-  } catch {}
+  try { body = await req.json(); } catch {}
 
   const projectId = String(body?.projectId || "demo");
-  const agentId = String(body?.agentId || body?.agent || "02_creative_director");
+  const agentId   = String(body?.agentId || body?.agent || "02_creative_director");
 
   const modelName = String(body?.model || process.env.OPENAI_MODEL || "gpt-5");
+  const reasoningEffort = String(body?.reasoningEffort || "low");
+  const maxOutputTokens = Number(body?.maxOutputTokens || 900);
 
-  // IMPORTANT DEFAULTS FOR PATCH OUTPUT:
-  // - minimal reasoning (so we get actual text output)
-  // - large output budget for real scripts
-  const reasoningEffort = String(
-    body?.reasoningEffort || process.env.AGENT_REASONING_EFFORT || "minimal"
-  );
-  const maxOutputTokens = Number(
-    body?.maxOutputTokens || process.env.AGENT_PATCH_MAX_OUTPUT_TOKENS || 6000
-  );
-
-  // Accept multiple prompt keys (client flexibility)
-  const promptText = String(
-    body?.input ||
-      body?.prompt ||
-      body?.task ||
-      body?.promptText ||
-      body?.instruction ||
-      ""
-  ).trim();
-
+  const promptText = String(body?.promptText || body?.instruction || "").trim();
   if (!promptText) {
     return NextResponse.json({ ok: false, error: "MISSING_PROMPT" }, { status: 400 });
   }
@@ -136,10 +114,7 @@ export async function POST(req: Request) {
     model: modelName as any,
     reasoning: { effort: reasoningEffort as any },
     max_output_tokens: maxOutputTokens,
-    text: { format: { type: "text" }, verbosity: "low" },
-
-    // Standard Responses API input shape
-    input: [
+    promptText: [
       {
         role: "user",
         content: [
@@ -149,12 +124,12 @@ export async function POST(req: Request) {
 `Return ONLY a single fenced PowerShell code block.
 No commentary. No extra text.
 
-TASK:
+promptText:
 ${promptText}
-`,
-          },
-        ],
-      },
+`
+          }
+        ]
+      }
     ],
   });
 
@@ -165,18 +140,16 @@ ${promptText}
   const outputText = extractAnyText(raw);
   let extracted = extractPatchScript(outputText);
 
-  // 2) If empty outputText, fallback to raw JSON as text (so we ALWAYS save something)
+  // 2) If empty outputText, fallback to raw JSON as text promptText (so we ALWAYS save something)
   let mode = extracted?.mode || "";
   let script = extracted?.script || "";
 
   if (!script) {
+    // try raw json fallback
     let rawText = "";
-    try {
-      rawText = JSON.stringify(raw, null, 2);
-    } catch {
-      rawText = String(raw);
-    }
+    try { rawText = JSON.stringify(raw, null, 2); } catch { rawText = String(raw); }
 
+    // cap rawText to keep KV reasonable
     if (rawText.length > 12000) rawText = rawText.slice(0, 12000) + "\n# ...TRUNCATED...\n";
 
     const rawFallback = extractPatchScript(rawText);
@@ -200,7 +173,7 @@ ${promptText}
   };
 
   const patchLatest = `agentPatch:project:${projectId}:latest`;
-  const patchById = `agentPatch:project:${projectId}:${runId}`;
+  const patchById   = `agentPatch:project:${projectId}:${runId}`;
 
   await kv.set(patchLatest, patchObj);
   await kv.set(patchById, patchObj);
@@ -233,3 +206,5 @@ ${promptText}
     patchKeys: { patchLatest, patchById },
   });
 }
+
+
