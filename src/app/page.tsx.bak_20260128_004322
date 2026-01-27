@@ -1,0 +1,162 @@
+﻿import Link from "next/link";
+
+export const dynamic = "force-dynamic";
+
+function buildMeta() {
+  const env = process.env.VERCEL_ENV || "unknown";
+  const deployId = process.env.VERCEL_DEPLOYMENT_ID || "unknown";
+  const sha = process.env.VERCEL_GIT_COMMIT_SHA || "unknown";
+  return { env, deployId, sha };
+}
+
+export default function HomePage() {
+  const meta = buildMeta();
+
+  return (
+    <main className="min-h-screen bg-[#070A12] text-white">
+      {/* Background glow + subtle dot field */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(1200px_600px_at_50%_0%,rgba(168,85,247,0.28),transparent_60%),radial-gradient(1000px_600px_at_85%_20%,rgba(59,130,246,0.22),transparent_60%),radial-gradient(900px_600px_at_15%_35%,rgba(236,72,153,0.18),transparent_60%)]" />
+        <div className="absolute inset-0 opacity-[0.16] [background-image:radial-gradient(rgba(255,255,255,0.75)_1px,transparent_1px)] [background-size:26px_26px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(900px_500px_at_50%_35%,transparent,rgba(7,10,18,0.92))]" />
+      </div>
+
+      {/* Top Nav */}
+      <header className="relative z-10">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5">
+          <div className="flex items-center gap-2">
+            <div className="h-9 w-9 rounded-xl bg-white/10 ring-1 ring-white/15 grid place-items-center">
+              <span className="text-xs font-extrabold">D8</span>
+            </div>
+            <div className="text-sm font-semibold tracking-tight">Dominat8</div>
+          </div>
+
+          <nav className="hidden items-center gap-7 text-sm text-white/70 md:flex">
+            <a href="#features" className="hover:text-white">Features</a>
+            <a href="#resources" className="hover:text-white">Resources</a>
+            <a href="#pricing" className="hover:text-white">Pricing</a>
+            <a href="/admin" className="hover:text-white">Login</a>
+          </nav>
+
+          <Link
+            href="/admin"
+            className="rounded-xl bg-white px-4 py-2 text-sm font-extrabold text-[#070A12] hover:bg-white/90"
+          >
+            Get started
+          </Link>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <section className="relative z-10">
+        <div className="mx-auto max-w-6xl px-4 pt-8 pb-14 md:pt-12">
+          <div className="mx-auto max-w-3xl text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-semibold text-white/80">
+              <span className="inline-block h-2 w-2 rounded-full bg-violet-300 shadow-[0_0_18px_rgba(196,181,253,0.7)]" />
+              More than a website builder
+            </div>
+
+            <h1 className="mt-5 text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl">
+              Your site should do more <span className="text-white/90">than look good</span>
+            </h1>
+
+            <p className="mt-4 text-sm leading-relaxed text-white/70 sm:text-base">
+              Dominat8 builds high-converting, publish-ready sites with structure and SEO foundations —
+              without the chaos.
+            </p>
+
+            <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Link
+                href="/admin"
+                className="inline-flex items-center justify-center rounded-2xl bg-violet-500 px-6 py-3 text-sm font-extrabold text-white shadow-xl shadow-black/35 hover:bg-violet-400"
+              >
+                Start Building Now
+              </Link>
+
+              <a
+                href="#preview"
+                className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-6 py-3 text-sm font-semibold text-white/90 hover:bg-white/10"
+              >
+                Watch video
+              </a>
+            </div>
+          </div>
+
+          {/* Product preview card */}
+          <div id="preview" className="mt-10 rounded-[28px] border border-white/12 bg-white/[0.06] p-4 shadow-2xl shadow-black/50 backdrop-blur">
+            <div className="rounded-2xl border border-white/10 bg-black/35 p-4">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-semibold text-white/70">LIVE_OK</div>
+                <div className="text-[11px] text-white/50">env: {meta.env}</div>
+              </div>
+
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-[11px] font-semibold text-white/60">Editor</div>
+                  <div className="mt-2 text-sm font-extrabold">Generate Website</div>
+                  <div className="mt-1 text-xs text-white/60">Pages • Sections • Styles</div>
+                  <div className="mt-3 h-2 w-full rounded-full bg-white/10">
+                    <div className="h-2 w-2/3 rounded-full bg-violet-400" />
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-[11px] font-semibold text-white/60">Preview</div>
+                  <div className="mt-2 rounded-lg border border-white/10 bg-black/40 p-3">
+                    <div className="text-xs font-semibold text-white/75">Maximizing your potential</div>
+                    <div className="mt-2 h-24 rounded-md bg-white/10" />
+                    <div className="mt-3 flex gap-2">
+                      <div className="h-7 w-20 rounded-md bg-violet-500/80" />
+                      <div className="h-7 w-24 rounded-md bg-white/10" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <div className="text-[11px] font-semibold text-white/60">Deploy Proof</div>
+                  <div className="mt-2 text-xs text-white/70">DEPLOY_ID</div>
+                  <div className="mt-1 font-mono text-[11px] text-white/85 break-all">{meta.deployId}</div>
+                  <div className="mt-3 text-xs text-white/70">GIT_SHA</div>
+                  <div className="mt-1 font-mono text-[11px] text-white/85 break-all">{meta.sha}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Simple sections (kept minimal so hero stays dominant) */}
+          <div id="features" className="mt-14 grid gap-4 md:grid-cols-3">
+            {[
+              { t: "Generate fast", d: "High-quality pages in minutes. No endless prompting." },
+              { t: "Guardrails on", d: "Scoped changes so the repo stays shippable." },
+              { t: "Publish-ready", d: "Deploy to production with clear proof signals." },
+            ].map((x) => (
+              <div key={x.t} className="rounded-3xl border border-white/10 bg-white/5 p-6">
+                <div className="text-sm font-extrabold">{x.t}</div>
+                <div className="mt-2 text-sm text-white/70">{x.d}</div>
+              </div>
+            ))}
+          </div>
+
+          <div id="pricing" className="mt-14 rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
+            <div className="text-sm font-extrabold">Pricing</div>
+            <div className="mt-2 text-sm text-white/70">Start free. Upgrade when you’re ready.</div>
+            <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Link href="/admin" className="rounded-2xl bg-white px-6 py-3 text-sm font-extrabold text-[#070A12] hover:bg-white/90">
+                Start free
+              </Link>
+              <Link href="/admin" className="rounded-2xl border border-white/15 bg-white/10 px-6 py-3 text-sm font-semibold text-white hover:bg-white/15">
+                Go Pro
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer className="relative z-10 border-t border-white/10">
+        <div className="mx-auto max-w-6xl px-4 py-10 text-xs text-white/55">
+          © {new Date().getFullYear()} Dominat8. All rights reserved.
+        </div>
+      </footer>
+    </main>
+  );
+}
