@@ -1,303 +1,471 @@
-﻿import Link from "next/link";
+/* eslint-disable react/no-unescaped-entities */
+export const dynamic = "force-static";
 
-export const dynamic = "force-dynamic";
+type BuildInfo = {
+  env: string;
+  deployId: string;
+  sha: string;
+};
 
-function buildMeta() {
+function getBuildInfo(): BuildInfo {
+  // These are evaluated at build time on the server.
   const env = process.env.VERCEL_ENV || "unknown";
-  const deployId = process.env.VERCEL_DEPLOYMENT_ID || "unknown";
+  const deployId = process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_DEPLOYMENT_URL || "unknown";
   const sha = process.env.VERCEL_GIT_COMMIT_SHA || "unknown";
   return { env, deployId, sha };
 }
 
 export default function HomePage() {
-  const meta = buildMeta();
+  const build = getBuildInfo();
 
-  // Inline fallbacks so it NEVER renders “unstyled”
-  const c = {
-    bg: "#070A12",
-    white: "#FFFFFF",
-    white70: "rgba(255,255,255,0.70)",
-    white55: "rgba(255,255,255,0.55)",
-    border: "rgba(255,255,255,0.12)",
-    panel: "rgba(255,255,255,0.06)",
-    panel2: "rgba(0,0,0,0.35)",
-    violet: "#8B5CF6",
-    violet2: "#A78BFA",
-  };
-
-  const heroBgStyle: React.CSSProperties = {
-    position: "fixed",
-    inset: 0,
-    pointerEvents: "none",
-    backgroundColor: c.bg,
-    backgroundImage: [
-      "radial-gradient(1200px 600px at 50% 0%, rgba(168,85,247,0.28), transparent 60%)",
-      "radial-gradient(1000px 600px at 85% 20%, rgba(59,130,246,0.22), transparent 60%)",
-      "radial-gradient(900px 600px at 15% 35%, rgba(236,72,153,0.18), transparent 60%)",
-      "radial-gradient(900px 500px at 50% 35%, transparent, rgba(7,10,18,0.92))",
-    ].join(", "),
-  };
-
-  const dotStyle: React.CSSProperties = {
-    position: "fixed",
-    inset: 0,
-    pointerEvents: "none",
-    opacity: 0.16,
-    backgroundImage: "radial-gradient(rgba(255,255,255,0.75) 1px, transparent 1px)",
-    backgroundSize: "26px 26px",
+  const styles: Record<string, any> = {
+    page: {
+      minHeight: "100vh",
+      background: "radial-gradient(1200px 800px at 65% 5%, rgba(168,85,247,0.22), rgba(0,0,0,0) 60%), radial-gradient(900px 700px at 15% 20%, rgba(59,130,246,0.14), rgba(0,0,0,0) 62%), linear-gradient(180deg, #07070B 0%, #07070B 40%, #05050A 100%)",
+      color: "#EDEAF7",
+      fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'",
+      padding: "28px 16px 56px",
+    },
+    container: {
+      width: "100%",
+      maxWidth: 1160,
+      margin: "0 auto",
+    },
+    topbar: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      padding: "10px 0 22px",
+    },
+    brand: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      textDecoration: "none",
+      color: "#F3EEFF",
+    },
+    logo: {
+      width: 34,
+      height: 34,
+      borderRadius: 12,
+      background: "linear-gradient(135deg, rgba(168,85,247,0.95), rgba(59,130,246,0.75))",
+      boxShadow: "0 10px 30px rgba(168,85,247,0.25), 0 10px 30px rgba(59,130,246,0.12)",
+      border: "1px solid rgba(255,255,255,0.18)",
+    },
+    brandText: {
+      display: "flex",
+      flexDirection: "column",
+      lineHeight: 1.05,
+    },
+    brandName: {
+      fontSize: 13,
+      letterSpacing: "0.22em",
+      textTransform: "uppercase",
+      opacity: 0.9,
+      fontWeight: 700,
+    },
+    brandSub: {
+      fontSize: 12,
+      opacity: 0.7,
+      marginTop: 3,
+    },
+    nav: {
+      display: "flex",
+      alignItems: "center",
+      gap: 14,
+      flexWrap: "wrap",
+      justifyContent: "flex-end",
+    },
+    navLink: {
+      fontSize: 13,
+      color: "rgba(237,234,247,0.82)",
+      textDecoration: "none",
+      padding: "8px 10px",
+      borderRadius: 10,
+      border: "1px solid rgba(255,255,255,0.08)",
+      background: "rgba(255,255,255,0.03)",
+    },
+    heroGrid: {
+      display: "grid",
+      gridTemplateColumns: "1.15fr 0.85fr",
+      gap: 18,
+      alignItems: "stretch",
+      marginTop: 6,
+    },
+    heroLeft: {
+      padding: "18px 8px 8px",
+    },
+    kicker: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "8px 12px",
+      borderRadius: 999,
+      background: "linear-gradient(90deg, rgba(168,85,247,0.18), rgba(59,130,246,0.10))",
+      border: "1px solid rgba(255,255,255,0.12)",
+      boxShadow: "0 10px 40px rgba(168,85,247,0.08)",
+      color: "rgba(237,234,247,0.92)",
+      fontSize: 12,
+      letterSpacing: "0.08em",
+      textTransform: "uppercase",
+      fontWeight: 700,
+    },
+    h1: {
+      marginTop: 16,
+      fontSize: 50,
+      lineHeight: 1.02,
+      letterSpacing: "-0.02em",
+      fontWeight: 900,
+      color: "#F6F2FF",
+      textShadow: "0 20px 80px rgba(168,85,247,0.18)",
+    },
+    h1Accent: {
+      background: "linear-gradient(90deg, rgba(168,85,247,1), rgba(59,130,246,1))",
+      WebkitBackgroundClip: "text",
+      backgroundClip: "text",
+      color: "transparent",
+    },
+    sub: {
+      marginTop: 14,
+      maxWidth: 640,
+      fontSize: 16,
+      lineHeight: 1.55,
+      color: "rgba(237,234,247,0.78)",
+    },
+    ctas: {
+      display: "flex",
+      gap: 12,
+      flexWrap: "wrap",
+      marginTop: 18,
+      alignItems: "center",
+    },
+    btnPrimary: {
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+      padding: "12px 16px",
+      borderRadius: 14,
+      textDecoration: "none",
+      fontWeight: 800,
+      fontSize: 14,
+      color: "#07070B",
+      background: "linear-gradient(90deg, rgba(168,85,247,1), rgba(59,130,246,1))",
+      boxShadow: "0 18px 55px rgba(168,85,247,0.26), 0 10px 24px rgba(59,130,246,0.16)",
+      border: "1px solid rgba(255,255,255,0.10)",
+    },
+    btnGhost: {
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+      padding: "12px 16px",
+      borderRadius: 14,
+      textDecoration: "none",
+      fontWeight: 800,
+      fontSize: 14,
+      color: "rgba(237,234,247,0.88)",
+      background: "rgba(255,255,255,0.04)",
+      border: "1px solid rgba(255,255,255,0.12)",
+      boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+    },
+    bullets: {
+      marginTop: 16,
+      display: "grid",
+      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+      gap: 10,
+      maxWidth: 640,
+    },
+    bullet: {
+      borderRadius: 16,
+      padding: "12px 12px",
+      background: "rgba(255,255,255,0.03)",
+      border: "1px solid rgba(255,255,255,0.10)",
+      boxShadow: "0 12px 40px rgba(0,0,0,0.35)",
+    },
+    bulletTitle: {
+      fontSize: 12,
+      fontWeight: 900,
+      letterSpacing: "0.18em",
+      textTransform: "uppercase",
+      color: "rgba(237,234,247,0.88)",
+    },
+    bulletText: {
+      marginTop: 6,
+      fontSize: 13,
+      lineHeight: 1.45,
+      color: "rgba(237,234,247,0.70)",
+    },
+    rightCard: {
+      borderRadius: 20,
+      padding: 14,
+      background: "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))",
+      border: "1px solid rgba(255,255,255,0.12)",
+      boxShadow: "0 30px 90px rgba(0,0,0,0.45), 0 20px 55px rgba(168,85,247,0.10)",
+      position: "relative",
+      overflow: "hidden",
+    },
+    rightGlow: {
+      position: "absolute",
+      inset: -60,
+      background: "radial-gradient(closest-side at 70% 30%, rgba(168,85,247,0.32), rgba(0,0,0,0) 70%), radial-gradient(closest-side at 30% 70%, rgba(59,130,246,0.20), rgba(0,0,0,0) 70%)",
+      filter: "blur(14px)",
+      pointerEvents: "none",
+    },
+    badgeRow: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      position: "relative",
+      zIndex: 2,
+    },
+    badge: {
+      fontSize: 11,
+      fontWeight: 900,
+      letterSpacing: "0.16em",
+      textTransform: "uppercase",
+      padding: "8px 10px",
+      borderRadius: 999,
+      background: "rgba(0,0,0,0.35)",
+      border: "1px solid rgba(255,255,255,0.12)",
+      color: "rgba(237,234,247,0.85)",
+    },
+    liveOk: {
+      background: "linear-gradient(90deg, rgba(34,197,94,0.25), rgba(34,197,94,0.10))",
+      border: "1px solid rgba(34,197,94,0.35)",
+      color: "rgba(214,255,226,0.92)",
+    },
+    previewTitle: {
+      marginTop: 14,
+      fontSize: 14,
+      fontWeight: 900,
+      letterSpacing: "0.14em",
+      textTransform: "uppercase",
+      color: "rgba(237,234,247,0.84)",
+      position: "relative",
+      zIndex: 2,
+    },
+    previewFrame: {
+      marginTop: 12,
+      borderRadius: 16,
+      border: "1px solid rgba(255,255,255,0.12)",
+      background: "rgba(0,0,0,0.35)",
+      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
+      overflow: "hidden",
+      position: "relative",
+      zIndex: 2,
+    },
+    previewHeader: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      padding: "10px 12px",
+      borderBottom: "1px solid rgba(255,255,255,0.10)",
+      background: "rgba(255,255,255,0.03)",
+    },
+    dots: { display: "flex", gap: 6, alignItems: "center" },
+    dot: (c: string) => ({
+      width: 10,
+      height: 10,
+      borderRadius: 999,
+      background: c,
+      boxShadow: "0 6px 20px rgba(0,0,0,0.35)",
+    }),
+    previewBody: {
+      padding: 12,
+      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+      fontSize: 12,
+      lineHeight: 1.55,
+      color: "rgba(237,234,247,0.80)",
+    },
+    keyRow: {
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 10,
+      padding: "8px 0",
+      borderBottom: "1px dashed rgba(255,255,255,0.10)",
+    },
+    keyName: { color: "rgba(237,234,247,0.70)" },
+    keyVal: { color: "rgba(237,234,247,0.92)", fontWeight: 700 },
+    section: {
+      marginTop: 26,
+      paddingTop: 22,
+      borderTop: "1px solid rgba(255,255,255,0.08)",
+    },
+    sectionTitle: {
+      fontSize: 12,
+      fontWeight: 900,
+      letterSpacing: "0.18em",
+      textTransform: "uppercase",
+      color: "rgba(237,234,247,0.80)",
+    },
+    sectionText: {
+      marginTop: 10,
+      color: "rgba(237,234,247,0.72)",
+      lineHeight: 1.6,
+      fontSize: 14,
+      maxWidth: 820,
+    },
+    footerRow: {
+      marginTop: 34,
+      display: "flex",
+      justifyContent: "space-between",
+      gap: 12,
+      flexWrap: "wrap",
+      alignItems: "center",
+      opacity: 0.85,
+      fontSize: 12,
+      color: "rgba(237,234,247,0.65)",
+    },
+    fineLink: {
+      color: "rgba(237,234,247,0.70)",
+      textDecoration: "none",
+      borderBottom: "1px solid rgba(237,234,247,0.20)",
+      paddingBottom: 2,
+    },
   };
 
   return (
-    <main
-      className="min-h-screen text-white"
-      style={{ minHeight: "100vh", color: c.white, backgroundColor: c.bg }}
-    >
-      {/* Locked background (works even if Tailwind doesn’t) */}
-      <div aria-hidden="true" style={heroBgStyle} />
-      <div aria-hidden="true" style={dotStyle} />
-
-      {/* Top nav */}
-      <header className="relative z-10">
-        <div
-          className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5"
-          style={{ maxWidth: 1152, margin: "0 auto", padding: "20px 16px" }}
-        >
-          <div className="flex items-center gap-2" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
-              className="h-9 w-9 rounded-xl grid place-items-center"
-              style={{
-                height: 36,
-                width: 36,
-                borderRadius: 14,
-                background: "rgba(255,255,255,0.10)",
-                border: "1px solid rgba(255,255,255,0.15)",
-                display: "grid",
-                placeItems: "center",
-              }}
-            >
-              <span style={{ fontSize: 12, fontWeight: 800 }}>D8</span>
+    <main style={styles.page}>
+      <div style={styles.container}>
+        <div style={styles.topbar}>
+          <a href="/" style={styles.brand} aria-label="Dominat8 Home">
+            <div style={styles.logo} />
+            <div style={styles.brandText}>
+              <div style={styles.brandName}>Dominat8</div>
+              <div style={styles.brandSub}>AI website builder for conversion-first sites</div>
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em" }}>Dominat8</div>
-          </div>
+          </a>
 
-          <nav
-            className="hidden md:flex items-center gap-7 text-sm"
-            style={{ display: "none" }}
-          >
-            {/* keep minimal — your site already has /admin as main entry */}
+          <nav style={styles.nav} aria-label="Top navigation">
+            <a href="#preview" style={styles.navLink}>Preview</a>
+            <a href="/templates" style={styles.navLink}>Templates</a>
+            <a href="/pricing" style={styles.navLink}>Pricing</a>
           </nav>
-
-          <Link
-            href="/admin"
-            className="rounded-xl bg-white px-4 py-2 text-sm font-extrabold text-[#070A12]"
-            style={{
-              borderRadius: 14,
-              background: c.white,
-              color: c.bg,
-              padding: "10px 14px",
-              fontSize: 13,
-              fontWeight: 800,
-              textDecoration: "none",
-            }}
-          >
-            Get started
-          </Link>
         </div>
-      </header>
 
-      {/* Hero */}
-      <section className="relative z-10">
-        <div
-          className="mx-auto max-w-6xl px-4 pt-8 pb-14 md:pt-12"
-          style={{ maxWidth: 1152, margin: "0 auto", padding: "32px 16px 56px 16px" }}
-        >
-          <div className="mx-auto max-w-3xl text-center" style={{ maxWidth: 768, margin: "0 auto", textAlign: "center" }}>
-            <div
-              className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-semibold"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                borderRadius: 999,
-                border: "1px solid rgba(255,255,255,0.15)",
-                background: "rgba(255,255,255,0.05)",
-                padding: "6px 12px",
-                fontSize: 12,
-                fontWeight: 700,
-                color: "rgba(255,255,255,0.82)",
-              }}
-            >
-              <span
-                style={{
-                  height: 8,
-                  width: 8,
-                  borderRadius: 999,
-                  background: c.violet2,
-                  boxShadow: "0 0 18px rgba(196,181,253,0.70)",
-                  display: "inline-block",
-                }}
-              />
-              More than a website builder
+        <div style={styles.heroGrid}>
+          <section style={styles.heroLeft}>
+            <div style={styles.kicker}>
+              <span style={{ opacity: 0.95 }}>Craftify-style hero</span>
+              <span style={{ opacity: 0.65 }}>inline-styled fallback</span>
             </div>
 
-            <h1
-              className="mt-5 text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl"
-              style={{
-                marginTop: 18,
-                fontSize: 56,
-                lineHeight: 1.05,
-                fontWeight: 900,
-                letterSpacing: "-0.03em",
-                color: c.white,
-              }}
-            >
-              Your site should do more{" "}
-              <span style={{ color: "rgba(255,255,255,0.92)" }}>than look good</span>
+            <h1 style={styles.h1}>
+              Your site should do more than{" "}
+              <span style={styles.h1Accent}>look good</span>.
             </h1>
 
-            <p
-              className="mt-4 text-sm leading-relaxed sm:text-base"
-              style={{ marginTop: 14, fontSize: 15, lineHeight: 1.6, color: c.white70 }}
-            >
-              Dominat8 builds high-converting, publish-ready sites with structure and SEO foundations —
-              without the chaos.
+            <p style={styles.sub}>
+              Dominat8 builds polished, conversion-first pages fast — with a locked visual layer that
+              still renders properly even if Tailwind/classes fail to load.
             </p>
 
-            <div
-              className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row"
-              style={{
-                marginTop: 22,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 12,
-              }}
-            >
-              <Link
-                href="/admin"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 18,
-                  background: c.violet,
-                  color: c.white,
-                  padding: "12px 18px",
-                  fontSize: 13,
-                  fontWeight: 900,
-                  textDecoration: "none",
-                  boxShadow: "0 18px 50px rgba(0,0,0,0.45)",
-                }}
-              >
-                Start Building Now
-              </Link>
-
-              <a
-                href="#preview"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 18,
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  background: "rgba(255,255,255,0.06)",
-                  color: "rgba(255,255,255,0.92)",
-                  padding: "12px 18px",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  textDecoration: "none",
-                }}
-              >
-                Watch video
+            <div style={styles.ctas}>
+              <a href="/builder" style={styles.btnPrimary}>
+                Start Building Now <span aria-hidden="true">→</span>
+              </a>
+              <a href="#preview" style={styles.btnGhost}>
+                Watch video <span aria-hidden="true">↘</span>
               </a>
             </div>
-          </div>
 
-          {/* Product preview */}
-          <div
-            id="preview"
-            style={{
-              marginTop: 34,
-              borderRadius: 28,
-              border: `1px solid ${c.border}`,
-              background: c.panel,
-              padding: 16,
-              boxShadow: "0 30px 90px rgba(0,0,0,0.55)",
-              backdropFilter: "blur(10px)",
-              WebkitBackdropFilter: "blur(10px)",
-            }}
-          >
-            <div
-              style={{
-                borderRadius: 18,
-                border: "1px solid rgba(255,255,255,0.10)",
-                background: c.panel2,
-                padding: 16,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.70)" }}>LIVE_OK</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.50)" }}>env: {meta.env}</div>
+            <div style={styles.bullets}>
+              <div style={styles.bullet}>
+                <div style={styles.bulletTitle}>FAST</div>
+                <div style={styles.bulletText}>From idea → publish in minutes.</div>
               </div>
-
-              <div
-                style={{
-                  marginTop: 12,
-                  display: "grid",
-                  gap: 12,
-                  gridTemplateColumns: "repeat(1, minmax(0, 1fr))",
-                }}
-              >
-                <div style={{ borderRadius: 14, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.05)", padding: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.60)" }}>Editor</div>
-                  <div style={{ marginTop: 8, fontSize: 14, fontWeight: 900 }}>Generate Website</div>
-                  <div style={{ marginTop: 4, fontSize: 12, color: "rgba(255,255,255,0.60)" }}>Pages • Sections • Styles</div>
-                  <div style={{ marginTop: 10, height: 8, borderRadius: 999, background: "rgba(255,255,255,0.10)" }}>
-                    <div style={{ height: 8, width: "66%", borderRadius: 999, background: "rgba(139,92,246,0.85)" }} />
-                  </div>
-                </div>
-
-                <div style={{ borderRadius: 14, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.05)", padding: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.60)" }}>Preview</div>
-                  <div style={{ marginTop: 8, borderRadius: 12, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(0,0,0,0.40)", padding: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.80)" }}>Maximizing the Potential</div>
-                    <div style={{ marginTop: 10, height: 84, borderRadius: 10, background: "rgba(255,255,255,0.10)" }} />
-                    <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                      <div style={{ height: 28, width: 78, borderRadius: 10, background: "rgba(139,92,246,0.75)" }} />
-                      <div style={{ height: 28, width: 96, borderRadius: 10, background: "rgba(255,255,255,0.10)" }} />
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ borderRadius: 14, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.05)", padding: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.60)" }}>Deploy Proof</div>
-                  <div style={{ marginTop: 10, fontSize: 11, color: "rgba(255,255,255,0.70)" }}>DEPLOY_ID</div>
-                  <div style={{ marginTop: 4, fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: 11, color: "rgba(255,255,255,0.85)", wordBreak: "break-all" }}>
-                    {meta.deployId}
-                  </div>
-                  <div style={{ marginTop: 10, fontSize: 11, color: "rgba(255,255,255,0.70)" }}>GIT_SHA</div>
-                  <div style={{ marginTop: 4, fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: 11, color: "rgba(255,255,255,0.85)", wordBreak: "break-all" }}>
-                    {meta.sha}
-                  </div>
-                </div>
+              <div style={styles.bullet}>
+                <div style={styles.bulletTitle}>POLISHED</div>
+                <div style={styles.bulletText}>Craft-grade spacing & glow.</div>
               </div>
-
-              {/* Make it “3 columns” on wider screens without Tailwind */}
-              <style>{`
-                @media (min-width: 900px) {
-                  #preview > div > div:nth-child(2) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-                }
-              `}</style>
+              <div style={styles.bullet}>
+                <div style={styles.bulletTitle}>LOCKED</div>
+                <div style={styles.bulletText}>Inline fallback styling.</div>
+              </div>
             </div>
-          </div>
 
-          {/* Minimal footer spacer (keeps hero dominant) */}
-          <div style={{ marginTop: 30, textAlign: "center", color: c.white55, fontSize: 12 }}>
-            © {new Date().getFullYear()} Dominat8. All rights reserved.
+            <div style={styles.section}>
+              <div style={styles.sectionTitle}>Why this patch exists</div>
+              <div style={styles.sectionText}>
+                If your homepage ever appears “unstyled” (black text, blue links), this hero still looks intentional
+                because it does not depend on Tailwind being applied. This is a visual safety net.
+              </div>
+            </div>
+          </section>
+
+          <aside style={styles.rightCard} id="preview" aria-label="Preview card">
+            <div style={styles.rightGlow} />
+
+            <div style={styles.badgeRow}>
+              <div style={{ ...styles.badge, ...styles.liveOk }}>LIVE_OK</div>
+              <div style={styles.badge}>BUILD PROOF</div>
+              <div style={styles.badge}>NO-TAILWIND SAFE</div>
+            </div>
+
+            <div style={styles.previewTitle}>Live Preview (Proof)</div>
+
+            <div style={styles.previewFrame}>
+              <div style={styles.previewHeader}>
+                <div style={styles.dots}>
+                  <span style={styles.dot("rgba(244,63,94,0.85)")} />
+                  <span style={styles.dot("rgba(250,204,21,0.85)")} />
+                  <span style={styles.dot("rgba(34,197,94,0.85)")} />
+                </div>
+                <div style={{ fontSize: 12, opacity: 0.82, fontWeight: 800 }}>
+                  dominat8.com
+                </div>
+              </div>
+
+              <div style={styles.previewBody}>
+                <div style={{ marginBottom: 10, fontWeight: 900, opacity: 0.95 }}>
+                  HOME_OK · Locked Hero Render
+                </div>
+
+                <div style={styles.keyRow}>
+                  <span style={styles.keyName}>VERCEL_ENV</span>
+                  <span style={styles.keyVal}>{build.env}</span>
+                </div>
+                <div style={styles.keyRow}>
+                  <span style={styles.keyName}>VERCEL_DEPLOYMENT_ID</span>
+                  <span style={styles.keyVal}>{build.deployId}</span>
+                </div>
+                <div style={{ ...styles.keyRow, borderBottom: "none" }}>
+                  <span style={styles.keyName}>VERCEL_GIT_COMMIT_SHA</span>
+                  <span style={styles.keyVal}>{build.sha}</span>
+                </div>
+
+                <div style={{ marginTop: 12, opacity: 0.70 }}>
+                  If you see this card styled, your homepage can’t “go plain” anymore.
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "rgba(237,234,247,0.72)", position: "relative", zIndex: 2 }}>
+              Tip: add <span style={{ fontWeight: 900, color: "rgba(237,234,247,0.90)" }}>?ts=</span> to bust cache.
+              This page is intentionally “locked” visually.
+            </div>
+          </aside>
+        </div>
+
+        <div style={styles.footerRow}>
+          <div>© {new Date().getFullYear()} Dominat8</div>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+            <a href="/privacy" style={styles.fineLink}>Privacy</a>
+            <a href="/terms" style={styles.fineLink}>Terms</a>
+            <a href="/contact" style={styles.fineLink}>Contact</a>
           </div>
         </div>
-      </section>
+      </div>
+
+      {/* Mobile fallback: if the grid is too tight, keep it readable */}
+      <style>{`
+        @media (max-width: 980px) {
+          main > div > div:nth-child(2) { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </main>
   );
 }
