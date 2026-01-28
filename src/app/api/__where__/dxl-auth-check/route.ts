@@ -6,7 +6,7 @@ export async function GET(req: Request) {
   return NextResponse.json(
     {
       ok: true,
-      stamp: "PROBE_SRCAPP_20260129_101902",
+      stamp: "PROBE_SRCAPP_20260129_102030",
       at: new Date().toISOString(),
       path: url.pathname,
       note: "ROUTE-PROBE: tells which file is being built (app vs src/app)."
