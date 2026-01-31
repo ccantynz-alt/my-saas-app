@@ -1,3 +1,4 @@
+﻿import "./globals.css";
 import "../io/styles/io.css";
 import D8TV from './_client/D8TV';
 
