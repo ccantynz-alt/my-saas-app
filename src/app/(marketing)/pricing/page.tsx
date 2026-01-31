@@ -30,16 +30,28 @@ export default function Page() {
           </div>
         </div>
 
-        <D8Section eyebrow="Premium SaaS" title="Pricing" lead="Choose a plan and ship a premium site quickly — with consistent section framing and depth." tone="glass">
+        <D8Section eyebrow="Premium SaaS" title="Pricing" lead="Choose a plan and ship a premium site quickly â€” with consistent section framing and depth." tone="glass">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
-            <D8Card title="Consistent sections" body="Premium framing and hierarchy across marketing pages." kicker="SYSTEM" />
-            <D8Card title="Inline-safe" body="Core content renders intentionally even if utility classes fail." kicker="LOCKED" />
-            <D8Card title="Conversion-first" body="Clear CTAs and predictable page rhythm." kicker="CONVERT" />
+            <D8Card>
+  <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: ".12em", opacity: 0.75, textTransform: "uppercase" }}>SYSTEM</div>
+  <div style={{ marginTop: 6, fontSize: 16, fontWeight: 950, letterSpacing: "-0.02em" }}>Consistent sections</div>
+  <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6, opacity: 0.78 }}>Premium framing and hierarchy across marketing pages.</div>
+</D8Card>
+            <D8Card>
+  <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: ".12em", opacity: 0.75, textTransform: "uppercase" }}>LOCKED</div>
+  <div style={{ marginTop: 6, fontSize: 16, fontWeight: 950, letterSpacing: "-0.02em" }}>Inline-safe</div>
+  <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6, opacity: 0.78 }}>Core content renders intentionally even if utility classes fail.</div>
+</D8Card>
+            <D8Card>
+  <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: ".12em", opacity: 0.75, textTransform: "uppercase" }}>CONVERT</div>
+  <div style={{ marginTop: 6, fontSize: 16, fontWeight: 950, letterSpacing: "-0.02em" }}>Conversion-first</div>
+  <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6, opacity: 0.78 }}>Clear CTAs and predictable page rhythm.</div>
+</D8Card>
           </div>
         </D8Section>
 
         <div style={{ marginTop: 34, opacity: 0.85, fontSize: 12, color: "rgba(237,234,247,0.65)", display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <div>© 2026 Dominat8</div>
+          <div>Â© 2026 Dominat8</div>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
             <Link href="/privacy" style={{ color: "rgba(237,234,247,0.70)", textDecoration: "none", borderBottom: "1px solid rgba(237,234,247,0.20)", paddingBottom: 2 }}>Privacy</Link>
             <Link href="/terms" style={{ color: "rgba(237,234,247,0.70)", textDecoration: "none", borderBottom: "1px solid rgba(237,234,247,0.20)", paddingBottom: 2 }}>Terms</Link>

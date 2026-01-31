@@ -1,17 +1,47 @@
 import React from "react";
 
-export function D8Card(props: { children?: React.ReactNode }) {
+export type D8CardProps = React.PropsWithChildren<{
+  kicker?: string;
+  title?: string;
+  body?: string;
+}>;
+
+export function D8Card({ kicker, title, body, children }: D8CardProps) {
+  const hasProps = Boolean(kicker || title || body);
+
   return (
     <div
       style={{
-        borderRadius: 18,
-        padding: 14,
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.10)",
-        boxShadow: "0 18px 55px rgba(0,0,0,0.35)",
+        padding: 18,
+        borderRadius: 20,
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.10)',
+        boxShadow: '0 14px 48px rgba(0,0,0,0.30)',
       }}
     >
-      {props.children}
+      {hasProps ? (
+        <>
+          {kicker ? (
+            <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: '.12em', opacity: 0.75, textTransform: 'uppercase' }}>
+              {kicker}
+            </div>
+          ) : null}
+
+          {title ? (
+            <div style={{ marginTop: kicker ? 6 : 0, fontSize: 16, fontWeight: 950, letterSpacing: '-0.02em' }}>
+              {title}
+            </div>
+          ) : null}
+
+          {body ? (
+            <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6, opacity: 0.78 }}>
+              {body}
+            </div>
+          ) : null}
+        </>
+      ) : (
+        children
+      )}
     </div>
   );
 }
