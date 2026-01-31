@@ -1,10 +1,13 @@
-# Normalize line endings
+# Normalize line endings for code to reduce accidental build breaks.
 * text=auto
 
-# Keep PowerShell scripts as CRLF on Windows
-*.ps1 text eol=crlf
-
-# YAML/MD are fine as LF
-*.yml text eol=lf
+*.ts   text eol=lf
+*.tsx  text eol=lf
+*.js   text eol=lf
+*.jsx  text eol=lf
+*.mjs  text eol=lf
+*.cjs  text eol=lf
+*.json text eol=lf
+*.yml  text eol=lf
 *.yaml text eol=lf
-*.md text eol=lf
+*.md   text eol=lf
